@@ -1,0 +1,68 @@
+import { MY_CHAT_ID, SHEET_ID } from './config';
+import { handleCommand } from './commands';
+import { sendText } from './services/telegram';
+
+interface TelegramUpdate {
+  message?: {
+    chat: {
+      id: number | string;
+    };
+    text?: string;
+  };
+}
+
+function logCommand(
+  spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  timestamp: Date,
+  text: string,
+): void {
+  const sheet = spreadsheet.getSheetByName('All_Logs');
+
+  if (!sheet) {
+    throw new Error('Sheet "All_Logs" not found.');
+  }
+
+  sheet.appendRow([timestamp, text, 'Command_Parsed', 'Success']);
+}
+
+function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
+  const contents = e.postData?.contents;
+
+  if (!contents) {
+    return null;
+  }
+
+  return JSON.parse(contents) as TelegramUpdate;
+}
+
+function doPost(e: GoogleAppsScript.Events.DoPost): void {
+  try {
+    const update = parseUpdate(e);
+
+    if (!update?.message) {
+      return;
+    }
+
+    const chatId = String(update.message.chat.id);
+    const text = update.message.text ?? '';
+    const timestamp = new Date();
+
+    if (chatId !== MY_CHAT_ID) {
+      sendText(chatId, '抱歉，由于职责所在，我目前只能专注管理某一位队员。');
+      return;
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const reply = handleCommand(spreadsheet, text, timestamp);
+
+    sendText(chatId, reply);
+    logCommand(spreadsheet, timestamp, text);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);
+  }
+}
+
+Object.assign(globalThis, { doPost });
+
+export { doPost };

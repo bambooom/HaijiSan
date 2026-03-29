@@ -1,0 +1,66 @@
+name: Deploy HaijiSan
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
+        run: pnpm build
+
+      - name: Create clasp credentials
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+
+      - name: Create clasp project config
+        run: GAS_SCRIPT_ID='${{ secrets.GAS_SCRIPT_ID }}' pnpm clasp:prepare
+
+      - name: Push to Apps Script
+        run: pnpm exec clasp push --force
+
+      - name: Create or update deployment
+        run: |
+          GAS_DEPLOYMENT_ID='${{ secrets.GAS_DEPLOYMENT_ID }}'
+
+          if [ -n "$GAS_DEPLOYMENT_ID" ]; then
+            pnpm exec clasp create-deployment \
+              --deploymentId "$GAS_DEPLOYMENT_ID" \
+              --description "GitHub Actions ${GITHUB_SHA}"
+          else
+            pnpm exec clasp create-deployment \
+              --description "GitHub Actions ${GITHUB_SHA}"
+          fi
