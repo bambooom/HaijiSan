@@ -1,7 +1,6 @@
 {
   "name": "haijisan",
   "private": true,
-  "packageManager": "pnpm@10.7.1",
   "scripts": {
     "clasp:prepare": "node ./scripts/write-clasp-config.mjs",
     "build": "node ./scripts/build.mjs",
