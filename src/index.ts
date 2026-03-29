@@ -1,5 +1,7 @@
-import { MY_CHAT_ID, SHEET_ID } from './config';
+import { MY_CHAT_ID, SHEET_LAYOUTS } from './config';
 import { handleCommand } from './commands';
+import { allLogsRepository } from './repositories';
+import { spreadsheetService } from './services/spreadsheet';
 import { sendText } from './services/telegram';
 
 interface TelegramUpdate {
@@ -11,20 +13,6 @@ interface TelegramUpdate {
   };
 }
 
-function logCommand(
-  spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
-  timestamp: Date,
-  text: string,
-): void {
-  const sheet = spreadsheet.getSheetByName('All_Logs');
-
-  if (!sheet) {
-    throw new Error('Sheet "All_Logs" not found.');
-  }
-
-  sheet.appendRow([timestamp, text, 'Command_Parsed', 'Success']);
-}
-
 function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   const contents = e.postData?.contents;
 
@@ -33,6 +21,43 @@ function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   }
 
   return JSON.parse(contents) as TelegramUpdate;
+}
+
+function validateSheetHeaders(): string {
+  const reports = Object.values(SHEET_LAYOUTS).map((layout) => {
+    try {
+      const actualHeaders = spreadsheetService.getHeaderRow(layout.name);
+      const expectedHeaders = [...layout.headers];
+      const isMatch =
+        actualHeaders.length === expectedHeaders.length &&
+        actualHeaders.every(
+          (header, index) => header === expectedHeaders[index],
+        );
+
+      if (isMatch) {
+        return `OK ${layout.name}`;
+      }
+
+      return [
+        `MISMATCH ${layout.name}`,
+        `Expected: ${expectedHeaders.join(' | ')}`,
+        `Actual: ${actualHeaders.join(' | ')}`,
+      ].join('\n');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `ERROR ${layout.name}: ${message}`;
+    }
+  });
+
+  const failures = reports.filter(
+    (report) => report.startsWith('MISMATCH') || report.startsWith('ERROR'),
+  );
+
+  if (failures.length > 0) {
+    throw new Error(failures.join('\n\n'));
+  }
+
+  return reports.join('\n');
 }
 
 function doPost(e: GoogleAppsScript.Events.DoPost): void {
@@ -52,17 +77,16 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
       return;
     }
 
-    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
-    const reply = handleCommand(spreadsheet, text, timestamp);
+    const reply = handleCommand(text, timestamp);
 
     sendText(chatId, reply);
-    logCommand(spreadsheet, timestamp, text);
+    allLogsRepository.appendMessageLog(timestamp, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);
   }
 }
 
-Object.assign(globalThis, { doPost });
+Object.assign(globalThis, { doPost, validateSheetHeaders });
 
-export { doPost };
+export { doPost, validateSheetHeaders };

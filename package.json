@@ -6,6 +6,7 @@
     "build": "node ./scripts/build.mjs",
     "clean": "node ./scripts/clean.mjs",
     "lint": "eslint . --max-warnings=0",
+    "sheet:validate-headers": "node ./scripts/validate-sheet-headers.mjs",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm build",
     "push": "pnpm clasp:prepare && pnpm build && pnpm exec clasp push --force",
