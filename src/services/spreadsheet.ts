@@ -2,6 +2,10 @@ import { SHEET_ID } from '../config';
 
 export type SheetCellValue = string | number | boolean | Date | null;
 export type SheetRow = SheetCellValue[];
+export type SheetDataRow = {
+  rowNumber: number;
+  values: SheetRow;
+};
 export type SheetRecord<TField extends string = string> = Partial<
   Record<TField, SheetCellValue | undefined>
 >;
@@ -50,6 +54,16 @@ export class SpreadsheetService {
   }
 
   /**
+   * Returns all data rows with the actual sheet row number.
+   */
+  getDataRows(sheetName: string): SheetDataRow[] {
+    return this.getRows(sheetName).map((values, index) => ({
+      rowNumber: index + 2,
+      values,
+    }));
+  }
+
+  /**
    * Appends a row to the target sheet.
    */
   appendRow(sheetName: string, rowData: SheetRow): void {
@@ -72,6 +86,57 @@ export class SpreadsheetService {
     });
 
     this.appendRow(sheetName, rowData);
+  }
+
+  /**
+   * Updates selected fields on an existing row.
+   */
+  updateRecordAtRow<TField extends string>(
+    sheetName: string,
+    fields: readonly TField[],
+    rowNumber: number,
+    updates: object,
+  ): void {
+    if (rowNumber <= 1) {
+      throw new Error(`Invalid row number ${rowNumber} for ${sheetName}`);
+    }
+
+    const sheet = this.getSheet(sheetName);
+    const typedUpdates = updates as SheetRecord<TField>;
+    const currentRow = sheet
+      .getRange(rowNumber, 1, 1, fields.length)
+      .getValues()[0] as SheetRow;
+    const nextRow = [...currentRow];
+
+    fields.forEach((field, index) => {
+      if (!Object.prototype.hasOwnProperty.call(typedUpdates, field)) {
+        return;
+      }
+
+      const value = typedUpdates[field];
+      nextRow[index] = value === undefined ? '' : value;
+    });
+
+    sheet.getRange(rowNumber, 1, 1, fields.length).setValues([nextRow]);
+  }
+
+  /**
+   * Deletes rows from bottom to top so row numbers stay stable.
+   */
+  deleteRows(sheetName: string, rowNumbers: number[]): void {
+    const uniqueRowNumbers = [...new Set(rowNumbers)].sort(
+      (left, right) => right - left,
+    );
+
+    if (uniqueRowNumbers.some((rowNumber) => rowNumber <= 1)) {
+      throw new Error(`Cannot delete header row from ${sheetName}`);
+    }
+
+    const sheet = this.getSheet(sheetName);
+
+    uniqueRowNumbers.forEach((rowNumber) => {
+      sheet.deleteRow(rowNumber);
+    });
   }
 
   /**
