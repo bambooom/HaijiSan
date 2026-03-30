@@ -11,18 +11,20 @@ export const BOT_TOKEN = __APP_CONFIG__.BOT_TOKEN;
 export const MY_CHAT_ID = __APP_CONFIG__.MY_CHAT_ID;
 
 export const SHEETS_NAMES = {
-  STATUS_BODY: 'Status_Body',
+  STATUS_LOG: 'Status_Log',
+  BODY_LOG: 'Body_Log',
+  SLEEP_LOG: 'Sleep_Log',
   WORKOUT_LOG: 'Workout_Log',
-  MASTER_STOCK: 'Master_Stock',
-  JOURNAL_FOOD: 'Journal_Food',
-  JOURNAL_FOOD_ITEMS: 'Journal_Food_Items',
-  ALL_LOGS: 'All_Logs',
+  FOOD_LOG: 'Food_Log',
+  FOOD_ITEMS: 'Food_Items',
+  STOCK: 'Stock',
   REF_CALORIES: 'Ref_Calories',
+  BOT_LOG: 'Bot_Log',
 } as const;
 
 export const SHEET_LAYOUTS = {
-  STATUS_BODY: {
-    name: SHEETS_NAMES.STATUS_BODY,
+  STATUS_LOG: {
+    name: SHEETS_NAMES.STATUS_LOG,
     fields: [
       'entry_id',
       'logged_at',
@@ -31,9 +33,6 @@ export const SHEET_LAYOUTS = {
       'unit',
       'note',
       'cycle_day',
-      'sleep_start_at',
-      'sleep_end_at',
-      'sleep_hours',
     ],
     headers: [
       '记录ID(entry_id)',
@@ -43,9 +42,52 @@ export const SHEET_LAYOUTS = {
       '单位(unit)',
       '备注(note)',
       '周期天数(cycle_day)',
+    ],
+  },
+  BODY_LOG: {
+    name: SHEETS_NAMES.BODY_LOG,
+    fields: [
+      'body_log_id',
+      'logged_at',
+      'weight_kg',
+      'bmi',
+      'body_fat_pct',
+      'lean_body_mass_kg',
+      'source',
+      'note',
+    ],
+    headers: [
+      '身体记录ID(body_log_id)',
+      '记录时间(logged_at)',
+      '体重公斤(weight_kg)',
+      'BMI(bmi)',
+      '体脂率(body_fat_pct)',
+      '瘦体重公斤(lean_body_mass_kg)',
+      '数据来源(source)',
+      '备注(note)',
+    ],
+  },
+  SLEEP_LOG: {
+    name: SHEETS_NAMES.SLEEP_LOG,
+    fields: [
+      'sleep_log_id',
+      'logged_at',
+      'sleep_start_at',
+      'sleep_end_at',
+      'sleep_hours',
+      'sleep_quality',
+      'source',
+      'note',
+    ],
+    headers: [
+      '睡眠记录ID(sleep_log_id)',
+      '记录时间(logged_at)',
       '睡眠开始时间(sleep_start_at)',
       '睡眠结束时间(sleep_end_at)',
       '睡眠时长小时(sleep_hours)',
+      '睡眠质量(sleep_quality)',
+      '数据来源(source)',
+      '备注(note)',
     ],
   },
   WORKOUT_LOG: {
@@ -77,8 +119,8 @@ export const SHEET_LAYOUTS = {
       '备注(note)',
     ],
   },
-  MASTER_STOCK: {
-    name: SHEETS_NAMES.MASTER_STOCK,
+  STOCK: {
+    name: SHEETS_NAMES.STOCK,
     fields: [
       'stock_item_id',
       'item_name',
@@ -102,10 +144,10 @@ export const SHEET_LAYOUTS = {
       '备注(note)',
     ],
   },
-  JOURNAL_FOOD: {
-    name: SHEETS_NAMES.JOURNAL_FOOD,
+  FOOD_LOG: {
+    name: SHEETS_NAMES.FOOD_LOG,
     fields: [
-      'journal_entry_id',
+      'food_log_id',
       'logged_at',
       'meal_type',
       'meal_text',
@@ -114,7 +156,7 @@ export const SHEET_LAYOUTS = {
       'note',
     ],
     headers: [
-      '饮食记录ID(journal_entry_id)',
+      '饮食记录ID(food_log_id)',
       '记录时间(logged_at)',
       '餐次类型(meal_type)',
       '饮食内容(meal_text)',
@@ -123,10 +165,10 @@ export const SHEET_LAYOUTS = {
       '备注(note)',
     ],
   },
-  JOURNAL_FOOD_ITEMS: {
-    name: SHEETS_NAMES.JOURNAL_FOOD_ITEMS,
+  FOOD_ITEMS: {
+    name: SHEETS_NAMES.FOOD_ITEMS,
     fields: [
-      'parent_journal_entry_id',
+      'parent_food_log_id',
       'item_name',
       'quantity',
       'unit',
@@ -137,7 +179,7 @@ export const SHEET_LAYOUTS = {
       'note',
     ],
     headers: [
-      '父饮食记录ID(parent_journal_entry_id)',
+      '父饮食记录ID(parent_food_log_id)',
       '项目名称(item_name)',
       '数量(quantity)',
       '单位(unit)',
@@ -148,8 +190,8 @@ export const SHEET_LAYOUTS = {
       '备注(note)',
     ],
   },
-  ALL_LOGS: {
-    name: SHEETS_NAMES.ALL_LOGS,
+  BOT_LOG: {
+    name: SHEETS_NAMES.BOT_LOG,
     fields: ['logged_at', 'raw_text', 'handling_mode', 'status', 'note'],
     headers: [
       '记录时间(logged_at)',

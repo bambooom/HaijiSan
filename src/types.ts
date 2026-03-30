@@ -1,6 +1,12 @@
-export type BodyEntryType = 'weight' | 'bowel' | 'menstruation' | 'sleep';
+export type StatusEntryType =
+  | 'bowel'
+  | 'menstruation'
+  | 'symptom'
+  | 'medication';
 
 export type WorkoutLevel = 'easy' | 'medium' | 'hard';
+
+export type SleepQuality = 'good' | 'normal' | 'poor';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -10,23 +16,44 @@ export type HandlingMode = 'command' | 'rule' | 'ai';
 
 export type HandlingStatus = 'success' | 'ignored' | 'failed';
 
+export type HealthDataSource = 'manual' | 'ios_health' | 'smart_scale';
+
 export type ReferenceSource =
   | 'nutrition_label'
   | 'manual_entry'
   | 'internet_reference'
   | 'ai_estimate';
 
-export interface StatusBodyEntry {
+export interface StatusLogEntry {
   entry_id: string;
   logged_at: string;
-  entry_type: BodyEntryType;
+  entry_type: StatusEntryType;
   value: string | number;
   unit: string;
   note: string;
   cycle_day: number | null;
+}
+
+export interface BodyLogEntry {
+  body_log_id: string;
+  logged_at: string;
+  weight_kg: number | null;
+  bmi: number | null;
+  body_fat_pct: number | null;
+  lean_body_mass_kg: number | null;
+  source: HealthDataSource;
+  note: string;
+}
+
+export interface SleepLogEntry {
+  sleep_log_id: string;
+  logged_at: string;
   sleep_start_at: string;
   sleep_end_at: string;
   sleep_hours: number | null;
+  sleep_quality: SleepQuality;
+  source: HealthDataSource;
+  note: string;
 }
 
 export interface WorkoutLogEntry {
@@ -43,7 +70,7 @@ export interface WorkoutLogEntry {
   note: string;
 }
 
-export interface MasterStockEntry {
+export interface StockEntry {
   stock_item_id: string;
   item_name: string;
   quantity: number | null;
@@ -55,8 +82,8 @@ export interface MasterStockEntry {
   note: string;
 }
 
-export interface JournalFoodEntry {
-  journal_entry_id: string;
+export interface FoodLogEntry {
+  food_log_id: string;
   logged_at: string;
   meal_type: MealType;
   meal_text: string;
@@ -65,8 +92,8 @@ export interface JournalFoodEntry {
   note: string;
 }
 
-export interface JournalFoodItemEntry {
-  parent_journal_entry_id: string;
+export interface FoodItemEntry {
+  parent_food_log_id: string;
   item_name: string;
   quantity: number | null;
   unit: string;
@@ -77,7 +104,7 @@ export interface JournalFoodItemEntry {
   note: string;
 }
 
-export interface AllLogEntry {
+export interface BotLogEntry {
   logged_at: string;
   raw_text: string;
   handling_mode: HandlingMode;

@@ -14,30 +14,63 @@ At the moment, the bot is intended to act as a lightweight personal logging assi
 
 - Telegram bot messages are sent to a Google Apps Script web app through a webhook.
 - Google Apps Script processes incoming messages and writes structured records into Google Sheets.
-- The target spreadsheet is `Project_HAIJI_BodyLog`.
+- The target spreadsheet is `Project_HAIJI`.
 - The sheet structure is already created and ready for use.
 
 ## Spreadsheet Design
 
-The spreadsheet should now be treated as a seven-tab structure. The goal is to keep the user-facing sheets readable while leaving enough structure for bot automation and future AI parsing.
+The spreadsheet should now be treated as a nine-tab structure. The goal is to keep the user-facing sheets readable while leaving enough structure for bot automation and future AI parsing.
 
 The canonical sheet names and column order are defined in `src/config.ts` under `SHEET_LAYOUTS`. This should remain the single source of truth for append order and header generation so repositories do not rely on hard-coded column positions.
 
-### `Status_Body`
+### `Status_Log`
 
-Used for simple body-state records.
+Used for simple manual status records.
 
 Typical entries:
 
-- Body weight
 - Bowel movement records
 - Menstrual status
-- Sleep records
+- Symptoms or medication notes
 
 Recommended headers:
 
 ```text
-记录ID(entry_id)	记录时间(logged_at)	记录类型(entry_type)	数值(value)	单位(unit)	备注(note)	周期天数(cycle_day)	睡眠开始时间(sleep_start_at)	睡眠结束时间(sleep_end_at)	睡眠时长小时(sleep_hours)
+记录ID(entry_id)	记录时间(logged_at)	记录类型(entry_type)	数值(value)	单位(unit)	备注(note)	周期天数(cycle_day)
+```
+
+### `Body_Log`
+
+Used for structured body-composition records, especially scale snapshots or future iOS Health imports.
+
+Typical entries:
+
+- Body weight
+- BMI
+- Body fat percentage
+- Lean body mass
+
+Recommended headers:
+
+```text
+身体记录ID(body_log_id)	记录时间(logged_at)	体重公斤(weight_kg)	BMI(bmi)	体脂率(body_fat_pct)	瘦体重公斤(lean_body_mass_kg)	数据来源(source)	备注(note)
+```
+
+### `Sleep_Log`
+
+Used for structured sleep records.
+
+Typical entries:
+
+- Sleep start time
+- Sleep end time
+- Sleep duration
+- Sleep quality
+
+Recommended headers:
+
+```text
+睡眠记录ID(sleep_log_id)	记录时间(logged_at)	睡眠开始时间(sleep_start_at)	睡眠结束时间(sleep_end_at)	睡眠时长小时(sleep_hours)	睡眠质量(sleep_quality)	数据来源(source)	备注(note)
 ```
 
 ### `Workout_Log`
@@ -59,7 +92,7 @@ Recommended headers:
 运动ID(workout_id)	记录时间(logged_at)	运动名称(workout_name)	运动视频链接(workout_video_url)	运动等级(workout_level)	运动时长分钟(duration_min)	平均心率(avg_hr)	最高心率(max_hr)	最低心率(min_hr)	消耗卡路里(calories_kcal)	备注(note)
 ```
 
-### `Master_Stock`
+### `Stock`
 
 Used for the current state of food inventory.
 
@@ -77,7 +110,7 @@ Recommended headers:
 库存ID(stock_item_id)	食材名称(item_name)	当前数量(quantity)	单位(unit)	购入日期(purchased_at)	更新时间(updated_at)	购买渠道(purchase_channel)	关联热量参考ID(linked_food_ref_id)	备注(note)
 ```
 
-### `Journal_Food`
+### `Food_Log`
 
 Used as the main food journal. This sheet should stay readable and diary-like: one row per meal event rather than one row per ingredient.
 
@@ -91,12 +124,12 @@ Typical entries:
 Recommended headers:
 
 ```text
-饮食记录ID(journal_entry_id)	记录时间(logged_at)	餐次类型(meal_type)	饮食内容(meal_text)	估算热量(estimated_calories)	AI拆解状态(parse_status)	备注(note)
+饮食记录ID(food_log_id)	记录时间(logged_at)	餐次类型(meal_type)	饮食内容(meal_text)	估算热量(estimated_calories)	AI拆解状态(parse_status)	备注(note)
 ```
 
-### `Journal_Food_Items`
+### `Food_Items`
 
-Used as the detail layer behind `Journal_Food`. This tab is intended for AI or structured parsing output rather than daily manual editing.
+Used as the detail layer behind `Food_Log`. This tab is intended for AI or structured parsing output rather than daily manual editing.
 
 Typical entries:
 
@@ -110,10 +143,10 @@ Typical entries:
 Recommended headers:
 
 ```text
-父饮食记录ID(parent_journal_entry_id)	项目名称(item_name)	数量(quantity)	单位(unit)	估算热量(estimated_calories)	关联热量参考ID(linked_food_ref_id)	关联库存ID(linked_stock_item_id)	AI置信度(ai_confidence)	备注(note)
+父饮食记录ID(parent_food_log_id)	项目名称(item_name)	数量(quantity)	单位(unit)	估算热量(estimated_calories)	关联热量参考ID(linked_food_ref_id)	关联库存ID(linked_stock_item_id)	AI置信度(ai_confidence)	备注(note)
 ```
 
-### `All_Logs`
+### `Bot_Log`
 
 Used as a minimal bot processing log rather than a full audit warehouse.
 
@@ -233,7 +266,7 @@ The following items are planned next, but are not yet implemented here.
 
 ### 4. Inventory-aware food logging
 
-- Connect `Journal_Food` entries with `Master_Stock` deductions.
+- Connect `Food_Log` entries with `Stock` deductions.
 - Add a stock consumption model for home-cooked meals.
 - Flag missing stock assumptions instead of silently deducting incorrect amounts.
 

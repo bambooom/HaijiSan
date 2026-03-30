@@ -1,6 +1,6 @@
 import { MY_CHAT_ID, SHEET_LAYOUTS } from './config';
 import { handleCommand } from './commands';
-import { allLogsRepository } from './repositories';
+import { botLogRepository } from './repositories';
 import { spreadsheetService } from './services/spreadsheet';
 import { sendText } from './services/telegram';
 
@@ -80,7 +80,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
     const reply = handleCommand(text, timestamp);
 
     sendText(chatId, reply);
-    allLogsRepository.appendMessageLog(timestamp, text);
+    botLogRepository.appendMessageLog(timestamp, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);

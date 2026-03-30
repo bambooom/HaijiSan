@@ -1,24 +1,21 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { AllLogEntry, HandlingMode, HandlingStatus } from '../types';
+import type { BotLogEntry, HandlingMode, HandlingStatus } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 
-export class AllLogsRepository {
+export class BotLogRepository {
   constructor(
     private readonly spreadsheet: SpreadsheetService = spreadsheetService,
   ) {}
 
-  private readonly layout = SHEET_LAYOUTS.ALL_LOGS;
+  private readonly layout = SHEET_LAYOUTS.BOT_LOG;
 
-  append(entry: AllLogEntry): void {
+  append(entry: BotLogEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
   }
 
-  /**
-   * Records a parsed inbound message in the shared log sheet.
-   */
   appendMessageLog(
     timestamp: Date,
     text: string,
@@ -36,4 +33,4 @@ export class AllLogsRepository {
   }
 }
 
-export const allLogsRepository = new AllLogsRepository();
+export const botLogRepository = new BotLogRepository();

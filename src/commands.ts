@@ -1,4 +1,9 @@
-import { masterStockRepository, statusBodyRepository } from './repositories';
+import {
+  bodyLogRepository,
+  stockRepository,
+  statusLogRepository,
+} from './repositories';
+import type { StockListItem } from './repositories';
 
 const HELP_MESSAGE =
   '你好，我是清濑灰二。很高兴能协助你管理状态。目前支持：\n\n' +
@@ -13,24 +18,24 @@ const HELP_MESSAGE =
   '你可以直接点击指令或输入对应文字。';
 
 function appendBodyStatus(timestamp: Date, weight: string): string {
-  statusBodyRepository.logWeight(timestamp, weight);
+  bodyLogRepository.logWeight(timestamp, weight);
   return `✅ 体重 ${weight}kg 已记录。稳住节奏，清晨的空气正适合奔跑。`;
 }
 
 function appendMetabolismStatus(timestamp: Date): string {
-  statusBodyRepository.logMetabolism(timestamp);
+  statusLogRepository.logBowel(timestamp);
   return '✅ 代谢记录完毕。身体越轻盈，心情也会越透彻。';
 }
 
 function appendStock(timestamp: Date, name: string, amount: string): string {
-  masterStockRepository.addStock(timestamp, name, amount);
+  stockRepository.addStock(timestamp, name, amount);
   return `✅ ${name} x${amount} 已入库。我会帮你守好后勤的。`;
 }
 
 function buildStockList(): string {
-  const entries = masterStockRepository
+  const entries = stockRepository
     .listStock()
-    .map((item) => `• ${item.name}: ${item.amount}`);
+    .map((item: StockListItem) => `• ${item.name}: ${item.amount}`);
 
   if (entries.length === 0) {
     return '仓库目前是空的，需要去超市采购吗？';

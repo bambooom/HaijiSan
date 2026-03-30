@@ -1,24 +1,24 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { JournalFoodItemEntry } from '../types';
+import type { FoodItemEntry } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 
-export class JournalFoodItemsRepository {
+export class FoodItemsRepository {
   constructor(
     private readonly spreadsheet: SpreadsheetService = spreadsheetService,
   ) {}
 
-  private readonly layout = SHEET_LAYOUTS.JOURNAL_FOOD_ITEMS;
+  private readonly layout = SHEET_LAYOUTS.FOOD_ITEMS;
 
-  append(entry: JournalFoodItemEntry): void {
+  append(entry: FoodItemEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
   }
 
-  appendMany(entries: JournalFoodItemEntry[]): void {
+  appendMany(entries: FoodItemEntry[]): void {
     entries.forEach((entry) => this.append(entry));
   }
 }
 
-export const journalFoodItemsRepository = new JournalFoodItemsRepository();
+export const foodItemsRepository = new FoodItemsRepository();

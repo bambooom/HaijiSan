@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { MasterStockEntry } from '../types';
+import type { StockEntry } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -10,18 +10,18 @@ export type StockListItem = {
   amount: string;
 };
 
-export class MasterStockRepository {
+export class StockRepository {
   constructor(
     private readonly spreadsheet: SpreadsheetService = spreadsheetService,
   ) {}
 
-  private readonly layout = SHEET_LAYOUTS.MASTER_STOCK;
+  private readonly layout = SHEET_LAYOUTS.STOCK;
 
   private createEntryId(timestamp: Date): string {
     return `stock_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
   }
 
-  append(entry: MasterStockEntry): void {
+  append(entry: StockEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
   }
 
@@ -58,4 +58,4 @@ export class MasterStockRepository {
   }
 }
 
-export const masterStockRepository = new MasterStockRepository();
+export const stockRepository = new StockRepository();
