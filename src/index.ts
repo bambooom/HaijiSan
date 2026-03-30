@@ -1,7 +1,6 @@
-import { MY_CHAT_ID, SHEET_LAYOUTS } from './config';
+import { MY_CHAT_ID } from './config';
 import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
-import { spreadsheetService } from './services/spreadsheet';
 import { sendText } from './services/telegram';
 
 interface TelegramUpdate {
@@ -21,43 +20,6 @@ function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   }
 
   return JSON.parse(contents) as TelegramUpdate;
-}
-
-function validateSheetHeaders(): string {
-  const reports = Object.values(SHEET_LAYOUTS).map((layout) => {
-    try {
-      const actualHeaders = spreadsheetService.getHeaderRow(layout.name);
-      const expectedHeaders = [...layout.headers];
-      const isMatch =
-        actualHeaders.length === expectedHeaders.length &&
-        actualHeaders.every(
-          (header, index) => header === expectedHeaders[index],
-        );
-
-      if (isMatch) {
-        return `OK ${layout.name}`;
-      }
-
-      return [
-        `MISMATCH ${layout.name}`,
-        `Expected: ${expectedHeaders.join(' | ')}`,
-        `Actual: ${actualHeaders.join(' | ')}`,
-      ].join('\n');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return `ERROR ${layout.name}: ${message}`;
-    }
-  });
-
-  const failures = reports.filter(
-    (report) => report.startsWith('MISMATCH') || report.startsWith('ERROR'),
-  );
-
-  if (failures.length > 0) {
-    throw new Error(failures.join('\n\n'));
-  }
-
-  return reports.join('\n');
 }
 
 function doPost(e: GoogleAppsScript.Events.DoPost): void {
@@ -87,6 +49,6 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
   }
 }
 
-Object.assign(globalThis, { doPost, validateSheetHeaders });
+Object.assign(globalThis, { doPost });
 
-export { doPost, validateSheetHeaders };
+export { doPost };

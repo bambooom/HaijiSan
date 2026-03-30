@@ -63,10 +63,11 @@ export class SpreadsheetService {
   appendRecord<TField extends string>(
     sheetName: string,
     fields: readonly TField[],
-    record: SheetRecord<TField>,
+    record: object,
   ): void {
+    const typedRecord = record as SheetRecord<TField>;
     const rowData = fields.map((field) => {
-      const value = record[field];
+      const value = typedRecord[field];
       return value === undefined ? '' : value;
     });
 

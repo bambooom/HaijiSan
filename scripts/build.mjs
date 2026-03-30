@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const distDir = path.join(projectRoot, 'dist');
+const sheetLayoutsPath = path.join(projectRoot, 'src', 'sheet-layouts.json');
 
 loadEnv({ path: path.join(projectRoot, '.env') });
 loadEnv({ path: path.join(projectRoot, '.env.local'), override: true });
@@ -27,6 +28,12 @@ const appConfig = {
   BOT_TOKEN: getRequiredEnv('BOT_TOKEN'),
   MY_CHAT_ID: getRequiredEnv('MY_CHAT_ID'),
 };
+
+const sheetLayouts = JSON.parse(readFileSync(sheetLayoutsPath, 'utf8'));
+const adminSheetLayouts = Object.values(sheetLayouts).map((layout) => ({
+  name: layout.name,
+  headers: layout.headers,
+}));
 
 async function buildGasEntry(
   entryFile,
@@ -58,6 +65,14 @@ await buildGasEntry(['index.ts'], 'Code.js', {
 await buildGasEntry(['tools', 'sheet-styler.ts'], 'Styler.js', {
   bundle: false,
   format: 'esm',
+});
+
+await buildGasEntry(['tools', 'sheet-admin.ts'], 'SheetAdmin.js', {
+  bundle: false,
+  format: 'esm',
+  define: {
+    __SHEET_LAYOUTS__: JSON.stringify(adminSheetLayouts),
+  },
 });
 
 copyFileSync(
