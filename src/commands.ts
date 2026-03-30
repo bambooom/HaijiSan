@@ -1,12 +1,22 @@
-import { bodyLogRepository, statusLogRepository } from './repositories';
 import { handleFoodCommand } from './handlers/food';
+import { handleSleepCommand } from './handlers/sleep';
+import { handleStatusCommand } from './handlers/status';
 import { handleStockCommand } from './handlers/stock';
+import { handleWorkoutCommand } from './handlers/workout';
 
 const HELP_MESSAGE =
   '你好，我是清濑灰二。很高兴能协助你管理状态。目前支持：\n\n' +
   '<b>🏃 身体记录</b>\n' +
   '/weight 55 - 记录体重\n' +
   '/poo - 记录代谢情况\n\n' +
+  '<b>😴 睡眠记录</b>\n' +
+  '/sleep 23:30 07:30 好 - 记录睡眠\n\n' +
+  '<b>💪 运动记录</b>\n' +
+  '/workout 跑步 35 中等 - 记录运动\n\n' +
+  '<b>🩺 状态记录</b>\n' +
+  '/period - 记录经期开始\n' +
+  '/period 2 - 记录经期第 2 天\n' +
+  '/symptom 头痛 - 记录症状\n\n' +
   '<b>📦 物资管理</b>\n' +
   '/stock 鸡蛋 +6个 盒马 - 增加库存\n' +
   '/stock 鸡蛋 -2个 - 扣减库存\n' +
@@ -20,16 +30,6 @@ const HELP_MESSAGE =
   '<b>📖 参考</b>\n' +
   '/ref - 查看热量参考表\n\n' +
   '你可以直接点击指令或输入对应斜杠命令。';
-
-function appendBodyStatus(timestamp: Date, weight: string): string {
-  bodyLogRepository.logWeight(timestamp, weight);
-  return `✅ 体重 ${weight}kg 已记录。稳住节奏，清晨的空气正适合奔跑。`;
-}
-
-function appendMetabolismStatus(timestamp: Date): string {
-  statusLogRepository.logBowel(timestamp);
-  return '✅ 代谢记录完毕。身体越轻盈，心情也会越透彻。';
-}
 
 export function handleCommand(text: string, timestamp: Date): string {
   const normalizedText = text.trimStart();
@@ -45,18 +45,33 @@ export function handleCommand(text: string, timestamp: Date): string {
     return HELP_MESSAGE;
   }
 
-  if (normalizedText.startsWith('/weight')) {
-    const weight = normalizedText.match(/\d+(\.\d+)?/);
+  if (
+    normalizedText.startsWith('/weight') ||
+    normalizedText.startsWith('/poo') ||
+    normalizedText.startsWith('/period') ||
+    normalizedText.startsWith('/symptom')
+  ) {
+    const statusResult = handleStatusCommand(normalizedText, timestamp);
 
-    if (!weight) {
-      return '请输入正确的体重数字，例如：/weight 55';
+    if (statusResult !== null) {
+      return statusResult;
     }
-
-    return appendBodyStatus(timestamp, weight[0]);
   }
 
-  if (normalizedText.startsWith('/poo')) {
-    return appendMetabolismStatus(timestamp);
+  if (normalizedText.startsWith('/sleep')) {
+    const sleepResult = handleSleepCommand(normalizedText, timestamp);
+
+    if (sleepResult !== null) {
+      return sleepResult;
+    }
+  }
+
+  if (normalizedText.startsWith('/workout')) {
+    const workoutResult = handleWorkoutCommand(normalizedText, timestamp);
+
+    if (workoutResult !== null) {
+      return workoutResult;
+    }
   }
 
   if (

@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { WorkoutLogEntry } from '../types';
+import type { WorkoutLevel, WorkoutLogEntry } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -18,6 +18,29 @@ export class WorkoutLogRepository {
 
   createEntryId(timestamp: Date): string {
     return `workout_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+  }
+
+  logWorkout(
+    timestamp: Date,
+    workoutName: string,
+    durationMin: number,
+    workoutLevel: WorkoutLevel,
+    note = '',
+    workoutVideoUrl = '',
+  ): void {
+    this.append({
+      workout_id: this.createEntryId(timestamp),
+      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      workout_name: workoutName,
+      workout_video_url: workoutVideoUrl,
+      workout_level: workoutLevel,
+      duration_min: durationMin,
+      avg_hr: null,
+      max_hr: null,
+      min_hr: null,
+      calories_kcal: null,
+      note,
+    });
   }
 }
 

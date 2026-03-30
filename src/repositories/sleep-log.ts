@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { SleepLogEntry } from '../types';
+import type { SleepLogEntry, SleepQuality } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -18,6 +18,26 @@ export class SleepLogRepository {
 
   append(entry: SleepLogEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  logSleep(
+    timestamp: Date,
+    sleepStartAt: Date,
+    sleepEndAt: Date,
+    sleepHours: number,
+    sleepQuality: SleepQuality,
+    note = '',
+  ): void {
+    this.append({
+      sleep_log_id: this.createEntryId(timestamp),
+      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      sleep_start_at: this.spreadsheet.getTimestamp(false, sleepStartAt),
+      sleep_end_at: this.spreadsheet.getTimestamp(false, sleepEndAt),
+      sleep_hours: sleepHours,
+      sleep_quality: sleepQuality,
+      source: 'manual',
+      note,
+    });
   }
 }
 
