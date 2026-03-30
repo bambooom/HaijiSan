@@ -1,35 +1,52 @@
 import { handleFoodCommand } from './handlers/food';
+import { handleReferenceCommand } from './handlers/reference';
 import { handleSleepCommand } from './handlers/sleep';
 import { handleStatusCommand } from './handlers/status';
 import { handleStockCommand } from './handlers/stock';
 import { handleWorkoutCommand } from './handlers/workout';
 
 const HELP_MESSAGE =
-  '你好，我是清濑灰二。很高兴能协助你管理状态。目前支持：\n\n' +
-  '<b>🏃 身体记录</b>\n' +
+  '你好，我是清濑灰二。下面这份可以直接当速查表使用。\n\n' +
+  '<b>📚 帮助</b>\n' +
+  '/start - 查看这份说明\n' +
+  '/help - 再看一遍所有指令\n\n' +
+  '<b>🏃 身体与状态</b>\n' +
   '/weight 55 - 记录体重\n' +
-  '/poo - 记录代谢情况\n\n' +
-  '<b>😴 睡眠记录</b>\n' +
-  '/sleep 23:30 07:30 好 - 记录睡眠\n\n' +
-  '<b>💪 运动记录</b>\n' +
-  '/workout 跑步 35 中等 - 记录运动\n\n' +
-  '<b>🩺 状态记录</b>\n' +
-  '/period - 记录经期开始\n' +
-  '/period 2 - 记录经期第 2 天\n' +
-  '/symptom 头痛 - 记录症状\n\n' +
-  '<b>📦 物资管理</b>\n' +
-  '/stock 鸡蛋 +6个 盒马 - 增加库存\n' +
-  '/stock 鸡蛋 -2个 - 扣减库存\n' +
-  '/setstock 鸡蛋 12个 盒马 - 手动校正库存\n' +
-  '/check - 查看当前冰箱库存\n\n' +
-  '<b>🍜 饮食记录</b>\n' +
-  '/food 早餐 280g西兰花+81g鸡小胸 - 记录居家饮食\n' +
-  '/food 中饭 一碗牛肉粉 - 记录外食描述\n' +
-  '/food 夜宵 一杯酸奶 - 记录加餐或宵夜\n' +
+  '例如：/weight 55.3\n\n' +
+  '/poo - 记录排便情况\n' +
+  '例如：/poo\n\n' +
+  '/period - 记录经期开始或当天状态\n' +
+  '例如：/period\n' +
+  '例如：/period 2 量少\n\n' +
+  '/symptom - 记录症状，可附周期天数\n' +
+  '例如：/symptom 头痛\n' +
+  '例如：/symptom 腹痛 day 2\n\n' +
+  '<b>😴 睡眠</b>\n' +
+  '/sleep - 记录入睡、醒来时间和睡眠质量\n' +
+  '例如：/sleep 23:30 07:30 好\n' +
+  '例如：/sleep 00:45 08:15 一般\n\n' +
+  '<b>💪 运动</b>\n' +
+  '/workout - 记录运动名称、时长和强度\n' +
+  '例如：/workout 跑步 35 中等\n' +
+  '例如：/workout 帕梅拉燃脂 20 高强度\n\n' +
+  '<b>📦 库存</b>\n' +
+  '/stock - 增加或扣减库存\n' +
+  '例如：/stock 鸡蛋 +6个 盒马\n' +
+  '例如：/stock 鸡蛋 -2个\n\n' +
+  '/setstock - 直接校正库存\n' +
+  '例如：/setstock 鸡蛋 12个 盒马\n\n' +
+  '/check - 查看当前库存\n' +
+  '例如：/check\n\n' +
+  '<b>🍜 饮食</b>\n' +
+  '/food - 记录一餐内容，支持居家称重或外食描述\n' +
+  '例如：/food 早餐 280g西兰花+81g鸡小胸\n' +
+  '例如：/food 中饭 一碗牛肉粉\n' +
   '餐次前缀可写：早餐/早饭/早，午餐/午饭/中饭/午/中，晚餐/晚饭/晚，加餐/夜宵/宵夜/零食\n\n' +
-  '<b>📖 参考</b>\n' +
-  '/ref - 查看热量参考表\n\n' +
-  '你可以直接点击指令或输入对应斜杠命令。';
+  '<b>📖 热量参考</b>\n' +
+  '/ref - 查看热量参考表\n' +
+  '例如：/ref\n' +
+  '/ref 关键词 - 按名称或品牌搜索\n' +
+  '例如：/ref 鸡蛋';
 
 export function handleCommand(text: string, timestamp: Date): string {
   const normalizedText = text.trimStart();
@@ -91,6 +108,14 @@ export function handleCommand(text: string, timestamp: Date): string {
 
     if (foodResult !== null) {
       return foodResult;
+    }
+  }
+
+  if (normalizedText.startsWith('/ref')) {
+    const referenceResult = handleReferenceCommand(normalizedText);
+
+    if (referenceResult !== null) {
+      return referenceResult;
     }
   }
 
