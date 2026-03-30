@@ -2,6 +2,7 @@ import { SHEET_LAYOUTS } from '../config';
 import type { FoodReferenceEntry } from '../types';
 import {
   spreadsheetService,
+  type SheetRow,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 
@@ -20,8 +21,34 @@ export class RefCaloriesRepository {
 
   private readonly layout = SHEET_LAYOUTS.REF_CALORIES;
 
+  private mapRow(row: SheetRow): FoodReference {
+    return {
+      id: String(row[0] ?? ''),
+      name: String(row[1] ?? ''),
+      brand: String(row[2] ?? ''),
+      unit: String(row[4] ?? ''),
+      calories: row[5] === '' ? 0 : Number(row[5]),
+    };
+  }
+
   append(entry: FoodReferenceEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  findById(foodRefId: string): FoodReference | null {
+    const normalizedFoodRefId = foodRefId.trim();
+
+    if (!normalizedFoodRefId) {
+      return null;
+    }
+
+    const result = this.spreadsheet
+      .getDataRows(this.layout.name)
+      .find(({ values }) => {
+        return String(values[0] ?? '').trim() === normalizedFoodRefId;
+      });
+
+    return result ? this.mapRow(result.values) : null;
   }
 
   /**
@@ -34,24 +61,20 @@ export class RefCaloriesRepository {
       return null;
     }
 
-    const result = this.spreadsheet.getRows(this.layout.name).find((row) => {
-      const name = String(row[1] ?? '')
-        .trim()
-        .toLowerCase();
-      return name.includes(normalizedKeyword);
-    });
+    const result = this.spreadsheet
+      .getDataRows(this.layout.name)
+      .find(({ values }) => {
+        const name = String(values[1] ?? '')
+          .trim()
+          .toLowerCase();
+        return name.includes(normalizedKeyword);
+      });
 
     if (!result) {
       return null;
     }
 
-    return {
-      id: String(result[0] ?? ''),
-      name: String(result[1] ?? ''),
-      brand: String(result[2] ?? ''),
-      unit: String(result[4] ?? ''),
-      calories: Number(result[5]),
-    };
+    return this.mapRow(result.values);
   }
 }
 

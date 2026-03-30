@@ -171,10 +171,9 @@ export function handleStockCommand(
   text: string,
   timestamp: Date,
 ): string | null {
-  if (text.startsWith('/stock') || text.startsWith('库存')) {
-    const normalizedText = text.startsWith('库存')
-      ? text.replace(/^库存\s*/, '/stock ')
-      : text;
+  const normalizedText = text.trimStart();
+
+  if (normalizedText.startsWith('/stock')) {
     const parsed = parseStockCommand(normalizedText, '/stock');
 
     if (!parsed) {
@@ -194,8 +193,8 @@ export function handleStockCommand(
     );
   }
 
-  if (text.startsWith('/setstock')) {
-    const parsed = parseStockCommand(text, '/setstock');
+  if (normalizedText.startsWith('/setstock')) {
+    const parsed = parseStockCommand(normalizedText, '/setstock');
 
     if (!parsed) {
       return '格式错误。请使用：/setstock 鸡蛋 12个 盒马';
@@ -214,7 +213,7 @@ export function handleStockCommand(
     );
   }
 
-  if (text.startsWith('/check')) {
+  if (normalizedText.startsWith('/check')) {
     return buildStockList();
   }
 

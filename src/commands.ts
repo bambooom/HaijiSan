@@ -1,4 +1,5 @@
 import { bodyLogRepository, statusLogRepository } from './repositories';
+import { handleFoodCommand } from './handlers/food';
 import { handleStockCommand } from './handlers/stock';
 
 const HELP_MESSAGE =
@@ -11,9 +12,14 @@ const HELP_MESSAGE =
   '/stock 鸡蛋 -2个 - 扣减库存\n' +
   '/setstock 鸡蛋 12个 盒马 - 手动校正库存\n' +
   '/check - 查看当前冰箱库存\n\n' +
+  '<b>🍜 饮食记录</b>\n' +
+  '/food 早餐 280g西兰花+81g鸡小胸 - 记录居家饮食\n' +
+  '/food 中饭 一碗牛肉粉 - 记录外食描述\n' +
+  '/food 夜宵 一杯酸奶 - 记录加餐或宵夜\n' +
+  '餐次前缀可写：早餐/早饭/早，午餐/午饭/中饭/午/中，晚餐/晚饭/晚，加餐/夜宵/宵夜/零食\n\n' +
   '<b>📖 参考</b>\n' +
   '/ref - 查看热量参考表\n\n' +
-  '你可以直接点击指令或输入对应文字。';
+  '你可以直接点击指令或输入对应斜杠命令。';
 
 function appendBodyStatus(timestamp: Date, weight: string): string {
   bodyLogRepository.logWeight(timestamp, weight);
@@ -26,12 +32,21 @@ function appendMetabolismStatus(timestamp: Date): string {
 }
 
 export function handleCommand(text: string, timestamp: Date): string {
-  if (text.startsWith('/start') || text.startsWith('/help')) {
+  const normalizedText = text.trimStart();
+
+  if (!normalizedText.startsWith('/')) {
+    return '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。';
+  }
+
+  if (
+    normalizedText.startsWith('/start') ||
+    normalizedText.startsWith('/help')
+  ) {
     return HELP_MESSAGE;
   }
 
-  if (text.startsWith('/weight') || text.includes('体重')) {
-    const weight = text.match(/\d+(\.\d+)?/);
+  if (normalizedText.startsWith('/weight')) {
+    const weight = normalizedText.match(/\d+(\.\d+)?/);
 
     if (!weight) {
       return '请输入正确的体重数字，例如：/weight 55';
@@ -40,14 +55,28 @@ export function handleCommand(text: string, timestamp: Date): string {
     return appendBodyStatus(timestamp, weight[0]);
   }
 
-  if (text.startsWith('/poo') || text.includes('拉屎')) {
+  if (normalizedText.startsWith('/poo')) {
     return appendMetabolismStatus(timestamp);
   }
 
-  const stockResult = handleStockCommand(text, timestamp);
+  if (
+    normalizedText.startsWith('/stock') ||
+    normalizedText.startsWith('/setstock') ||
+    normalizedText.startsWith('/check')
+  ) {
+    const stockResult = handleStockCommand(normalizedText, timestamp);
 
-  if (stockResult !== null) {
-    return stockResult;
+    if (stockResult !== null) {
+      return stockResult;
+    }
+  }
+
+  if (normalizedText.startsWith('/food')) {
+    const foodResult = handleFoodCommand(normalizedText, timestamp);
+
+    if (foodResult !== null) {
+      return foodResult;
+    }
   }
 
   return '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。';
