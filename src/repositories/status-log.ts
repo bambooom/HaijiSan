@@ -31,6 +31,39 @@ export class StatusLogRepository {
       cycle_day: null,
     });
   }
+
+  logMenstruation(
+    timestamp: Date,
+    cycleDay: number | null = null,
+    note = '',
+  ): void {
+    this.append({
+      entry_id: this.createEntryId(timestamp),
+      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      entry_type: 'menstruation',
+      value: 'start',
+      unit: '',
+      note,
+      cycle_day: cycleDay,
+    });
+  }
+
+  logSymptom(
+    timestamp: Date,
+    symptom: string,
+    note = '',
+    cycleDay: number | null = null,
+  ): void {
+    this.append({
+      entry_id: this.createEntryId(timestamp),
+      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      entry_type: 'symptom',
+      value: symptom,
+      unit: '',
+      note,
+      cycle_day: cycleDay,
+    });
+  }
 }
 
 export const statusLogRepository = new StatusLogRepository();
