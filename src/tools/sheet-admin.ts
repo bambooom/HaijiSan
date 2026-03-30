@@ -25,7 +25,7 @@ function getHeaderRow(sheetName: string): string[] {
     .map((cell) => String(cell ?? ''));
 }
 
-function validateSheetHeaders(): string {
+function validateSheetHeaders() {
   const reports = SHEET_LAYOUTS.map((layout) => {
     try {
       const actualHeaders = getHeaderRow(layout.name);
@@ -58,6 +58,5 @@ function validateSheetHeaders(): string {
   if (failures.length > 0) {
     throw new Error(failures.join('\n\n'));
   }
-
-  return reports.join('\n');
+  Logger.log(reports.join('\n'));
 }
