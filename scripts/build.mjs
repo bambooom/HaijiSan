@@ -28,21 +28,36 @@ const appConfig = {
   MY_CHAT_ID: getRequiredEnv('MY_CHAT_ID'),
 };
 
+async function buildGasEntry(
+  entryFile,
+  outputFile,
+  { bundle = true, format = 'iife', define = {} } = {},
+) {
+  await build({
+    entryPoints: [path.join(projectRoot, 'src', ...entryFile)],
+    bundle,
+    format,
+    platform: 'browser',
+    target: ['es2019'],
+    outfile: path.join(distDir, outputFile),
+    logLevel: 'info',
+    legalComments: 'none',
+    define,
+  });
+}
+
 rmSync(distDir, { recursive: true, force: true });
 mkdirSync(distDir, { recursive: true });
 
-await build({
-  entryPoints: [path.join(projectRoot, 'src', 'index.ts')],
-  bundle: true,
-  format: 'iife',
-  platform: 'browser',
-  target: ['es2019'],
-  outfile: path.join(distDir, 'Code.js'),
-  logLevel: 'info',
-  legalComments: 'none',
+await buildGasEntry(['index.ts'], 'Code.js', {
   define: {
     __APP_CONFIG__: JSON.stringify(appConfig),
   },
+});
+
+await buildGasEntry(['tools', 'sheet-styler.ts'], 'Styler.js', {
+  bundle: false,
+  format: 'esm',
 });
 
 copyFileSync(
