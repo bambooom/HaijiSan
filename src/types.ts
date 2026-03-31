@@ -18,6 +18,91 @@ export type HandlingStatus = 'success' | 'ignored' | 'failed';
 
 export type HealthDataSource = 'manual' | 'ios_health' | 'smart_scale';
 
+export type CommandHandlingResult = {
+  reply: string;
+  handlingMode: HandlingMode;
+  status: HandlingStatus;
+  note: string;
+};
+
+export type AiResponseMode = 'reply' | 'command' | 'clarify';
+
+export type AiIntent =
+  | 'chat'
+  | 'weight'
+  | 'poo'
+  | 'period'
+  | 'symptom'
+  | 'sleep'
+  | 'workout'
+  | 'food'
+  | 'food_estimate'
+  | 'stock_adjust'
+  | 'stock_set'
+  | 'stock_check';
+
+export interface AiPlan {
+  mode: AiResponseMode;
+  intent: AiIntent;
+  reply: string;
+  weightKg?: number | null;
+  cycleDay?: number | null;
+  symptom?: string;
+  periodNote?: string;
+  sleepStart?: string;
+  sleepEnd?: string;
+  sleepQuality?: SleepQuality;
+  workoutName?: string;
+  durationMin?: number | null;
+  workoutLevel?: WorkoutLevel;
+  mealType?: MealType;
+  mealText?: string;
+  stockItemName?: string;
+  stockQuantity?: number | null;
+  stockUnit?: string;
+  purchaseChannel?: string;
+  note?: string;
+}
+
+export type IngredientEstimateConfidence = 'low' | 'medium' | 'high';
+
+export interface IngredientEstimateInput {
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface IngredientEstimateResult extends IngredientEstimateInput {
+  estimatedCalories: number | null;
+  confidence: IngredientEstimateConfidence;
+  note: string;
+}
+
+export interface MealStructureResult {
+  mealType: MealType;
+  mealText: string;
+  shouldPersist: boolean;
+  items: IngredientEstimateInput[];
+  note: string;
+}
+
+export type MealResolvedItemSource = 'reference' | 'ai';
+
+export interface MealResolvedItem extends IngredientEstimateInput {
+  estimatedCalories: number | null;
+  source: MealResolvedItemSource;
+  note: string;
+}
+
+export interface MealResolutionResult {
+  mealType: MealType;
+  mealText: string;
+  shouldPersist: boolean;
+  estimatedCalories: number | null;
+  items: MealResolvedItem[];
+  note: string;
+}
+
 export type ReferenceSource =
   | 'nutrition_label'
   | 'manual_entry'
@@ -103,6 +188,38 @@ export interface FoodItemEntry {
   ai_confidence: number | null;
   note: string;
 }
+
+export interface PendingMealRecordInput {
+  createdAt: string;
+  mealType: MealType;
+  mealText: string;
+  estimatedCalories: number | null;
+  parseStatus: ParseStatus;
+  note: string;
+  items: FoodItemEntry[];
+}
+
+export interface PendingMappedCommandAction {
+  kind: 'mapped-command';
+  createdAt: string;
+  sourceText: string;
+  previewText: string;
+  commandText: string;
+  note: string;
+}
+
+export interface PendingMealRecordAction {
+  kind: 'meal-record';
+  createdAt: string;
+  sourceText: string;
+  previewText: string;
+  mealRecord: PendingMealRecordInput;
+  note: string;
+}
+
+export type PendingAiAction =
+  | PendingMappedCommandAction
+  | PendingMealRecordAction;
 
 export interface BotLogEntry {
   logged_at: string;

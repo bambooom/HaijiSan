@@ -1,15 +1,18 @@
+import { handleAiMessage, handleCancelPendingAction } from './handlers/ai';
 import { handleFoodCommand } from './handlers/food';
 import { handleReferenceCommand } from './handlers/reference';
 import { handleSleepCommand } from './handlers/sleep';
 import { handleStatusCommand } from './handlers/status';
 import { handleStockCommand } from './handlers/stock';
 import { handleWorkoutCommand } from './handlers/workout';
+import type { CommandHandlingResult, HandlingMode } from './types';
 
 const HELP_MESSAGE =
   '你好，我是清濑灰二。下面这份可以直接当速查表使用。\n\n' +
   '<b>📚 帮助</b>\n' +
   '/start - 查看这份说明\n' +
-  '/help - 再看一遍所有指令\n\n' +
+  '/help - 再看一遍所有指令\n' +
+  '/cancel - 取消当前待确认的 AI 写入\n\n' +
   '<b>🏃 身体与状态</b>\n' +
   '/weight 55 - 记录体重\n' +
   '例如：/weight 55.3\n\n' +
@@ -48,18 +51,65 @@ const HELP_MESSAGE =
   '/ref 关键词 - 按名称或品牌搜索\n' +
   '例如：/ref 鸡蛋';
 
-export function handleCommand(text: string, timestamp: Date): string {
+function buildResult(
+  reply: string,
+  handlingMode: HandlingMode,
+  note = '',
+  status: CommandHandlingResult['status'] = 'success',
+): CommandHandlingResult {
+  return {
+    reply,
+    handlingMode,
+    status,
+    note,
+  };
+}
+
+export function handleCommand(
+  text: string,
+  timestamp: Date,
+): CommandHandlingResult {
   const normalizedText = text.trimStart();
 
   if (!normalizedText.startsWith('/')) {
-    return '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。';
+    if (!normalizedText.trim()) {
+      return buildResult(
+        '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。',
+        'rule',
+        'empty-message',
+        'ignored',
+      );
+    }
+
+    try {
+      return handleAiMessage(normalizedText, timestamp);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      return buildResult(
+        '我刚才没能顺利处理这条消息。你也可以先继续使用 /help 里的命令。',
+        'ai',
+        `ai-error=${message}`.slice(0, 500),
+        'failed',
+      );
+    }
   }
 
   if (
     normalizedText.startsWith('/start') ||
     normalizedText.startsWith('/help')
   ) {
-    return HELP_MESSAGE;
+    return buildResult(HELP_MESSAGE, 'command', 'help');
+  }
+
+  if (normalizedText.startsWith('/cancel')) {
+    const cancelResult = handleCancelPendingAction(timestamp);
+
+    return {
+      ...cancelResult,
+      handlingMode: 'command',
+      note: `slash-cancel; ${cancelResult.note}`.slice(0, 500),
+    };
   }
 
   if (
@@ -71,7 +121,7 @@ export function handleCommand(text: string, timestamp: Date): string {
     const statusResult = handleStatusCommand(normalizedText, timestamp);
 
     if (statusResult !== null) {
-      return statusResult;
+      return buildResult(statusResult, 'command', 'status-command');
     }
   }
 
@@ -79,7 +129,7 @@ export function handleCommand(text: string, timestamp: Date): string {
     const sleepResult = handleSleepCommand(normalizedText, timestamp);
 
     if (sleepResult !== null) {
-      return sleepResult;
+      return buildResult(sleepResult, 'command', 'sleep-command');
     }
   }
 
@@ -87,7 +137,7 @@ export function handleCommand(text: string, timestamp: Date): string {
     const workoutResult = handleWorkoutCommand(normalizedText, timestamp);
 
     if (workoutResult !== null) {
-      return workoutResult;
+      return buildResult(workoutResult, 'command', 'workout-command');
     }
   }
 
@@ -99,7 +149,7 @@ export function handleCommand(text: string, timestamp: Date): string {
     const stockResult = handleStockCommand(normalizedText, timestamp);
 
     if (stockResult !== null) {
-      return stockResult;
+      return buildResult(stockResult, 'command', 'stock-command');
     }
   }
 
@@ -107,7 +157,7 @@ export function handleCommand(text: string, timestamp: Date): string {
     const foodResult = handleFoodCommand(normalizedText, timestamp);
 
     if (foodResult !== null) {
-      return foodResult;
+      return buildResult(foodResult, 'command', 'food-command');
     }
   }
 
@@ -115,9 +165,14 @@ export function handleCommand(text: string, timestamp: Date): string {
     const referenceResult = handleReferenceCommand(normalizedText);
 
     if (referenceResult !== null) {
-      return referenceResult;
+      return buildResult(referenceResult, 'command', 'reference-command');
     }
   }
 
-  return '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。';
+  return buildResult(
+    '嗯，我听到了。输入 /help 可以查看我可以为你做的事情。',
+    'rule',
+    'unknown-command',
+    'ignored',
+  );
 }

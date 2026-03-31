@@ -23,10 +23,16 @@ function getRequiredEnv(name) {
   return value;
 }
 
+function getOptionalEnv(name, fallbackValue) {
+  return process.env[name] || fallbackValue;
+}
+
 const appConfig = {
   SHEET_ID: getRequiredEnv('SHEET_ID'),
   BOT_TOKEN: getRequiredEnv('BOT_TOKEN'),
   MY_CHAT_ID: getRequiredEnv('MY_CHAT_ID'),
+  GEMINI_API_KEY: getRequiredEnv('GEMINI_API_KEY'),
+  GEMINI_MODEL: getOptionalEnv('GEMINI_MODEL', 'gemini-2.0-flash'),
 };
 
 const sheetLayouts = JSON.parse(readFileSync(sheetLayoutsPath, 'utf8'));

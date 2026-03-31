@@ -39,10 +39,16 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
       return;
     }
 
-    const reply = handleCommand(text, timestamp);
+    const result = handleCommand(text, timestamp);
 
-    sendText(chatId, reply);
-    botLogRepository.appendMessageLog(timestamp, text);
+    sendText(chatId, result.reply);
+    botLogRepository.appendMessageLog(
+      timestamp,
+      text,
+      result.handlingMode,
+      result.status,
+      result.note,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);

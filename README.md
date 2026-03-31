@@ -204,15 +204,18 @@ Create either `.env` or `.env.local` locally. Both files are ignored by [/.gitig
 SHEET_ID=your_google_sheet_id
 BOT_TOKEN=your_telegram_bot_token
 MY_CHAT_ID=your_chat_id
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=optional_default_is_gemini_2_0_flash
 GAS_SCRIPT_ID=your_google_apps_script_id
 GAS_DEPLOYMENT_ID=optional_existing_deployment_id
 ```
 
 Notes:
 
-- `SHEET_ID`, `BOT_TOKEN`, and `MY_CHAT_ID` are injected into the final GAS artifact during `pnpm build`.
+- `SHEET_ID`, `BOT_TOKEN`, `MY_CHAT_ID`, and `GEMINI_API_KEY` are injected into the final GAS artifact during `pnpm build`.
 - `GAS_SCRIPT_ID` is used to generate `.clasp.json` when running `pnpm push` or `pnpm deploy`, so `.clasp.json` does not need to be committed.
 - `GAS_DEPLOYMENT_ID` is only used by local `pnpm deploy`. If it is present, the existing deployment is updated; otherwise a new deployment is created.
+- `GEMINI_MODEL` is optional locally and defaults to `gemini-2.0-flash`.
 
 ## Current Bot Scope
 
@@ -233,6 +236,7 @@ Configure these GitHub repository secrets:
 - `SHEET_ID`: The production Google Sheet ID.
 - `BOT_TOKEN`: The production Telegram bot token.
 - `MY_CHAT_ID`: The allowed production chat ID.
+- `GEMINI_API_KEY`: The production Gemini API key.
 - `GAS_SCRIPT_ID`: The target Google Apps Script project ID used to generate `.clasp.json` in Actions.
 - `GAS_DEPLOYMENT_ID`: Optional. If provided, the same web app deployment is updated continuously; otherwise a new deployment is created each time.
 
@@ -257,6 +261,16 @@ The following items are planned next, but are not yet implemented here.
 - Integrate Gemini API for more natural bot replies.
 - Use AI to classify user intent and generate structured actions.
 - Introduce response safeguards so AI output cannot directly corrupt sheet data.
+
+## Current AI Routing
+
+- Slash commands still take priority and continue to use the existing deterministic handlers.
+- Any Telegram message that does not start with `/` now routes into Gemini.
+- Gemini is asked to return a constrained JSON plan instead of directly writing sheet fields.
+- The application then maps that plan back into the existing command handlers for weight, bowel, period, symptom, sleep, workout, food, and stock operations.
+- For AI-inferred write operations, the bot now pauses before writing and asks for `确认` or `取消`; you can also send `/cancel` to explicitly drop the pending write.
+- Read-only actions like inventory checks can still execute directly.
+- If Gemini cannot safely form a command, the bot falls back to a short clarification or a normal chat reply.
 
 ### 3. Calorie estimation workflow
 
