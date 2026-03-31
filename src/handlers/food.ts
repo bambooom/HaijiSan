@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import {
   persistMealRecord,
   buildFoodItemEntriesFromParsed,
@@ -21,11 +22,13 @@ export function handleFoodCommand(
   text: string,
   timestamp: Date,
 ): string | null {
-  if (!text.startsWith('/food')) {
+  if (!text.startsWith(SLASH_COMMANDS.FOOD)) {
     return null;
   }
 
-  const parsedFoodInput = parseFoodContent(text.slice('/food'.length).trim());
+  const parsedFoodInput = parseFoodContent(
+    text.slice(SLASH_COMMANDS.FOOD.length).trim(),
+  );
 
   if (!parsedFoodInput) {
     return '格式错误。请使用：/food 早餐 280g西兰花+81g鸡小胸、/food 早 280g西兰花+81g鸡小胸，或 /food 晚饭 一碗牛肉粉';

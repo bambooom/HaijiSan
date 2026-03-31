@@ -1,4 +1,4 @@
-import { SHEET_LAYOUTS } from '../config';
+import { SHEET_LAYOUTS } from '../constants/sheets';
 import type { BotLogEntry, HandlingMode, HandlingStatus } from '../types';
 import {
   spreadsheetService,

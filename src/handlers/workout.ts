@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { workoutLogRepository } from '../repositories';
 import type { ParsedWorkoutCommand, WorkoutLevel } from '../types';
 
@@ -28,7 +29,7 @@ export function handleWorkoutCommand(
   text: string,
   timestamp: Date,
 ): string | null {
-  if (!text.startsWith('/workout')) {
+  if (!text.startsWith(SLASH_COMMANDS.WORKOUT)) {
     return null;
   }
 
@@ -51,7 +52,7 @@ export function handleWorkoutCommand(
 }
 
 function parseWorkoutCommand(text: string): ParsedWorkoutCommand | null {
-  const rawContent = text.slice('/workout'.length).trim();
+  const rawContent = text.slice(SLASH_COMMANDS.WORKOUT.length).trim();
 
   if (!rawContent) {
     return null;

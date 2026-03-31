@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { stockRepository } from '../repositories';
 import {
   buildSetStockMessage,
@@ -12,8 +13,8 @@ export function handleStockCommand(
 ): string | null {
   const normalizedText = text.trimStart();
 
-  if (normalizedText.startsWith('/stock')) {
-    const parsed = parseStockCommand(normalizedText, '/stock');
+  if (normalizedText.startsWith(SLASH_COMMANDS.STOCK)) {
+    const parsed = parseStockCommand(normalizedText, SLASH_COMMANDS.STOCK);
 
     if (!parsed) {
       return '格式错误。请使用：/stock 鸡蛋 +6个 盒马 或 /stock 鸡蛋 -2个';
@@ -32,8 +33,8 @@ export function handleStockCommand(
     );
   }
 
-  if (normalizedText.startsWith('/setstock')) {
-    const parsed = parseStockCommand(normalizedText, '/setstock');
+  if (normalizedText.startsWith(SLASH_COMMANDS.SET_STOCK)) {
+    const parsed = parseStockCommand(normalizedText, SLASH_COMMANDS.SET_STOCK);
 
     if (!parsed) {
       return '格式错误。请使用：/setstock 鸡蛋 12个 盒马';
@@ -52,7 +53,7 @@ export function handleStockCommand(
     );
   }
 
-  if (normalizedText.startsWith('/check')) {
+  if (normalizedText.startsWith(SLASH_COMMANDS.CHECK)) {
     return buildStockListMessage();
   }
 

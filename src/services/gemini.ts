@@ -1,4 +1,4 @@
-import { GEMINI_API_KEY, GEMINI_MODEL } from '../config';
+import { GEMINI_API_KEY, GEMINI_MODEL } from '../app-config';
 import type {
   AiIntent,
   AiPlan,

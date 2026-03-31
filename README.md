@@ -21,7 +21,7 @@ At the moment, the bot is intended to act as a lightweight personal logging assi
 
 The spreadsheet should now be treated as a nine-tab structure. The goal is to keep the user-facing sheets readable while leaving enough structure for bot automation and future AI parsing.
 
-The canonical sheet names and column order are defined in `src/config.ts` under `SHEET_LAYOUTS`. This should remain the single source of truth for append order and header generation so repositories do not rely on hard-coded column positions.
+The canonical sheet names and column order are defined in `src/constants/sheets.ts` and `src/constants/sheet-layouts.json`. This should remain the single source of truth for append order and header generation so repositories do not rely on hard-coded column positions.
 
 ### `Status_Log`
 
@@ -183,10 +183,31 @@ Recommended headers:
 
 ## Project Structure
 
-- `src/`: TypeScript source code. You can continue to split modules and import additional libraries here.
-- `scripts/`: Local build and utility scripts.
-- `dist/`: Build output directory used by clasp push.
-- `appsscript.json`: GAS manifest copied into `dist/` during the build.
+```text
+.
+├── src/
+│   ├── index.ts                # Telegram webhook entrypoint for GAS runtime
+│   ├── commands.ts             # Main command and AI-routing entrypoint
+│   ├── app-config.ts           # Runtime config injected at build time
+│   ├── constants/              # Static constants such as slash commands and sheet metadata
+│   ├── handlers/               # Input-facing handlers for slash commands and AI-triggered actions
+│   ├── services/               # Business workflows and external integrations
+│   ├── repositories/           # Sheet-specific data access wrappers
+│   ├── types/                  # Shared cross-module types grouped by domain
+│   ├── utils/                  # Small stateless parsing and message helpers
+│   ├── shared/                 # Lightweight shared constants and low-level helpers
+│   └── gas/                    # Manual GAS editor helpers
+├── scripts/                    # Local build and utility scripts
+├── dist/                       # Build output used by clasp push
+└── appsscript.json             # GAS manifest copied into dist during build
+```
+
+Notes:
+
+- `handlers` should stay focused on input parsing, routing, and user-facing replies.
+- `services` should hold reusable workflows and integrations without becoming sheet-specific.
+- `repositories` should stay close to persistence and row mapping, not business rules.
+- `types` and `utils` exist to keep the main files shorter and easier to scan.
 
 ## Local Development
 

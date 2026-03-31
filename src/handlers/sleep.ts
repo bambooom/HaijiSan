@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { sleepLogRepository } from '../repositories';
 import type { ParsedSleepCommand, ParsedTime, SleepQuality } from '../types';
 
@@ -30,7 +31,7 @@ export function handleSleepCommand(
   text: string,
   timestamp: Date,
 ): string | null {
-  if (!text.startsWith('/sleep')) {
+  if (!text.startsWith(SLASH_COMMANDS.SLEEP)) {
     return null;
   }
 
@@ -56,7 +57,7 @@ function parseSleepCommand(
   text: string,
   timestamp: Date,
 ): ParsedSleepCommand | null {
-  const rawContent = text.slice('/sleep'.length).trim();
+  const rawContent = text.slice(SLASH_COMMANDS.SLEEP.length).trim();
 
   if (!rawContent) {
     return null;

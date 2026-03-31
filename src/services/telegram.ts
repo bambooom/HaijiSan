@@ -1,4 +1,4 @@
-import { BOT_TOKEN } from '../config';
+import { BOT_TOKEN } from '../app-config';
 
 export function sendText(chatId: string, text: string): void {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;

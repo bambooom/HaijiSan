@@ -1,4 +1,5 @@
 import { stockRepository } from '../repositories';
+import type { StockMutationCommand } from '../constants/commands';
 import type {
   ParsedStockCommand,
   StockAdjustResult,
@@ -7,7 +8,7 @@ import type {
 
 export function parseStockCommand(
   text: string,
-  command: '/stock' | '/setstock',
+  command: StockMutationCommand,
 ): ParsedStockCommand | null {
   const rawContent = text.slice(command.length).trim();
 

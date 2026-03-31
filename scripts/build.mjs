@@ -8,7 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const distDir = path.join(projectRoot, 'dist');
-const sheetLayoutsPath = path.join(projectRoot, 'src', 'sheet-layouts.json');
+const sheetLayoutsPath = path.join(
+  projectRoot,
+  'src',
+  'constants',
+  'sheet-layouts.json',
+);
 
 loadEnv({ path: path.join(projectRoot, '.env') });
 loadEnv({ path: path.join(projectRoot, '.env.local'), override: true });

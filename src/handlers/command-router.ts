@@ -1,3 +1,8 @@
+import {
+  SLASH_COMMANDS,
+  STATUS_COMMANDS,
+  STOCK_COMMANDS,
+} from '../constants/commands';
 import { handleFoodCommand } from './food';
 import { handleReferenceCommand } from './reference';
 import { handleSleepCommand } from './sleep';
@@ -24,34 +29,32 @@ const COMMAND_ROUTES: CommandRoute[] = [
   // Keep slash command dispatch in one place so direct and AI-triggered flows stay aligned.
   {
     note: 'status-command',
-    matches: (text) =>
-      matchesAnyPrefix(text, ['/weight', '/poo', '/period', '/symptom']),
+    matches: (text) => matchesAnyPrefix(text, [...STATUS_COMMANDS]),
     execute: handleStatusCommand,
   },
   {
     note: 'sleep-command',
-    matches: (text) => text.startsWith('/sleep'),
+    matches: (text) => text.startsWith(SLASH_COMMANDS.SLEEP),
     execute: handleSleepCommand,
   },
   {
     note: 'workout-command',
-    matches: (text) => text.startsWith('/workout'),
+    matches: (text) => text.startsWith(SLASH_COMMANDS.WORKOUT),
     execute: handleWorkoutCommand,
   },
   {
     note: 'stock-command',
-    matches: (text) =>
-      matchesAnyPrefix(text, ['/stock', '/setstock', '/check']),
+    matches: (text) => matchesAnyPrefix(text, [...STOCK_COMMANDS]),
     execute: handleStockCommand,
   },
   {
     note: 'food-command',
-    matches: (text) => text.startsWith('/food'),
+    matches: (text) => text.startsWith(SLASH_COMMANDS.FOOD),
     execute: handleFoodCommand,
   },
   {
     note: 'reference-command',
-    matches: (text) => text.startsWith('/ref'),
+    matches: (text) => text.startsWith(SLASH_COMMANDS.REFERENCE),
     execute: (text) => handleReferenceCommand(text),
   },
 ];

@@ -1,4 +1,4 @@
-import { SHEET_ID } from '../config';
+import { SHEET_ID } from '../app-config';
 import type { SheetDataRow, SheetRecord, SheetRow } from '../types';
 
 export class SpreadsheetService {

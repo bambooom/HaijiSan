@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { buildAiResult } from './ai-result';
 import { executeCommandRoute } from './command-router';
 import { handleFoodAiMessage } from './food-ai';
@@ -140,7 +141,7 @@ function handlePendingAiAction(
 }
 
 function buildPeriodCommand(plan: AiPlan): string | null {
-  const parts: string[] = ['/period'];
+  const parts: string[] = [SLASH_COMMANDS.PERIOD];
 
   if (typeof plan.cycleDay === 'number') {
     parts.push(String(plan.cycleDay));
@@ -157,10 +158,10 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
   switch (plan.intent) {
     case 'weight':
       return typeof plan.weightKg === 'number'
-        ? `/weight ${plan.weightKg}`
+        ? `${SLASH_COMMANDS.WEIGHT} ${plan.weightKg}`
         : null;
     case 'poo':
-      return '/poo';
+      return SLASH_COMMANDS.POO;
     case 'period':
       return buildPeriodCommand(plan);
     case 'symptom':
@@ -169,23 +170,23 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
       }
 
       return plan.cycleDay === null || typeof plan.cycleDay !== 'number'
-        ? `/symptom ${plan.symptom}`
-        : `/symptom ${plan.symptom} day ${plan.cycleDay}`;
+        ? `${SLASH_COMMANDS.SYMPTOM} ${plan.symptom}`
+        : `${SLASH_COMMANDS.SYMPTOM} ${plan.symptom} day ${plan.cycleDay}`;
     case 'sleep':
       if (!plan.sleepStart || !plan.sleepEnd) {
         return null;
       }
 
       return plan.sleepQuality
-        ? `/sleep ${plan.sleepStart} ${plan.sleepEnd} ${plan.sleepQuality}`
-        : `/sleep ${plan.sleepStart} ${plan.sleepEnd}`;
+        ? `${SLASH_COMMANDS.SLEEP} ${plan.sleepStart} ${plan.sleepEnd} ${plan.sleepQuality}`
+        : `${SLASH_COMMANDS.SLEEP} ${plan.sleepStart} ${plan.sleepEnd}`;
     case 'workout':
       if (!plan.workoutName || typeof plan.durationMin !== 'number') {
         return null;
       }
 
       return [
-        '/workout',
+        SLASH_COMMANDS.WORKOUT,
         plan.workoutName,
         String(plan.durationMin),
         plan.workoutLevel,
@@ -198,7 +199,7 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
         return null;
       }
 
-      return `/food ${MEAL_TYPE_LABELS[plan.mealType]} ${plan.mealText}`;
+      return `${SLASH_COMMANDS.FOOD} ${MEAL_TYPE_LABELS[plan.mealType]} ${plan.mealText}`;
     case 'food_estimate':
       return null;
     case 'stock_adjust':
@@ -207,7 +208,10 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
         return null;
       }
 
-      const command = plan.intent === 'stock_adjust' ? '/stock' : '/setstock';
+      const command =
+        plan.intent === 'stock_adjust'
+          ? SLASH_COMMANDS.STOCK
+          : SLASH_COMMANDS.SET_STOCK;
       const quantityToken =
         plan.intent === 'stock_adjust' && plan.stockQuantity > 0
           ? `+${plan.stockQuantity}`
@@ -223,7 +227,7 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
         .join(' ');
     }
     case 'stock_check':
-      return '/check';
+      return SLASH_COMMANDS.CHECK;
     case 'chat':
       return null;
   }

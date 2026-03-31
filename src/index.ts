@@ -1,4 +1,4 @@
-import { MY_CHAT_ID } from './config';
+import { MY_CHAT_ID } from './app-config';
 import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
 import { sendText } from './services/telegram';

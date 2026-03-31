@@ -1,50 +1,62 @@
 import { handleAiMessage, handleCancelPendingAction } from './handlers/ai';
+import { SLASH_COMMANDS, START_HELP_COMMANDS } from './constants/commands';
 import { executeCommandRoute } from './handlers/command-router';
 import type { CommandHandlingResult, HandlingMode } from './types';
 
-const HELP_MESSAGE =
-  '你好，我是清濑灰二。下面这份可以直接当速查表使用。\n\n' +
-  '<b>📚 帮助</b>\n' +
-  '/start - 查看这份说明\n' +
-  '/help - 再看一遍所有指令\n' +
-  '/cancel - 取消当前待确认的 AI 写入\n\n' +
-  '<b>🏃 身体与状态</b>\n' +
-  '/weight 55 - 记录体重\n' +
-  '例如：/weight 55.3\n\n' +
-  '/poo - 记录排便情况\n' +
-  '例如：/poo\n\n' +
-  '/period - 记录经期开始或当天状态\n' +
-  '例如：/period\n' +
-  '例如：/period 2 量少\n\n' +
-  '/symptom - 记录症状，可附周期天数\n' +
-  '例如：/symptom 头痛\n' +
-  '例如：/symptom 腹痛 day 2\n\n' +
-  '<b>😴 睡眠</b>\n' +
-  '/sleep - 记录入睡、醒来时间和睡眠质量\n' +
-  '例如：/sleep 23:30 07:30 好\n' +
-  '例如：/sleep 00:45 08:15 一般\n\n' +
-  '<b>💪 运动</b>\n' +
-  '/workout - 记录运动名称、时长和强度\n' +
-  '例如：/workout 跑步 35 中等\n' +
-  '例如：/workout 帕梅拉燃脂 20 高强度\n\n' +
-  '<b>📦 库存</b>\n' +
-  '/stock - 增加或扣减库存\n' +
-  '例如：/stock 鸡蛋 +6个 盒马\n' +
-  '例如：/stock 鸡蛋 -2个\n\n' +
-  '/setstock - 直接校正库存\n' +
-  '例如：/setstock 鸡蛋 12个 盒马\n\n' +
-  '/check - 查看当前库存\n' +
-  '例如：/check\n\n' +
-  '<b>🍜 饮食</b>\n' +
-  '/food - 记录一餐内容，支持居家称重或外食描述\n' +
-  '例如：/food 早餐 280g西兰花+81g鸡小胸\n' +
-  '例如：/food 中饭 一碗牛肉粉\n' +
-  '餐次前缀可写：早餐/早饭/早，午餐/午饭/中饭/午/中，晚餐/晚饭/晚，加餐/夜宵/宵夜/零食\n\n' +
-  '<b>📖 热量参考</b>\n' +
-  '/ref - 查看热量参考表\n' +
-  '例如：/ref\n' +
-  '/ref 关键词 - 按名称或品牌搜索\n' +
-  '例如：/ref 鸡蛋';
+const HELP_MESSAGE = `你好，我是清濑灰二。下面这份可以直接当速查表使用。
+
+<b>📚 帮助</b>
+${SLASH_COMMANDS.START} - 查看这份说明
+${SLASH_COMMANDS.HELP} - 再看一遍所有指令
+${SLASH_COMMANDS.CANCEL} - 取消当前待确认的 AI 写入
+
+<b>🏃 身体与状态</b>
+${SLASH_COMMANDS.WEIGHT} 55 - 记录体重
+例如：${SLASH_COMMANDS.WEIGHT} 55.3
+
+${SLASH_COMMANDS.POO} - 记录排便情况
+例如：${SLASH_COMMANDS.POO}
+
+${SLASH_COMMANDS.PERIOD} - 记录经期开始或当天状态
+例如：${SLASH_COMMANDS.PERIOD}
+例如：${SLASH_COMMANDS.PERIOD} 2 量少
+
+${SLASH_COMMANDS.SYMPTOM} - 记录症状，可附周期天数
+例如：${SLASH_COMMANDS.SYMPTOM} 头痛
+例如：${SLASH_COMMANDS.SYMPTOM} 腹痛 day 2
+
+<b>😴 睡眠</b>
+${SLASH_COMMANDS.SLEEP} - 记录入睡、醒来时间和睡眠质量
+例如：${SLASH_COMMANDS.SLEEP} 23:30 07:30 好
+例如：${SLASH_COMMANDS.SLEEP} 00:45 08:15 一般
+
+<b>💪 运动</b>
+${SLASH_COMMANDS.WORKOUT} - 记录运动名称、时长和强度
+例如：${SLASH_COMMANDS.WORKOUT} 跑步 35 中等
+例如：${SLASH_COMMANDS.WORKOUT} 帕梅拉燃脂 20 高强度
+
+<b>📦 库存</b>
+${SLASH_COMMANDS.STOCK} - 增加或扣减库存
+例如：${SLASH_COMMANDS.STOCK} 鸡蛋 +6个 盒马
+例如：${SLASH_COMMANDS.STOCK} 鸡蛋 -2个
+
+${SLASH_COMMANDS.SET_STOCK} - 直接校正库存
+例如：${SLASH_COMMANDS.SET_STOCK} 鸡蛋 12个 盒马
+
+${SLASH_COMMANDS.CHECK} - 查看当前库存
+例如：${SLASH_COMMANDS.CHECK}
+
+<b>🍜 饮食</b>
+${SLASH_COMMANDS.FOOD} - 记录一餐内容，支持居家称重或外食描述
+例如：${SLASH_COMMANDS.FOOD} 早餐 280g西兰花+81g鸡小胸
+例如：${SLASH_COMMANDS.FOOD} 中饭 一碗牛肉粉
+餐次前缀可写：早餐/早饭/早，午餐/午饭/中饭/午/中，晚餐/晚饭/晚，加餐/夜宵/宵夜/零食
+
+<b>📖 热量参考</b>
+${SLASH_COMMANDS.REFERENCE} - 查看热量参考表
+例如：${SLASH_COMMANDS.REFERENCE}
+${SLASH_COMMANDS.REFERENCE} 关键词 - 按名称或品牌搜索
+例如：${SLASH_COMMANDS.REFERENCE} 鸡蛋`;
 
 export function handleCommand(
   text: string,
@@ -77,13 +89,12 @@ export function handleCommand(
   }
 
   if (
-    normalizedText.startsWith('/start') ||
-    normalizedText.startsWith('/help')
+    START_HELP_COMMANDS.some((command) => normalizedText.startsWith(command))
   ) {
     return buildResult(HELP_MESSAGE, 'command', 'help');
   }
 
-  if (normalizedText.startsWith('/cancel')) {
+  if (normalizedText.startsWith(SLASH_COMMANDS.CANCEL)) {
     const cancelResult = handleCancelPendingAction(timestamp);
 
     return {

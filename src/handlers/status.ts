@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { bodyLogRepository, statusLogRepository } from '../repositories';
 
 function handleWeightCommand(text: string, timestamp: Date): string {
@@ -17,7 +18,7 @@ function handlePooCommand(timestamp: Date): string {
 }
 
 function handlePeriodCommand(text: string, timestamp: Date): string {
-  const rawContent = text.slice('/period'.length).trim();
+  const rawContent = text.slice(SLASH_COMMANDS.PERIOD.length).trim();
 
   if (!rawContent) {
     statusLogRepository.logMenstruation(timestamp);
@@ -38,7 +39,7 @@ function handlePeriodCommand(text: string, timestamp: Date): string {
 }
 
 function handleSymptomCommand(text: string, timestamp: Date): string {
-  const rawContent = text.slice('/symptom'.length).trim();
+  const rawContent = text.slice(SLASH_COMMANDS.SYMPTOM.length).trim();
 
   if (!rawContent) {
     return '请输入症状内容，例如：/symptom 头痛';
@@ -67,19 +68,19 @@ export function handleStatusCommand(
   text: string,
   timestamp: Date,
 ): string | null {
-  if (text.startsWith('/weight')) {
+  if (text.startsWith(SLASH_COMMANDS.WEIGHT)) {
     return handleWeightCommand(text, timestamp);
   }
 
-  if (text.startsWith('/poo')) {
+  if (text.startsWith(SLASH_COMMANDS.POO)) {
     return handlePooCommand(timestamp);
   }
 
-  if (text.startsWith('/period')) {
+  if (text.startsWith(SLASH_COMMANDS.PERIOD)) {
     return handlePeriodCommand(text, timestamp);
   }
 
-  if (text.startsWith('/symptom')) {
+  if (text.startsWith(SLASH_COMMANDS.SYMPTOM)) {
     return handleSymptomCommand(text, timestamp);
   }
 

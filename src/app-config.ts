@@ -1,5 +1,3 @@
-import sheetLayoutsJson from './sheet-layouts.json';
-
 type AppConfig = {
   SHEET_ID: string;
   BOT_TOKEN: string;
@@ -15,9 +13,3 @@ export const BOT_TOKEN = __APP_CONFIG__.BOT_TOKEN;
 export const MY_CHAT_ID = __APP_CONFIG__.MY_CHAT_ID;
 export const GEMINI_API_KEY = __APP_CONFIG__.GEMINI_API_KEY;
 export const GEMINI_MODEL = __APP_CONFIG__.GEMINI_MODEL;
-
-export const SHEET_LAYOUTS = sheetLayoutsJson;
-
-export const SHEETS_NAMES = Object.fromEntries(
-  Object.entries(SHEET_LAYOUTS).map(([key, layout]) => [key, layout.name]),
-) as Record<keyof typeof SHEET_LAYOUTS, string>;

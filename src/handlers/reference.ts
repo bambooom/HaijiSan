@@ -1,3 +1,4 @@
+import { SLASH_COMMANDS } from '../constants/commands';
 import { refCaloriesRepository } from '../repositories';
 import type { FoodReference } from '../types/repositories';
 
@@ -50,11 +51,11 @@ function buildReferenceSearchMessage(
 }
 
 export function handleReferenceCommand(text: string): string | null {
-  if (!text.startsWith('/ref')) {
+  if (!text.startsWith(SLASH_COMMANDS.REFERENCE)) {
     return null;
   }
 
-  const keyword = text.slice('/ref'.length).trim();
+  const keyword = text.slice(SLASH_COMMANDS.REFERENCE.length).trim();
 
   if (!keyword) {
     return buildReferenceListMessage(refCaloriesRepository.listAll());
