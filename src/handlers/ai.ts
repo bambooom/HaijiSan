@@ -1,41 +1,20 @@
-import { handleFoodCommand } from './food';
-import { executePendingMealRecordAction, handleFoodAiMessage } from './food-ai';
-import { handleSleepCommand } from './sleep';
-import { handleStatusCommand } from './status';
-import { handleStockCommand } from './stock';
-import { handleWorkoutCommand } from './workout';
+import { buildAiResult } from './ai-result';
+import { executeCommandRoute } from './command-router';
+import { handleFoodAiMessage } from './food-ai';
 import { geminiService } from '../services/gemini';
+import { confirmPendingMealRecordAction } from '../services/meal-action';
 import {
   clearPendingAiAction,
   getPendingAiAction,
   savePendingAiAction,
 } from '../services/pending-action';
+import { MEAL_TYPE_LABELS } from '../shared/meal';
 import type {
   AiPlan,
   CommandHandlingResult,
-  MealType,
   PendingMappedCommandAction,
+  PendingMealRecordAction,
 } from '../types';
-
-const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  breakfast: '早餐',
-  lunch: '午餐',
-  dinner: '晚餐',
-  snack: '加餐',
-};
-
-function buildAiResult(
-  reply: string,
-  status: CommandHandlingResult['status'] = 'success',
-  note = '',
-): CommandHandlingResult {
-  return {
-    reply,
-    handlingMode: 'ai',
-    status,
-    note,
-  };
-}
 
 function isConfirmationText(text: string): boolean {
   return /^(确认|确认一下|确认吧|好|好的|ok|okay|yes)$/i.test(text.trim());
@@ -79,7 +58,10 @@ function executePendingMappedCommandAction(
   const timestamp = Number.isNaN(createdAt.getTime())
     ? fallbackTimestamp
     : createdAt;
-  const commandReply = executeMappedCommand(action.commandText, timestamp);
+  const commandReply = executeCommandRoute(
+    action.commandText,
+    timestamp,
+  )?.reply;
 
   if (!commandReply) {
     return buildAiResult(
@@ -94,6 +76,36 @@ function executePendingMappedCommandAction(
     'success',
     `${action.note}; confirmed=true; execute=success`.slice(0, 500),
   );
+}
+
+function executePendingMealRecordAction(
+  action: PendingMealRecordAction,
+  fallbackTimestamp: Date,
+): CommandHandlingResult {
+  try {
+    const persisted = confirmPendingMealRecordAction(action, fallbackTimestamp);
+    const stockSuffix =
+      persisted.stockSync.updatedCount > 0
+        ? `库存同步 ${persisted.stockSync.updatedCount} 项。`
+        : '这次没有同步到库存项。';
+
+    return buildAiResult(
+      `已按刚才的预览写入。\n这餐已经记进 Food_Log 了，合计约 ${action.mealRecord.estimatedCalories ?? '未知'} kcal。${stockSuffix}`,
+      'success',
+      `${action.note}; confirmed=true; stock-updated=${persisted.stockSync.updatedCount}`.slice(
+        0,
+        500,
+      ),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return buildAiResult(
+      '我收到了确认，但这次实际写入没有成功。刚才那步已经停住了，你可以重新发一次。',
+      'failed',
+      `${action.note}; confirmed=true; persist-error=${message}`.slice(0, 500),
+    );
+  }
 }
 
 function handlePendingAiAction(
@@ -217,42 +229,6 @@ function buildCommandFromPlan(plan: AiPlan): string | null {
   }
 }
 
-function executeMappedCommand(
-  commandText: string,
-  timestamp: Date,
-): string | null {
-  if (
-    commandText.startsWith('/weight') ||
-    commandText.startsWith('/poo') ||
-    commandText.startsWith('/period') ||
-    commandText.startsWith('/symptom')
-  ) {
-    return handleStatusCommand(commandText, timestamp);
-  }
-
-  if (commandText.startsWith('/sleep')) {
-    return handleSleepCommand(commandText, timestamp);
-  }
-
-  if (commandText.startsWith('/workout')) {
-    return handleWorkoutCommand(commandText, timestamp);
-  }
-
-  if (
-    commandText.startsWith('/stock') ||
-    commandText.startsWith('/setstock') ||
-    commandText.startsWith('/check')
-  ) {
-    return handleStockCommand(commandText, timestamp);
-  }
-
-  if (commandText.startsWith('/food')) {
-    return handleFoodCommand(commandText, timestamp);
-  }
-
-  return null;
-}
-
 function summarizePlan(plan: AiPlan, commandText?: string): string {
   const parts = [`mode=${plan.mode}`, `intent=${plan.intent}`];
 
@@ -320,7 +296,7 @@ export function handleAiMessage(
     );
   }
 
-  const commandReply = executeMappedCommand(commandText, timestamp);
+  const commandReply = executeCommandRoute(commandText, timestamp)?.reply;
 
   if (!commandReply) {
     return buildAiResult(

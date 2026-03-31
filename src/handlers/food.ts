@@ -3,10 +3,8 @@ import {
   buildFoodItemEntriesFromParsed,
 } from '../services/meal-recording';
 import type { ParseStatus } from '../types';
-import {
-  parseFoodContent,
-  type ParsedFoodInput,
-} from '../services/food-analysis';
+import { parseFoodContent } from '../services/food-analysis';
+import type { ParsedFoodInput } from '../types/food-analysis';
 
 function buildFoodSuccessMessage(
   parsedFoodInput: ParsedFoodInput,

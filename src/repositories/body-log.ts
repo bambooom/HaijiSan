@@ -4,6 +4,7 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 export class BodyLogRepository {
   constructor(
@@ -13,7 +14,7 @@ export class BodyLogRepository {
   private readonly layout = SHEET_LAYOUTS.BODY_LOG;
 
   createEntryId(timestamp: Date): string {
-    return `body_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+    return createTimestampedEntryId(this.spreadsheet, 'body', timestamp);
   }
 
   append(entry: BodyLogEntry): void {
@@ -23,7 +24,7 @@ export class BodyLogRepository {
   logWeight(timestamp: Date, weight: string): void {
     this.append({
       body_log_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       weight_kg: Number(weight),
       bmi: null,
       body_fat_pct: null,

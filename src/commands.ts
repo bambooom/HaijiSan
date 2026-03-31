@@ -1,10 +1,5 @@
 import { handleAiMessage, handleCancelPendingAction } from './handlers/ai';
-import { handleFoodCommand } from './handlers/food';
-import { handleReferenceCommand } from './handlers/reference';
-import { handleSleepCommand } from './handlers/sleep';
-import { handleStatusCommand } from './handlers/status';
-import { handleStockCommand } from './handlers/stock';
-import { handleWorkoutCommand } from './handlers/workout';
+import { executeCommandRoute } from './handlers/command-router';
 import type { CommandHandlingResult, HandlingMode } from './types';
 
 const HELP_MESSAGE =
@@ -50,20 +45,6 @@ const HELP_MESSAGE =
   '例如：/ref\n' +
   '/ref 关键词 - 按名称或品牌搜索\n' +
   '例如：/ref 鸡蛋';
-
-function buildResult(
-  reply: string,
-  handlingMode: HandlingMode,
-  note = '',
-  status: CommandHandlingResult['status'] = 'success',
-): CommandHandlingResult {
-  return {
-    reply,
-    handlingMode,
-    status,
-    note,
-  };
-}
 
 export function handleCommand(
   text: string,
@@ -112,61 +93,10 @@ export function handleCommand(
     };
   }
 
-  if (
-    normalizedText.startsWith('/weight') ||
-    normalizedText.startsWith('/poo') ||
-    normalizedText.startsWith('/period') ||
-    normalizedText.startsWith('/symptom')
-  ) {
-    const statusResult = handleStatusCommand(normalizedText, timestamp);
+  const routedCommand = executeCommandRoute(normalizedText, timestamp);
 
-    if (statusResult !== null) {
-      return buildResult(statusResult, 'command', 'status-command');
-    }
-  }
-
-  if (normalizedText.startsWith('/sleep')) {
-    const sleepResult = handleSleepCommand(normalizedText, timestamp);
-
-    if (sleepResult !== null) {
-      return buildResult(sleepResult, 'command', 'sleep-command');
-    }
-  }
-
-  if (normalizedText.startsWith('/workout')) {
-    const workoutResult = handleWorkoutCommand(normalizedText, timestamp);
-
-    if (workoutResult !== null) {
-      return buildResult(workoutResult, 'command', 'workout-command');
-    }
-  }
-
-  if (
-    normalizedText.startsWith('/stock') ||
-    normalizedText.startsWith('/setstock') ||
-    normalizedText.startsWith('/check')
-  ) {
-    const stockResult = handleStockCommand(normalizedText, timestamp);
-
-    if (stockResult !== null) {
-      return buildResult(stockResult, 'command', 'stock-command');
-    }
-  }
-
-  if (normalizedText.startsWith('/food')) {
-    const foodResult = handleFoodCommand(normalizedText, timestamp);
-
-    if (foodResult !== null) {
-      return buildResult(foodResult, 'command', 'food-command');
-    }
-  }
-
-  if (normalizedText.startsWith('/ref')) {
-    const referenceResult = handleReferenceCommand(normalizedText);
-
-    if (referenceResult !== null) {
-      return buildResult(referenceResult, 'command', 'reference-command');
-    }
+  if (routedCommand) {
+    return buildResult(routedCommand.reply, 'command', routedCommand.note);
   }
 
   return buildResult(
@@ -175,4 +105,18 @@ export function handleCommand(
     'unknown-command',
     'ignored',
   );
+}
+
+function buildResult(
+  reply: string,
+  handlingMode: HandlingMode,
+  note = '',
+  status: CommandHandlingResult['status'] = 'success',
+): CommandHandlingResult {
+  return {
+    reply,
+    handlingMode,
+    status,
+    note,
+  };
 }

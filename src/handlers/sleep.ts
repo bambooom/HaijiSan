@@ -1,21 +1,5 @@
 import { sleepLogRepository } from '../repositories';
-import type { SleepQuality } from '../types';
-
-type ParsedTime = {
-  hour: number;
-  minute: number;
-  raw: string;
-};
-
-type ParsedSleepCommand = {
-  sleepStartAt: Date;
-  sleepEndAt: Date;
-  sleepHours: number;
-  sleepQuality: SleepQuality;
-  note: string;
-  startLabel: string;
-  endLabel: string;
-};
+import type { ParsedSleepCommand, ParsedTime, SleepQuality } from '../types';
 
 const SLEEP_QUALITY_ALIASES: Record<string, SleepQuality> = {
   good: 'good',
@@ -42,39 +26,30 @@ const SLEEP_QUALITY_LABELS: Record<SleepQuality, string> = {
   poor: '差',
 };
 
-function parseTimeToken(token: string): ParsedTime | null {
-  const match = token.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
-
-  if (!match) {
+export function handleSleepCommand(
+  text: string,
+  timestamp: Date,
+): string | null {
+  if (!text.startsWith('/sleep')) {
     return null;
   }
 
-  return {
-    hour: Number(match[1]),
-    minute: Number(match[2]),
-    raw: `${match[1].padStart(2, '0')}:${match[2]}`,
-  };
-}
+  const parsed = parseSleepCommand(text, timestamp);
 
-function buildDate(
-  baseDate: Date,
-  hour: number,
-  minute: number,
-  dayOffset = 0,
-): Date {
-  return new Date(
-    baseDate.getFullYear(),
-    baseDate.getMonth(),
-    baseDate.getDate() + dayOffset,
-    hour,
-    minute,
-    0,
-    0,
+  if (!parsed) {
+    return '格式错误。请使用：/sleep 23:30 07:30 好 或 /sleep 00:45 08:15';
+  }
+
+  sleepLogRepository.logSleep(
+    timestamp,
+    parsed.sleepStartAt,
+    parsed.sleepEndAt,
+    parsed.sleepHours,
+    parsed.sleepQuality,
+    parsed.note,
   );
-}
 
-function formatHours(hours: number): string {
-  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+  return `✅ 睡眠已记录，${parsed.startLabel} - ${parsed.endLabel}，共 ${formatHours(parsed.sleepHours)} 小时，质量${SLEEP_QUALITY_LABELS[parsed.sleepQuality]}。`;
 }
 
 function parseSleepCommand(
@@ -146,28 +121,37 @@ function parseSleepCommand(
   };
 }
 
-export function handleSleepCommand(
-  text: string,
-  timestamp: Date,
-): string | null {
-  if (!text.startsWith('/sleep')) {
+function parseTimeToken(token: string): ParsedTime | null {
+  const match = token.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+
+  if (!match) {
     return null;
   }
 
-  const parsed = parseSleepCommand(text, timestamp);
+  return {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+    raw: `${match[1].padStart(2, '0')}:${match[2]}`,
+  };
+}
 
-  if (!parsed) {
-    return '格式错误。请使用：/sleep 23:30 07:30 好 或 /sleep 00:45 08:15';
-  }
-
-  sleepLogRepository.logSleep(
-    timestamp,
-    parsed.sleepStartAt,
-    parsed.sleepEndAt,
-    parsed.sleepHours,
-    parsed.sleepQuality,
-    parsed.note,
+function buildDate(
+  baseDate: Date,
+  hour: number,
+  minute: number,
+  dayOffset = 0,
+): Date {
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate() + dayOffset,
+    hour,
+    minute,
+    0,
+    0,
   );
+}
 
-  return `✅ 睡眠已记录，${parsed.startLabel} - ${parsed.endLabel}，共 ${formatHours(parsed.sleepHours)} 小时，质量${SLEEP_QUALITY_LABELS[parsed.sleepQuality]}。`;
+function formatHours(hours: number): string {
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }

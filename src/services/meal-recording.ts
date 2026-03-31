@@ -3,17 +3,17 @@ import {
   foodLogRepository,
   stockRepository,
 } from '../repositories';
-import {
-  convertQuantity,
-  normalizeUnit,
-  type ParsedIngredient,
-} from './food-analysis';
+import { convertQuantity, normalizeUnit } from './food-analysis';
 import type {
   FoodItemEntry,
   IngredientEstimateResult,
   MealResolutionResult,
   ParseStatus,
 } from '../types';
+import type {
+  MealPersistResult,
+  ParsedIngredient,
+} from '../types/food-analysis';
 
 type PersistMealInput = {
   timestamp: Date;
@@ -29,11 +29,6 @@ type StockSyncResult = {
   matchedCount: number;
   updatedCount: number;
   skippedCount: number;
-};
-
-export type MealPersistResult = {
-  foodLogId: string;
-  stockSync: StockSyncResult;
 };
 
 function buildAiConfidence(

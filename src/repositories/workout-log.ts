@@ -4,6 +4,7 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 export class WorkoutLogRepository {
   constructor(
@@ -17,7 +18,7 @@ export class WorkoutLogRepository {
   }
 
   createEntryId(timestamp: Date): string {
-    return `workout_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+    return createTimestampedEntryId(this.spreadsheet, 'workout', timestamp);
   }
 
   logWorkout(
@@ -30,7 +31,7 @@ export class WorkoutLogRepository {
   ): void {
     this.append({
       workout_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       workout_name: workoutName,
       workout_video_url: workoutVideoUrl,
       workout_level: workoutLevel,

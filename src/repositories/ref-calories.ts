@@ -1,19 +1,9 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { FoodReferenceEntry } from '../types';
+import type { FoodReference, FoodReferenceEntry, SheetRow } from '../types';
 import {
   spreadsheetService,
-  type SheetRow,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-
-export type FoodReference = {
-  id: string;
-  name: string;
-  brand: string;
-  servingSize: number | null;
-  unit: string;
-  calories: number;
-};
 
 export class RefCaloriesRepository {
   constructor(
@@ -42,48 +32,6 @@ export class RefCaloriesRepository {
       .getDataRows(this.layout.name)
       .map(({ values }) => this.mapRow(values))
       .filter((item) => item.id.trim() !== '' && item.name.trim() !== '');
-  }
-
-  findById(foodRefId: string): FoodReference | null {
-    const normalizedFoodRefId = foodRefId.trim();
-
-    if (!normalizedFoodRefId) {
-      return null;
-    }
-
-    const result = this.spreadsheet
-      .getDataRows(this.layout.name)
-      .find(({ values }) => {
-        return String(values[0] ?? '').trim() === normalizedFoodRefId;
-      });
-
-    return result ? this.mapRow(result.values) : null;
-  }
-
-  /**
-   * Finds a food reference by fuzzy name match.
-   */
-  findByKeyword(keyword: string): FoodReference | null {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-
-    if (!normalizedKeyword) {
-      return null;
-    }
-
-    const result = this.spreadsheet
-      .getDataRows(this.layout.name)
-      .find(({ values }) => {
-        const name = String(values[1] ?? '')
-          .trim()
-          .toLowerCase();
-        return name.includes(normalizedKeyword);
-      });
-
-    if (!result) {
-      return null;
-    }
-
-    return this.mapRow(result.values);
   }
 
   searchByKeyword(keyword: string): FoodReference[] {

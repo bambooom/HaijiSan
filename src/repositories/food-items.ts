@@ -1,8 +1,7 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { FoodItemEntry } from '../types';
+import type { FoodItemEntry, SheetRow } from '../types';
 import {
   spreadsheetService,
-  type SheetRow,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 
@@ -48,36 +47,6 @@ export class FoodItemsRepository {
         ({ values }) => String(values[0] ?? '').trim() === normalizedFoodLogId,
       )
       .map(({ values }) => this.mapRow(values));
-  }
-
-  replaceByFoodLogId(foodLogId: string, entries: FoodItemEntry[]): void {
-    const normalizedFoodLogId = foodLogId.trim();
-
-    if (!normalizedFoodLogId) {
-      return;
-    }
-
-    const matchedRows = this.spreadsheet
-      .getDataRows(this.layout.name)
-      .filter(
-        ({ values }) => String(values[0] ?? '').trim() === normalizedFoodLogId,
-      )
-      .map(({ rowNumber }) => rowNumber);
-
-    if (matchedRows.length > 0) {
-      this.spreadsheet.deleteRows(this.layout.name, matchedRows);
-    }
-
-    if (entries.length === 0) {
-      return;
-    }
-
-    this.appendMany(
-      entries.map((entry) => ({
-        ...entry,
-        parent_food_log_id: normalizedFoodLogId,
-      })),
-    );
   }
 }
 

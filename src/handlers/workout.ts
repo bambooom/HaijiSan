@@ -1,13 +1,5 @@
 import { workoutLogRepository } from '../repositories';
-import type { WorkoutLevel } from '../types';
-
-type ParsedWorkoutCommand = {
-  workoutName: string;
-  durationMin: number;
-  workoutLevel: WorkoutLevel;
-  note: string;
-  workoutVideoUrl: string;
-};
+import type { ParsedWorkoutCommand, WorkoutLevel } from '../types';
 
 const WORKOUT_LEVEL_ALIASES: Record<string, WorkoutLevel> = {
   easy: 'easy',
@@ -32,22 +24,30 @@ const WORKOUT_LEVEL_LABELS: Record<WorkoutLevel, string> = {
   hard: '高强度',
 };
 
-function parseDurationToken(token: string): number | null {
-  const match = token.match(
-    /^(\d+(?:\.\d+)?)(?:m|min|mins|minute|minutes|分钟)?$/i,
+export function handleWorkoutCommand(
+  text: string,
+  timestamp: Date,
+): string | null {
+  if (!text.startsWith('/workout')) {
+    return null;
+  }
+
+  const parsed = parseWorkoutCommand(text);
+
+  if (!parsed) {
+    return '格式错误。请使用：/workout 跑步 35 中等 或 /workout 帕梅拉燃脂 20 高强度';
+  }
+
+  workoutLogRepository.logWorkout(
+    timestamp,
+    parsed.workoutName,
+    parsed.durationMin,
+    parsed.workoutLevel,
+    parsed.note,
+    parsed.workoutVideoUrl,
   );
 
-  if (!match) {
-    return null;
-  }
-
-  const durationMin = Number(match[1]);
-
-  if (Number.isNaN(durationMin) || durationMin <= 0) {
-    return null;
-  }
-
-  return durationMin;
+  return `✅ 运动 ${parsed.workoutName} 已记录，时长 ${parsed.durationMin} 分钟，强度${WORKOUT_LEVEL_LABELS[parsed.workoutLevel]}。`;
 }
 
 function parseWorkoutCommand(text: string): ParsedWorkoutCommand | null {
@@ -108,28 +108,20 @@ function parseWorkoutCommand(text: string): ParsedWorkoutCommand | null {
   };
 }
 
-export function handleWorkoutCommand(
-  text: string,
-  timestamp: Date,
-): string | null {
-  if (!text.startsWith('/workout')) {
+function parseDurationToken(token: string): number | null {
+  const match = token.match(
+    /^(\d+(?:\.\d+)?)(?:m|min|mins|minute|minutes|分钟)?$/i,
+  );
+
+  if (!match) {
     return null;
   }
 
-  const parsed = parseWorkoutCommand(text);
+  const durationMin = Number(match[1]);
 
-  if (!parsed) {
-    return '格式错误。请使用：/workout 跑步 35 中等 或 /workout 帕梅拉燃脂 20 高强度';
+  if (Number.isNaN(durationMin) || durationMin <= 0) {
+    return null;
   }
 
-  workoutLogRepository.logWorkout(
-    timestamp,
-    parsed.workoutName,
-    parsed.durationMin,
-    parsed.workoutLevel,
-    parsed.note,
-    parsed.workoutVideoUrl,
-  );
-
-  return `✅ 运动 ${parsed.workoutName} 已记录，时长 ${parsed.durationMin} 分钟，强度${WORKOUT_LEVEL_LABELS[parsed.workoutLevel]}。`;
+  return durationMin;
 }

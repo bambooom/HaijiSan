@@ -4,6 +4,7 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 export class StatusLogRepository {
   constructor(
@@ -13,7 +14,7 @@ export class StatusLogRepository {
   private readonly layout = SHEET_LAYOUTS.STATUS_LOG;
 
   private createEntryId(timestamp: Date): string {
-    return `status_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+    return createTimestampedEntryId(this.spreadsheet, 'status', timestamp);
   }
 
   append(entry: StatusLogEntry): void {
@@ -23,7 +24,7 @@ export class StatusLogRepository {
   logBowel(timestamp: Date): void {
     this.append({
       entry_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       entry_type: 'bowel',
       value: '4',
       unit: '',
@@ -39,7 +40,7 @@ export class StatusLogRepository {
   ): void {
     this.append({
       entry_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       entry_type: 'menstruation',
       value: 'start',
       unit: '',
@@ -56,7 +57,7 @@ export class StatusLogRepository {
   ): void {
     this.append({
       entry_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       entry_type: 'symptom',
       value: symptom,
       unit: '',

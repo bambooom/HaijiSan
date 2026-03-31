@@ -1,5 +1,5 @@
 import { refCaloriesRepository } from '../repositories';
-import type { FoodReference } from '../repositories/ref-calories';
+import type { FoodReference } from '../types/repositories';
 
 const MAX_REFERENCE_RESULTS = 10;
 

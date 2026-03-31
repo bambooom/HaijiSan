@@ -1,35 +1,17 @@
 import { SHEET_LAYOUTS } from '../config';
-import type { StockEntry } from '../types';
+import type {
+  SheetRow,
+  StockAdjustResult,
+  StockEntry,
+  StockListItem,
+} from '../types';
 import {
   spreadsheetService,
-  type SheetRow,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-
-export type StockListItem = {
-  name: string;
-  amount: string;
-};
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 const DEFAULT_STOCK_UNIT = '个/份';
-
-export type StockAdjustResult =
-  | {
-      ok: true;
-      entry: StockEntry;
-      quantity: number;
-      operation: 'create' | 'adjust' | 'set';
-    }
-  | {
-      ok: false;
-      reason:
-        | 'invalid-name'
-        | 'invalid-quantity'
-        | 'not-found'
-        | 'negative-stock';
-      quantity?: number;
-      currentQuantity?: number;
-    };
 
 export class StockRepository {
   constructor(
@@ -64,7 +46,7 @@ export class StockRepository {
   }
 
   private createEntryId(timestamp: Date): string {
-    return `stock_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+    return createTimestampedEntryId(this.spreadsheet, 'stock', timestamp);
   }
 
   append(entry: StockEntry): void {
@@ -92,10 +74,7 @@ export class StockRepository {
     const existingEntry = this.findByName(normalizedName);
 
     if (!existingEntry) {
-      const formattedTimestamp = this.spreadsheet.getTimestamp(
-        false,
-        timestamp,
-      );
+      const formattedTimestamp = formatLoggedAt(this.spreadsheet, timestamp);
       const entry: StockEntry = {
         stock_item_id: this.createEntryId(timestamp),
         item_name: normalizedName,
@@ -134,7 +113,7 @@ export class StockRepository {
         item_name: normalizedName,
         quantity,
         unit: this.resolveUnit(unit, existingEntry.unit),
-        updated_at: this.spreadsheet.getTimestamp(false, timestamp),
+        updated_at: formatLoggedAt(this.spreadsheet, timestamp),
         purchase_channel:
           purchaseChannel?.trim() || existingEntry.purchase_channel,
         note,
@@ -207,7 +186,7 @@ export class StockRepository {
         item_name: normalizedName,
         quantity: nextQuantity,
         unit: this.resolveUnit(unit, existingEntry.unit),
-        updated_at: this.spreadsheet.getTimestamp(false, timestamp),
+        updated_at: formatLoggedAt(this.spreadsheet, timestamp),
         purchase_channel:
           purchaseChannel?.trim() || existingEntry.purchase_channel,
         note,
@@ -281,7 +260,7 @@ export class StockRepository {
 
     const updates: Partial<StockEntry> = {
       quantity,
-      updated_at: this.spreadsheet.getTimestamp(false, timestamp),
+      updated_at: formatLoggedAt(this.spreadsheet, timestamp),
     };
 
     if (unit !== undefined) {

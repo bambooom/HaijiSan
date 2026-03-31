@@ -4,6 +4,7 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 export class SleepLogRepository {
   constructor(
@@ -13,7 +14,7 @@ export class SleepLogRepository {
   private readonly layout = SHEET_LAYOUTS.SLEEP_LOG;
 
   createEntryId(timestamp: Date): string {
-    return `sleep_${this.spreadsheet.getTimestamp(true, timestamp).replace(/[^0-9]/g, '')}`;
+    return createTimestampedEntryId(this.spreadsheet, 'sleep', timestamp);
   }
 
   append(entry: SleepLogEntry): void {
@@ -30,9 +31,9 @@ export class SleepLogRepository {
   ): void {
     this.append({
       sleep_log_id: this.createEntryId(timestamp),
-      logged_at: this.spreadsheet.getTimestamp(false, timestamp),
-      sleep_start_at: this.spreadsheet.getTimestamp(false, sleepStartAt),
-      sleep_end_at: this.spreadsheet.getTimestamp(false, sleepEndAt),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
+      sleep_start_at: formatLoggedAt(this.spreadsheet, sleepStartAt),
+      sleep_end_at: formatLoggedAt(this.spreadsheet, sleepEndAt),
       sleep_hours: sleepHours,
       sleep_quality: sleepQuality,
       source: 'manual',

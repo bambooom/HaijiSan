@@ -1,14 +1,5 @@
 import { SHEET_ID } from '../config';
-
-export type SheetCellValue = string | number | boolean | Date | null;
-export type SheetRow = SheetCellValue[];
-export type SheetDataRow = {
-  rowNumber: number;
-  values: SheetRow;
-};
-export type SheetRecord<TField extends string = string> = Partial<
-  Record<TField, SheetCellValue | undefined>
->;
+import type { SheetDataRow, SheetRecord, SheetRow } from '../types';
 
 export class SpreadsheetService {
   private ss: GoogleAppsScript.Spreadsheet.Spreadsheet | null = null;
@@ -118,42 +109,6 @@ export class SpreadsheetService {
     });
 
     sheet.getRange(rowNumber, 1, 1, fields.length).setValues([nextRow]);
-  }
-
-  /**
-   * Deletes rows from bottom to top so row numbers stay stable.
-   */
-  deleteRows(sheetName: string, rowNumbers: number[]): void {
-    const uniqueRowNumbers = [...new Set(rowNumbers)].sort(
-      (left, right) => right - left,
-    );
-
-    if (uniqueRowNumbers.some((rowNumber) => rowNumber <= 1)) {
-      throw new Error(`Cannot delete header row from ${sheetName}`);
-    }
-
-    const sheet = this.getSheet(sheetName);
-
-    uniqueRowNumbers.forEach((rowNumber) => {
-      sheet.deleteRow(rowNumber);
-    });
-  }
-
-  /**
-   * Returns the current header row for a sheet.
-   */
-  getHeaderRow(sheetName: string): string[] {
-    const sheet = this.getSheet(sheetName);
-    const lastColumn = sheet.getLastColumn();
-
-    if (lastColumn === 0) {
-      return [];
-    }
-
-    return sheet
-      .getRange(1, 1, 1, lastColumn)
-      .getValues()[0]
-      .map((cell) => String(cell ?? ''));
   }
 
   /**

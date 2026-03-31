@@ -6,6 +6,7 @@ import type {
   IngredientEstimateConfidence,
   IngredientEstimateInput,
   IngredientEstimateResult,
+  MealReferenceFact,
   MealResolutionResult,
   MealResolvedItem,
   MealStructureResult,
@@ -40,14 +41,6 @@ interface MealStructureEnvelope {
   shouldPersist?: unknown;
   items?: Array<Record<string, unknown>>;
   note?: unknown;
-}
-
-export interface MealReferenceFact {
-  itemName: string;
-  servingSize: number;
-  unit: string;
-  calories: number;
-  referenceName: string;
 }
 
 interface MealResolutionEnvelope {
