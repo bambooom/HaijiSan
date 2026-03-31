@@ -68,12 +68,12 @@ await buildGasEntry(['index.ts'], 'Code.js', {
   },
 });
 
-await buildGasEntry(['tools', 'sheet-styler.ts'], 'Styler.js', {
+await buildGasEntry(['gas', 'sheet-styler.ts'], 'Styler.js', {
   bundle: false,
   format: 'esm',
 });
 
-await buildGasEntry(['tools', 'sheet-admin.ts'], 'SheetAdmin.js', {
+await buildGasEntry(['gas', 'sheet-admin.ts'], 'SheetAdmin.js', {
   bundle: false,
   format: 'esm',
   define: {
