@@ -1,6 +1,29 @@
 import { SLASH_COMMANDS } from '../constants/commands';
 import { bodyLogRepository, statusLogRepository } from '../repositories';
 
+export function handleStatusCommand(
+  text: string,
+  timestamp: Date,
+): string | null {
+  if (text.startsWith(SLASH_COMMANDS.WEIGHT)) {
+    return handleWeightCommand(text, timestamp);
+  }
+
+  if (text.startsWith(SLASH_COMMANDS.POO)) {
+    return handlePooCommand(timestamp);
+  }
+
+  if (text.startsWith(SLASH_COMMANDS.PERIOD)) {
+    return handlePeriodCommand(text, timestamp);
+  }
+
+  if (text.startsWith(SLASH_COMMANDS.SYMPTOM)) {
+    return handleSymptomCommand(text, timestamp);
+  }
+
+  return null;
+}
+
 function handleWeightCommand(text: string, timestamp: Date): string {
   const weight = text.match(/\d+(\.\d+)?/);
 
@@ -62,27 +85,4 @@ function handleSymptomCommand(text: string, timestamp: Date): string {
   }
 
   return `✅ 症状 ${symptom} 已记录。`;
-}
-
-export function handleStatusCommand(
-  text: string,
-  timestamp: Date,
-): string | null {
-  if (text.startsWith(SLASH_COMMANDS.WEIGHT)) {
-    return handleWeightCommand(text, timestamp);
-  }
-
-  if (text.startsWith(SLASH_COMMANDS.POO)) {
-    return handlePooCommand(timestamp);
-  }
-
-  if (text.startsWith(SLASH_COMMANDS.PERIOD)) {
-    return handlePeriodCommand(text, timestamp);
-  }
-
-  if (text.startsWith(SLASH_COMMANDS.SYMPTOM)) {
-    return handleSymptomCommand(text, timestamp);
-  }
-
-  return null;
 }

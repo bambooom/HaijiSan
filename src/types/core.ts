@@ -1,3 +1,5 @@
+import { AI_INTENTS } from '../constants/ai';
+
 export type StatusEntryType =
   | 'bowel'
   | 'menstruation'
@@ -27,19 +29,7 @@ export type CommandHandlingResult = {
 
 export type AiResponseMode = 'reply' | 'command' | 'clarify';
 
-export type AiIntent =
-  | 'chat'
-  | 'weight'
-  | 'poo'
-  | 'period'
-  | 'symptom'
-  | 'sleep'
-  | 'workout'
-  | 'food'
-  | 'food_estimate'
-  | 'stock_adjust'
-  | 'stock_set'
-  | 'stock_check';
+export type AiIntent = (typeof AI_INTENTS)[keyof typeof AI_INTENTS];
 
 export type ReferenceSource =
   | 'nutrition_label'

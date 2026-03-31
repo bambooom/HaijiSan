@@ -1,4 +1,4 @@
-import type { CommandHandlingResult } from '../types';
+import type { CommandHandlingResult } from '../../types';
 
 export function buildAiResult(
   reply: string,

@@ -3,6 +3,7 @@ import {
   estimateMealCalories,
   estimateMealCaloriesFromStructured,
 } from './food-analysis';
+import { AI_CONFIRMATION_GUIDE, AI_INTENTS } from '../constants/ai';
 import { MEAL_TYPE_LABELS } from '../shared/meal';
 import type {
   AiPlan,
@@ -133,7 +134,7 @@ export function buildMealInput(plan: AiPlan, originalText: string): string {
 }
 
 export function buildMealPreviewReply(body: string): string {
-  return `${body}\n回复“确认”写入，回复“取消”放弃。`;
+  return `${body}\n${AI_CONFIRMATION_GUIDE}`;
 }
 
 export function buildMatchedReferenceFacts(
@@ -221,7 +222,7 @@ export function buildEstimatedMealNote(
 }
 
 export function shouldPersistMeal(plan: AiPlan, originalText: string): boolean {
-  if (plan.intent === 'food') {
+  if (plan.intent === AI_INTENTS.FOOD) {
     return true;
   }
 

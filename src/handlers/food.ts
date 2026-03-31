@@ -7,17 +7,6 @@ import type { ParseStatus } from '../types';
 import { parseFoodContent } from '../services/food-analysis';
 import type { ParsedFoodInput } from '../types/food-analysis';
 
-function buildFoodSuccessMessage(
-  parsedFoodInput: ParsedFoodInput,
-  parseStatus: ParseStatus,
-): string {
-  if (parseStatus === 'parsed') {
-    return `✅ 饮食已记录，共识别 ${parsedFoodInput.items.length} 个食材项目。`;
-  }
-
-  return '✅ 饮食已记录。我先帮你保存原始内容，后续再补充拆解。';
-}
-
 export function handleFoodCommand(
   text: string,
   timestamp: Date,
@@ -65,4 +54,15 @@ export function handleFoodCommand(
   });
 
   return buildFoodSuccessMessage(parsedFoodInput, parseStatus);
+}
+
+function buildFoodSuccessMessage(
+  parsedFoodInput: ParsedFoodInput,
+  parseStatus: ParseStatus,
+): string {
+  if (parseStatus === 'parsed') {
+    return `✅ 饮食已记录，共识别 ${parsedFoodInput.items.length} 个食材项目。`;
+  }
+
+  return '✅ 饮食已记录。我先帮你保存原始内容，后续再补充拆解。';
 }

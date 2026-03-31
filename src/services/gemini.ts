@@ -1,4 +1,5 @@
 import { GEMINI_API_KEY, GEMINI_MODEL } from '../app-config';
+import { AI_INTENT_VALUES } from '../constants/ai';
 import type {
   AiIntent,
   AiPlan,
@@ -57,20 +58,7 @@ const AI_RESPONSE_MODES = new Set<AiResponseMode>([
   'command',
   'clarify',
 ]);
-const AI_INTENTS = new Set<AiIntent>([
-  'chat',
-  'weight',
-  'poo',
-  'period',
-  'symptom',
-  'sleep',
-  'workout',
-  'food',
-  'food_estimate',
-  'stock_adjust',
-  'stock_set',
-  'stock_check',
-]);
+const AI_INTENTS = new Set<AiIntent>(AI_INTENT_VALUES);
 const SLEEP_QUALITIES = new Set<SleepQuality>(['good', 'normal', 'poor']);
 const WORKOUT_LEVELS = new Set<WorkoutLevel>(['easy', 'medium', 'hard']);
 const MEAL_TYPES = new Set<MealType>(['breakfast', 'lunch', 'dinner', 'snack']);

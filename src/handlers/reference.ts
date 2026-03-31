@@ -4,6 +4,23 @@ import type { FoodReference } from '../types/repositories';
 
 const MAX_REFERENCE_RESULTS = 10;
 
+export function handleReferenceCommand(text: string): string | null {
+  if (!text.startsWith(SLASH_COMMANDS.REFERENCE)) {
+    return null;
+  }
+
+  const keyword = text.slice(SLASH_COMMANDS.REFERENCE.length).trim();
+
+  if (!keyword) {
+    return buildReferenceListMessage(refCaloriesRepository.listAll());
+  }
+
+  return buildReferenceSearchMessage(
+    keyword,
+    refCaloriesRepository.searchByKeyword(keyword),
+  );
+}
+
 function formatReferenceAmount(entry: FoodReference): string {
   if (entry.servingSize === null || !entry.unit) {
     return `${entry.calories} kcal`;
@@ -48,21 +65,4 @@ function buildReferenceSearchMessage(
       : '';
 
   return `📖 “${keyword}” 的热量参考：\n${lines.join('\n')}${moreSuffix}`;
-}
-
-export function handleReferenceCommand(text: string): string | null {
-  if (!text.startsWith(SLASH_COMMANDS.REFERENCE)) {
-    return null;
-  }
-
-  const keyword = text.slice(SLASH_COMMANDS.REFERENCE.length).trim();
-
-  if (!keyword) {
-    return buildReferenceListMessage(refCaloriesRepository.listAll());
-  }
-
-  return buildReferenceSearchMessage(
-    keyword,
-    refCaloriesRepository.searchByKeyword(keyword),
-  );
 }

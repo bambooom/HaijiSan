@@ -1,5 +1,5 @@
-import { geminiService } from '../services/gemini';
-import { estimateMealCalories } from '../services/food-analysis';
+import { geminiService } from '../../services/gemini';
+import { estimateMealCalories } from '../../services/food-analysis';
 import {
   buildAiEstimateMap,
   buildEstimatedMealNote,
@@ -11,24 +11,24 @@ import {
   resolveMealEstimate,
   shouldPersistMeal,
   summarizeEstimatedMeal,
-} from '../services/food-ai';
+} from '../../services/food-ai';
 import {
   buildFoodItemEntriesFromParsed,
   buildFoodItemEntriesFromResolution,
-} from '../services/meal-recording';
-import { createPendingMealRecordAction } from '../services/meal-action';
-import { savePendingAiAction } from '../services/pending-action';
+} from '../../services/meal-recording';
+import { createPendingMealRecordAction } from '../../services/meal-action';
+import { savePendingAiAction } from '../../services/pending-action';
 import {
   buildEstimatedMealReply,
   buildNoCaloriesReply,
   buildResolvedMealReply,
-} from '../utils/food-ai-message';
-import { buildAiResult } from './ai-result';
+} from '../../utils/food-ai-message';
 import type {
   AiPlan,
   CommandHandlingResult,
   IngredientEstimateResult,
-} from '../types';
+} from '../../types';
+import { buildAiResult } from './result';
 
 export function handleFoodAiMessage(
   plan: AiPlan,
