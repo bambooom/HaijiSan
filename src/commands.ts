@@ -2,6 +2,7 @@ import { handleAiMessage, handleCancelPendingAction } from './handlers/ai';
 import { SLASH_COMMANDS, START_HELP_COMMANDS } from './constants/commands';
 import { executeCommandRoute } from './handlers/command-router';
 import type { CommandHandlingResult, HandlingMode } from './types';
+import { buildAiErrorReply } from './utils/ai-error';
 
 const HELP_MESSAGE = `你好，我是清濑灰二。下面这份可以直接当速查表使用。
 
@@ -80,7 +81,7 @@ export function handleCommand(
       const message = error instanceof Error ? error.message : String(error);
 
       return buildResult(
-        '我刚才没能顺利处理这条消息。你也可以先继续使用 /help 里的命令。',
+        buildAiErrorReply(message),
         'ai',
         `ai-error=${message}`.slice(0, 500),
         'failed',

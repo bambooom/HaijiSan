@@ -18,6 +18,7 @@ import type {
   PendingMealRecordAction,
 } from '../../types';
 import { appendAiNote, truncateAiNote } from '../../utils/ai-command';
+import { buildAiErrorReply } from '../../utils/ai-error';
 import { executeCommandRoute } from '../command-router';
 import {
   buildClarificationSourceText,
@@ -142,7 +143,7 @@ function handlePendingClarificationAction(
     return {
       kind: 'result',
       result: buildAiResult(
-        AI_MESSAGES.CLARIFICATION_FOLLOWUP_FAILED,
+        buildAiErrorReply(message, AI_MESSAGES.CLARIFICATION_FOLLOWUP_FAILED),
         'failed',
         appendAiNote(action.note, `clarify-followup=failed; error=${message}`),
       ),
