@@ -37,7 +37,7 @@ const appConfig = {
   BOT_TOKEN: getRequiredEnv('BOT_TOKEN'),
   MY_CHAT_ID: getRequiredEnv('MY_CHAT_ID'),
   GEMINI_API_KEY: getRequiredEnv('GEMINI_API_KEY'),
-  GEMINI_MODEL: getOptionalEnv('GEMINI_MODEL', 'gemini-2.0-flash'),
+  GEMINI_MODEL: getOptionalEnv('GEMINI_MODEL', 'gemini-2.5-flash'),
 };
 
 const sheetLayouts = JSON.parse(readFileSync(sheetLayoutsPath, 'utf8'));
