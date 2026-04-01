@@ -16,8 +16,13 @@ import type {
   PendingClarificationAction,
   PendingMappedCommandAction,
   PendingMealRecordAction,
+  PendingStockBatchAction,
 } from '../../types';
-import { appendAiNote, truncateAiNote } from '../../utils/ai-command';
+import {
+  appendAiNote,
+  buildStockMutationCommandText,
+  truncateAiNote,
+} from '../../utils/ai-command';
 import { buildAiErrorReply } from '../../utils/ai-error';
 import { executeCommandRoute } from '../command-router';
 import {
@@ -102,6 +107,13 @@ export function handlePendingAiAction(
     return {
       kind: 'result',
       result: executePendingMealRecordAction(pendingAction, timestamp),
+    };
+  }
+
+  if (pendingAction.kind === 'stock-batch') {
+    return {
+      kind: 'result',
+      result: executePendingStockBatchAction(pendingAction, timestamp),
     };
   }
 
@@ -213,6 +225,51 @@ function executePendingMealRecordAction(
   }
 }
 
+function executePendingStockBatchAction(
+  action: PendingStockBatchAction,
+  fallbackTimestamp: Date,
+): CommandHandlingResult {
+  const createdAt = new Date(action.createdAt);
+  const timestamp = Number.isNaN(createdAt.getTime())
+    ? fallbackTimestamp
+    : createdAt;
+  const successReplies: string[] = [];
+  const failedItems: string[] = [];
+
+  for (const item of action.items) {
+    const commandReply = executeCommandRoute(
+      buildStockMutationCommandText(action.operation, item),
+      timestamp,
+    )?.reply;
+
+    if (commandReply) {
+      successReplies.push(commandReply);
+    } else {
+      failedItems.push(item.name);
+    }
+  }
+
+  if (successReplies.length === 0) {
+    return buildAiResult(
+      AI_MESSAGES.PENDING_ACTION_FAILED,
+      'failed',
+      appendAiNote(
+        action.note,
+        `confirmed=true; stock-batch=0/${action.items.length}`,
+      ),
+    );
+  }
+
+  return buildAiResult(
+    buildStockBatchSuccessReply(successReplies, failedItems),
+    failedItems.length === 0 ? 'success' : 'failed',
+    appendAiNote(
+      action.note,
+      `confirmed=true; stock-batch=${successReplies.length}/${action.items.length}`,
+    ),
+  );
+}
+
 function buildMealRecordSuccessReply(
   action: PendingMealRecordAction,
   updatedCount: number,
@@ -223,4 +280,20 @@ function buildMealRecordSuccessReply(
       : AI_MESSAGES.MEAL_RECORD_SYNC_NONE;
 
   return `${AI_MESSAGES.MEAL_RECORD_WRITTEN}\n这餐已经记进 Food_Log 了，合计约 ${action.mealRecord.estimatedCalories ?? '未知'} kcal。${stockSuffix}`;
+}
+
+function buildStockBatchSuccessReply(
+  successReplies: string[],
+  failedItems: string[],
+): string {
+  const header =
+    failedItems.length === 0
+      ? `库存已更新，共 ${successReplies.length} 项。`
+      : `库存已更新 ${successReplies.length} 项。`;
+  const failedSuffix =
+    failedItems.length === 0
+      ? ''
+      : `\n以下项目没有写入：${failedItems.join('、')}`;
+
+  return `${header}\n${successReplies.join('\n')}${failedSuffix}`;
 }

@@ -37,6 +37,13 @@ export type ReferenceSource =
   | 'internet_reference'
   | 'ai_estimate';
 
+export interface AiStockItem {
+  name: string;
+  quantity: number;
+  unit?: string;
+  purchaseChannel?: string;
+}
+
 export interface AiPlan {
   mode: AiResponseMode;
   intent: AiIntent;
@@ -56,6 +63,7 @@ export interface AiPlan {
   stockItemName?: string;
   stockQuantity?: number | null;
   stockUnit?: string;
+  stockItems?: AiStockItem[];
   purchaseChannel?: string;
   note?: string;
 }

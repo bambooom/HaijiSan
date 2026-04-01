@@ -4,6 +4,7 @@ import type {
   AiIntent,
   AiPlan,
   AiResponseMode,
+  AiStockItem,
   IngredientEstimateConfidence,
   IngredientEstimateInput,
   IngredientEstimateResult,
@@ -53,6 +54,13 @@ interface MealResolutionEnvelope {
   note?: unknown;
 }
 
+interface StockItemEnvelope {
+  name?: unknown;
+  quantity?: unknown;
+  unit?: unknown;
+  purchaseChannel?: unknown;
+}
+
 const AI_RESPONSE_MODES = new Set<AiResponseMode>([
   'reply',
   'command',
@@ -99,6 +107,9 @@ function buildSystemInstruction(timestamp: Date): string {
     'mealType 只能是 breakfast、lunch、dinner、snack。',
     'food_estimate 至少应填写 mealText；如果用户已经说明餐次，也可以填写 mealType。',
     'stockQuantity 在 stock_adjust 中使用正负数字，在 stock_set 中使用非负数字。',
+    '如果是库存变更且一句话里包含多项物品，优先填写 stockItems 数组；每项包含 name、quantity、unit、purchaseChannel。',
+    'stockItems 在 stock_adjust 中使用正负数字，在 stock_set 中使用非负数字。',
+    '如果只有单项库存，也可以继续填写 stockItemName、stockQuantity、stockUnit、purchaseChannel。',
     '不要发明不存在的能力，不要要求直接操作数据库，不要输出额外字段。',
     '回复语言使用简体中文，尽量简洁。',
   ].join('\n');
@@ -208,6 +219,39 @@ function asNullableNumber(value: unknown): number | null | undefined {
   return undefined;
 }
 
+function asAiStockItem(value: unknown): AiStockItem | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const raw = value as StockItemEnvelope;
+  const name = asString(raw.name);
+  const quantity = asNullableNumber(raw.quantity);
+
+  if (!name || typeof quantity !== 'number') {
+    return null;
+  }
+
+  return {
+    name,
+    quantity,
+    unit: asString(raw.unit),
+    purchaseChannel: asString(raw.purchaseChannel),
+  };
+}
+
+function asAiStockItems(value: unknown): AiStockItem[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const items = value
+    .map((item) => asAiStockItem(item))
+    .filter((item): item is AiStockItem => item !== null);
+
+  return items.length > 0 ? items : undefined;
+}
+
 function asMode(value: unknown): AiResponseMode {
   if (
     typeof value === 'string' &&
@@ -311,6 +355,7 @@ function normalizePlan(raw: Record<string, unknown>): AiPlan {
     stockItemName: asString(raw.stockItemName),
     stockQuantity: asNullableNumber(raw.stockQuantity),
     stockUnit: asString(raw.stockUnit),
+    stockItems: asAiStockItems(raw.stockItems),
     purchaseChannel: asString(raw.purchaseChannel),
     note: asString(raw.note),
   };

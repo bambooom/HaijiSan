@@ -1,4 +1,4 @@
-import type { AiPlan, MealType, ParseStatus } from './core';
+import type { AiPlan, AiStockItem, MealType, ParseStatus } from './core';
 import type { FoodItemEntry } from './records';
 
 export interface PendingMealRecordInput {
@@ -29,6 +29,16 @@ export interface PendingMealRecordAction {
   note: string;
 }
 
+export interface PendingStockBatchAction {
+  kind: 'stock-batch';
+  createdAt: string;
+  sourceText: string;
+  previewText: string;
+  operation: 'adjust' | 'set';
+  items: AiStockItem[];
+  note: string;
+}
+
 export interface PendingClarificationAction {
   kind: 'clarify';
   createdAt: string;
@@ -41,4 +51,5 @@ export interface PendingClarificationAction {
 export type PendingAiAction =
   | PendingMappedCommandAction
   | PendingMealRecordAction
+  | PendingStockBatchAction
   | PendingClarificationAction;

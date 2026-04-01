@@ -3,7 +3,9 @@ import { savePendingAiAction } from '../../services/pending-action';
 import type { AiIntent, AiPlan, CommandHandlingResult } from '../../types';
 import {
   appendAiNote,
+  buildStockBatchPreview,
   buildCommandFromAiPlan,
+  resolveAiStockItems,
   summarizeAiPlan,
 } from '../../utils/ai-command';
 import { executeCommandRoute } from '../command-router';
@@ -21,6 +23,8 @@ type SpecialExecutor = (
 const SPECIAL_EXECUTORS: Partial<Record<AiIntent, SpecialExecutor>> = {
   [AI_INTENTS.FOOD]: handleFoodAiMessage,
   [AI_INTENTS.FOOD_ESTIMATE]: handleFoodAiMessage,
+  [AI_INTENTS.STOCK_ADJUST]: handleStockAiMessage,
+  [AI_INTENTS.STOCK_SET]: handleStockAiMessage,
 };
 
 export function handleExecuteStage(
@@ -82,4 +86,43 @@ function executeMappedCommand(
   }
 
   return buildAiResult(commandReply, 'success', commandNote);
+}
+
+function handleStockAiMessage(
+  plan: AiPlan,
+  sourceText: string,
+  timestamp: Date,
+): CommandHandlingResult {
+  const items = resolveAiStockItems(plan);
+
+  if (items.length === 0) {
+    return buildAiResult(
+      plan.reply || AI_MESSAGES.INCOMPLETE_COMMAND,
+      'ignored',
+      summarizeAiPlan(plan),
+    );
+  }
+
+  const previewText = buildStockBatchPreview(plan.intent, items);
+  const operation = plan.intent === AI_INTENTS.STOCK_SET ? 'set' : 'adjust';
+  const commandNote = appendAiNote(
+    summarizeAiPlan(plan),
+    `stock-items=${items.length}`,
+  );
+
+  savePendingAiAction({
+    kind: 'stock-batch',
+    createdAt: timestamp.toISOString(),
+    sourceText,
+    previewText,
+    operation,
+    items,
+    note: commandNote,
+  });
+
+  return buildAiResult(
+    previewText,
+    'success',
+    appendAiNote(commandNote, 'pending-confirmation=true'),
+  );
 }

@@ -1,10 +1,96 @@
 import { AI_INTENTS, AI_NOTE_MAX_LENGTH } from '../constants/ai';
 import { SLASH_COMMANDS } from '../constants/commands';
 import { MEAL_TYPE_LABELS } from '../shared/meal';
-import type { AiPlan } from '../types';
+import type { AiPlan, AiStockItem } from '../types';
 
 function joinCommandParts(parts: Array<string | null | undefined>): string {
   return parts.filter((part): part is string => Boolean(part)).join(' ');
+}
+
+function normalizeAiStockItem(item: AiStockItem): AiStockItem | null {
+  const name = item.name?.trim();
+  const unit = item.unit?.trim();
+  const purchaseChannel = item.purchaseChannel?.trim();
+
+  if (!name || !Number.isFinite(item.quantity)) {
+    return null;
+  }
+
+  return {
+    name,
+    quantity: item.quantity,
+    unit: unit || undefined,
+    purchaseChannel: purchaseChannel || undefined,
+  };
+}
+
+export function resolveAiStockItems(plan: AiPlan): AiStockItem[] {
+  const normalizedItems = (plan.stockItems ?? [])
+    .map((item) => normalizeAiStockItem(item))
+    .filter((item): item is AiStockItem => item !== null);
+
+  if (normalizedItems.length > 0) {
+    return normalizedItems;
+  }
+
+  if (!plan.stockItemName || typeof plan.stockQuantity !== 'number') {
+    return [];
+  }
+
+  return [
+    {
+      name: plan.stockItemName.trim(),
+      quantity: plan.stockQuantity,
+      unit: plan.stockUnit?.trim() || undefined,
+      purchaseChannel: plan.purchaseChannel?.trim() || undefined,
+    },
+  ];
+}
+
+export function buildStockMutationCommandText(
+  operation: 'adjust' | 'set',
+  item: AiStockItem,
+): string {
+  const command =
+    operation === 'adjust' ? SLASH_COMMANDS.STOCK : SLASH_COMMANDS.SET_STOCK;
+  const quantityToken =
+    operation === 'adjust' && item.quantity > 0
+      ? `+${item.quantity}`
+      : String(item.quantity);
+
+  return joinCommandParts([
+    command,
+    item.name,
+    `${quantityToken}${item.unit ?? ''}`,
+    item.purchaseChannel,
+  ]);
+}
+
+function buildStockPreviewLine(
+  operation: 'adjust' | 'set',
+  item: AiStockItem,
+): string {
+  const quantityToken =
+    operation === 'adjust' && item.quantity > 0
+      ? `+${item.quantity}`
+      : String(item.quantity);
+  const channelSuffix = item.purchaseChannel
+    ? `，渠道 ${item.purchaseChannel}`
+    : '';
+
+  return `- ${item.name} ${quantityToken}${item.unit ?? ''}${channelSuffix}`;
+}
+
+export function buildStockBatchPreview(
+  intent: AiPlan['intent'],
+  items: AiStockItem[],
+): string {
+  const operation = intent === AI_INTENTS.STOCK_SET ? 'set' : 'adjust';
+  const operationLabel = operation === 'set' ? '校正' : '更新';
+
+  return `我准备${operationLabel}这些库存：\n${items
+    .map((item) => buildStockPreviewLine(operation, item))
+    .join('\n')}\n回复“确认”写入，回复“取消”放弃。`;
 }
 
 function buildPeriodCommand(plan: AiPlan): string {
@@ -70,24 +156,28 @@ function buildFoodCommand(plan: AiPlan): string | null {
 }
 
 function buildStockCommand(plan: AiPlan): string | null {
-  if (!plan.stockItemName || typeof plan.stockQuantity !== 'number') {
+  const stockItems = resolveAiStockItems(plan);
+
+  if (stockItems.length !== 1) {
     return null;
   }
+
+  const [stockItem] = stockItems;
 
   const command =
     plan.intent === AI_INTENTS.STOCK_ADJUST
       ? SLASH_COMMANDS.STOCK
       : SLASH_COMMANDS.SET_STOCK;
   const quantityToken =
-    plan.intent === AI_INTENTS.STOCK_ADJUST && plan.stockQuantity > 0
-      ? `+${plan.stockQuantity}`
-      : String(plan.stockQuantity);
+    plan.intent === AI_INTENTS.STOCK_ADJUST && stockItem.quantity > 0
+      ? `+${stockItem.quantity}`
+      : String(stockItem.quantity);
 
   return joinCommandParts([
     command,
-    plan.stockItemName,
-    `${quantityToken}${plan.stockUnit ?? ''}`,
-    plan.purchaseChannel,
+    stockItem.name,
+    `${quantityToken}${stockItem.unit ?? ''}`,
+    stockItem.purchaseChannel,
   ]);
 }
 
