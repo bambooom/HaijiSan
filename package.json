@@ -7,8 +7,10 @@
     "clean": "node ./scripts/clean.mjs",
     "lint": "eslint . --max-warnings=0",
     "sheet:validate-headers": "node ./scripts/validate-sheet-headers.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm lint && pnpm typecheck && pnpm build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "push": "pnpm clasp:prepare && pnpm build && pnpm exec clasp push --force",
     "deploy": "pnpm clasp:prepare && pnpm build && node ./scripts/deploy.mjs"
   },
@@ -22,6 +24,7 @@
     "esbuild": "^0.25.2",
     "eslint": "^9.24.0",
     "globals": "^16.0.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.2"
   }
 }
