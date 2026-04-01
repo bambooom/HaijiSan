@@ -89,7 +89,7 @@ export function handlePendingAiAction(
     return {
       kind: 'result',
       result: buildAiResult(
-        `我这里还有一条待确认的操作。\n${pendingAction.previewText}`,
+        `${AI_MESSAGES.PENDING_ACTION_BLOCKED}\n${pendingAction.previewText}`,
         'ignored',
         truncateAiNote(`pending-action=blocked; kind=${pendingAction.kind}`),
       ),
@@ -187,18 +187,6 @@ function executePendingMappedCommandAction(
   );
 }
 
-function buildMealRecordSuccessReply(
-  action: PendingMealRecordAction,
-  updatedCount: number,
-): string {
-  const stockSuffix =
-    updatedCount > 0
-      ? `库存同步 ${updatedCount} 项。`
-      : '这次没有同步到库存项。';
-
-  return `已按刚才的预览写入。\n这餐已经记进 Food_Log 了，合计约 ${action.mealRecord.estimatedCalories ?? '未知'} kcal。${stockSuffix}`;
-}
-
 function executePendingMealRecordAction(
   action: PendingMealRecordAction,
   fallbackTimestamp: Date,
@@ -223,4 +211,16 @@ function executePendingMealRecordAction(
       appendAiNote(action.note, `confirmed=true; persist-error=${message}`),
     );
   }
+}
+
+function buildMealRecordSuccessReply(
+  action: PendingMealRecordAction,
+  updatedCount: number,
+): string {
+  const stockSuffix =
+    updatedCount > 0
+      ? `库存同步 ${updatedCount} 项。`
+      : AI_MESSAGES.MEAL_RECORD_SYNC_NONE;
+
+  return `${AI_MESSAGES.MEAL_RECORD_WRITTEN}\n这餐已经记进 Food_Log 了，合计约 ${action.mealRecord.estimatedCalories ?? '未知'} kcal。${stockSuffix}`;
 }

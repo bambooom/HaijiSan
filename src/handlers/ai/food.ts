@@ -20,8 +20,10 @@ import { createPendingMealRecordAction } from '../../services/meal-action';
 import { savePendingAiAction } from '../../services/pending-action';
 import {
   buildEstimatedMealReply,
+  buildMissingQuantityReply,
   buildNoCaloriesReply,
   buildResolvedMealReply,
+  buildUnableToEstimateReply,
 } from '../../utils/food-ai-message';
 import type {
   AiPlan,
@@ -104,7 +106,7 @@ export function handleFoodAiMessage(
 
   if (!estimate) {
     return buildAiResult(
-      '这顿我还没法稳稳地算。把主要食材和份量发清楚一点，我再替你估。',
+      buildUnableToEstimateReply(),
       'ignored',
       'mode=command; intent=food_estimate; estimate=unparseable',
     );
@@ -112,7 +114,7 @@ export function handleFoodAiMessage(
 
   if (estimate.items.length === 0) {
     return buildAiResult(
-      '我先去参考表里找了，但你这句里还缺能换算的份量。把食材和份量发给我就行，克数、个数、颗数、盒数都可以。',
+      buildMissingQuantityReply(),
       'ignored',
       `mode=command; intent=food_estimate; meal=${estimate.mealText}; estimate=no-weighted-items`.slice(
         0,

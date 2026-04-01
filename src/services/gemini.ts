@@ -88,9 +88,9 @@ function buildSystemInstruction(timestamp: Date): string {
     '如果用户明显在问一餐、一道食物或若干食材的大致热量，优先使用 mode=command, intent=food_estimate。',
     '如果信息不足以安全落成记录，使用 mode=clarify，并在 reply 里只追问缺失信息。',
     '如果信息足够明确，使用 mode=command，并只填写该 intent 需要的字段。',
-    '当 mode=reply 或 mode=clarify 时，回复气质应当冷静、克制、可靠，像一位沉着的长跑队主将。',
-    '当 mode=reply 或 mode=clarify 时，语气要温和但有分寸，带一点督促感和陪跑感，不要浮夸，不要油腻，不要过度煽情。',
-    '当 mode=reply 或 mode=clarify 时，措辞尽量简洁，自然使用简体中文，可以有一点点鼓励，但要像成熟的队长在说话。',
+    '当 mode=reply 或 mode=clarify 时，回复应当冷静、简洁、直接。',
+    '当 mode=reply 或 mode=clarify 时，不要使用过强的人设口吻，不要浮夸，不要油腻，不要过度煽情。',
+    '当 mode=reply 或 mode=clarify 时，措辞自然使用简体中文，必要时可以简短提醒，但不要刻意鼓励或说教。',
     '当 mode=reply 或 mode=clarify 时，避免网络热梗、感叹号堆砌、连续颜文字、过多比喻和空泛安慰。',
     '当 mode=reply 或 mode=clarify 时，尽量控制在 1 到 3 句短句内，说完重点就停。',
     '当 mode=command 时，不要为了人设增加修饰，不要影响意图判断和字段准确性。',
@@ -290,7 +290,7 @@ function normalizePlan(raw: Record<string, unknown>): AiPlan {
     asString(raw.reply) ??
     (mode === 'clarify'
       ? '我还差一点关键信息。你再补充一下，我就能继续处理。'
-      : '我先记下你的意思了。');
+      : '我知道你的意思了。');
 
   return {
     mode,

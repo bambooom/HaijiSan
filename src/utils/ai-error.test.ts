@@ -12,7 +12,7 @@ describe('buildAiErrorReply', () => {
     "status": "UNAVAILABLE"
   }
 }`),
-    ).toBe('AI 服务现在请求有点拥挤，稍等几十秒再试一次就行。');
+    ).toBe('AI 服务现在请求较多，稍等几十秒再试一次。');
   });
 
   it('returns a clearer reply for Gemini 429 rate-limit errors', () => {
@@ -43,7 +43,7 @@ describe('buildAiErrorReply', () => {
 
   it('falls back to the default reply for non-Gemini errors', () => {
     expect(buildAiErrorReply('Unexpected failure')).toBe(
-      '我刚才没能顺利处理这条消息。你也可以先继续使用 /help 里的命令。',
+      '这条消息刚才没有处理成功。你也可以先继续使用 /help 里的命令。',
     );
   });
 });

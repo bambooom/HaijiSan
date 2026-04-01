@@ -3,23 +3,31 @@ import type {
   ResolvedMealTextInput,
 } from '../types/food-analysis';
 
+export function buildUnableToEstimateReply(): string {
+  return '这顿暂时还没法算。把主要食材和份量说清楚一点，我再继续估。';
+}
+
+export function buildMissingQuantityReply(): string {
+  return '这句里还缺能换算的份量。把食材和份量发给我就行，克数、个数、颗数、盒数都可以。';
+}
+
 function buildCoverageNote(
   pendingParts: string[],
   aiResolvedCount: number,
 ): string {
   if (pendingParts.length === 0 && aiResolvedCount === 0) {
-    return '这一顿先按表里的参考给你算。';
+    return '这顿先按表里的参考来算。';
   }
 
   if (pendingParts.length === 0) {
-    return '这一顿先把表内参考和常见食材的 AI 估算合在一起给你算。';
+    return '这顿结合表内参考和常见食材估算来算。';
   }
 
-  return '我先把表内参考和 AI 能补到的部分合在一起给你算。';
+  return '这顿先按表内参考和可补充的估算结果来算。';
 }
 
 export function buildResolvedMealReply(input: ResolvedMealTextInput): string {
-  return `这一顿我直接按整句理解给你算。\n${input.detailLines}\n合计约 ${input.estimatedCalories ?? '未知'} kcal。`;
+  return `按这句描述估算如下：\n${input.detailLines}\n合计约 ${input.estimatedCalories ?? '未知'} kcal。`;
 }
 
 export function buildNoCaloriesReply(
@@ -27,10 +35,10 @@ export function buildNoCaloriesReply(
   aiFallbackFailed: boolean,
 ): string {
   const fallbackHint = aiFallbackFailed
-    ? '\n这次 Gemini 的兜底估算没有接上，所以我只保留了表内结果。'
+    ? '\n这次 AI 补估没有成功，所以这里只保留了表内结果。'
     : '';
 
-  return `我先查了 Ref_Calories，也试着用 AI 补估常见食材，但这顿还没有形成可用的总热量。\n${detailLines}${fallbackHint}\n把食材和份量再说细一点，我再继续算。克数、个数、颗数、盒数都可以。`;
+  return `这次还没法得到可用的总热量。\n${detailLines}${fallbackHint}\n把食材和份量说得更具体一点，我再继续算。克数、个数、颗数、盒数都可以。`;
 }
 
 export function buildEstimatedMealReply(input: EstimatedMealTextInput): string {
@@ -39,7 +47,7 @@ export function buildEstimatedMealReply(input: EstimatedMealTextInput): string {
       ? ''
       : `\n还没估出来的部分：${input.pendingParts.join('、')}`;
   const fallbackStatusSuffix = input.aiFallbackFailed
-    ? '\n这次 Gemini 的兜底估算没有接上，所以未命中部分暂时没补上。'
+    ? '\n这次 AI 补估没有成功，所以未命中部分暂时没补上。'
     : '';
 
   return `${buildCoverageNote(input.pendingParts, input.aiResolvedCount)}\n${input.detailLines}\n合计约 ${input.totalEstimatedCalories} kcal。${unresolvedSuffix}${fallbackStatusSuffix}`;

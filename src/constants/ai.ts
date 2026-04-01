@@ -40,14 +40,15 @@ export const AI_CLARIFICATION_NEW_TOPIC_PATTERN =
 
 export const AI_MESSAGES = {
   NO_PENDING_ACTION: '现在没有待确认的操作，不需要取消。',
-  PENDING_ACTION_CANCELLED:
-    '好，这一步先不写。我已经把刚才的待确认操作取消了。',
-  PENDING_ACTION_FAILED:
-    '我收到了确认，但这次实际写入没有成功。刚才那步已经停住了，你可以重新发一次。',
+  PENDING_ACTION_CANCELLED: '已取消刚才的待确认操作。',
+  PENDING_ACTION_BLOCKED: '我这里还有一条待确认的操作。',
+  PENDING_ACTION_FAILED: '我收到了确认，但这次写入没有成功。你可以重新发一次。',
+  MEAL_RECORD_WRITTEN: '已按刚才的预览写入。',
+  MEAL_RECORD_SYNC_NONE: '这次没有同步到库存项。',
   INCOMPLETE_COMMAND:
-    '我理解到你想记录内容，但关键信息还不够。你再补一句具体数值或时间。',
+    '我知道你想记录内容，但关键信息还不够。再补一句具体数值或时间就可以。',
   COMMAND_EXECUTION_FAILED:
-    '我理解到了你的意图，但这次还没能安全落成记录。你可以换一种更具体的说法，或者直接用 /help 里的命令。',
+    '我理解到了你的意图，但这次没有成功记录。你可以换一种更具体的说法，或者直接用 /help 里的命令。',
   CLARIFICATION_FOLLOWUP_FAILED:
-    '我刚才没能顺利处理这次补充。你可以直接把完整信息重发一遍，我继续帮你处理。',
+    '刚才这次补充没有处理成功。你可以直接把完整信息重发一遍。',
 } as const;
