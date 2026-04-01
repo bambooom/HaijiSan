@@ -1,7 +1,7 @@
 import { MY_CHAT_ID } from './app-config';
 import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
-import { sendText } from './services/telegram';
+import { sendChatAction, sendText } from './services/telegram';
 
 interface TelegramUpdate {
   message?: {
@@ -38,6 +38,8 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
       sendText(chatId, '抱歉，由于职责所在，我目前只能专注管理某一位队员。');
       return;
     }
+
+    sendChatAction(chatId, 'typing');
 
     const result = handleCommand(text, timestamp);
 
