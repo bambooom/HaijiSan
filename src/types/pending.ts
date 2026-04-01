@@ -1,4 +1,4 @@
-import type { MealType, ParseStatus } from './core';
+import type { AiPlan, MealType, ParseStatus } from './core';
 import type { FoodItemEntry } from './records';
 
 export interface PendingMealRecordInput {
@@ -29,6 +29,16 @@ export interface PendingMealRecordAction {
   note: string;
 }
 
+export interface PendingClarificationAction {
+  kind: 'clarify';
+  createdAt: string;
+  sourceText: string;
+  clarificationReply: string;
+  partialPlan: AiPlan;
+  note: string;
+}
+
 export type PendingAiAction =
   | PendingMappedCommandAction
-  | PendingMealRecordAction;
+  | PendingMealRecordAction
+  | PendingClarificationAction;

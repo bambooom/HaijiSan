@@ -104,6 +104,17 @@ function buildSystemInstruction(timestamp: Date): string {
   ].join('\n');
 }
 
+function buildClarificationFollowupInstruction(timestamp: Date): string {
+  return [
+    buildSystemInstruction(timestamp),
+    '你正在处理同一轮记录对话中的补充说明。',
+    '输入会包含 originalMessage、assistantClarification、partialPlan、followupMessage。',
+    '你要把 followupMessage 视为对 originalMessage 的补充或修正，并重新输出最终 JSON。',
+    '如果 followupMessage 修正了原信息，以修正后的值为准。',
+    '如果合并后信息仍不足以安全记录，可以继续返回 mode=clarify。',
+  ].join('\n');
+}
+
 function buildIngredientEstimateInstruction(): string {
   return [
     '你是一个食物热量估算助手。',
@@ -347,6 +358,26 @@ export class GeminiService {
   planMessage(message: string, timestamp: Date): AiPlan {
     return normalizePlan(
       postJsonRequest(buildSystemInstruction(timestamp), message),
+    );
+  }
+
+  planClarificationFollowup(
+    originalMessage: string,
+    clarificationReply: string,
+    followupMessage: string,
+    partialPlan: AiPlan,
+    timestamp: Date,
+  ): AiPlan {
+    return normalizePlan(
+      postJsonRequest(
+        buildClarificationFollowupInstruction(timestamp),
+        JSON.stringify({
+          originalMessage,
+          assistantClarification: clarificationReply,
+          partialPlan,
+          followupMessage,
+        }),
+      ),
     );
   }
 

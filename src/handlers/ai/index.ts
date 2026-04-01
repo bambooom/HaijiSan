@@ -20,12 +20,37 @@ export function handleAiMessage(
 ): CommandHandlingResult {
   const pendingActionResult = handlePendingAiAction(text, timestamp);
 
-  if (pendingActionResult) {
-    return pendingActionResult;
+  if (pendingActionResult?.kind === 'result') {
+    return pendingActionResult.result;
   }
 
-  const plan = geminiService.planMessage(text, timestamp);
-  const planNote = summarizeAiPlan(plan);
+  const sourceText = pendingActionResult?.sourceText ?? text;
+  const plan =
+    pendingActionResult?.kind === 'continue'
+      ? pendingActionResult.plan
+      : geminiService.planMessage(text, timestamp);
+  let planNote = summarizeAiPlan(plan);
+
+  if (pendingActionResult?.kind === 'continue') {
+    planNote = appendAiNote(planNote, 'clarify-followup=merged');
+  }
+
+  if (plan.mode === 'clarify') {
+    savePendingAiAction({
+      kind: 'clarify',
+      createdAt: timestamp.toISOString(),
+      sourceText,
+      clarificationReply: plan.reply,
+      partialPlan: plan,
+      note: planNote,
+    });
+
+    return buildAiResult(
+      plan.reply,
+      'success',
+      appendAiNote(planNote, 'clarify-saved=true'),
+    );
+  }
 
   if (plan.mode !== 'command') {
     return buildAiResult(plan.reply, 'success', planNote);
@@ -35,7 +60,7 @@ export function handleAiMessage(
     plan.intent === AI_INTENTS.FOOD_ESTIMATE ||
     plan.intent === AI_INTENTS.FOOD
   ) {
-    return handleFoodAiMessage(plan, text, timestamp);
+    return handleFoodAiMessage(plan, sourceText, timestamp);
   }
 
   const commandText = buildCommandFromAiPlan(plan);
@@ -56,7 +81,7 @@ export function handleAiMessage(
     savePendingAiAction({
       kind: 'mapped-command',
       createdAt: timestamp.toISOString(),
-      sourceText: text,
+      sourceText,
       previewText,
       commandText,
       note: commandNote,

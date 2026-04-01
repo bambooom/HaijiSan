@@ -4,19 +4,38 @@ import {
   AI_CONFIRMATION_PATTERN,
   AI_MESSAGES,
 } from '../../constants/ai';
+import { geminiService } from '../../services/gemini';
 import { confirmPendingMealRecordAction } from '../../services/meal-action';
 import {
   clearPendingAiAction,
   getPendingAiAction,
 } from '../../services/pending-action';
 import type {
+  AiPlan,
   CommandHandlingResult,
+  PendingClarificationAction,
   PendingMappedCommandAction,
   PendingMealRecordAction,
 } from '../../types';
 import { appendAiNote, truncateAiNote } from '../../utils/ai-command';
 import { executeCommandRoute } from '../command-router';
+import {
+  buildClarificationSourceText,
+  looksLikeClarificationFollowup,
+} from './clarify-followup';
 import { buildAiResult } from './result';
+
+export type PendingAiResolution =
+  | {
+      kind: 'result';
+      result: CommandHandlingResult;
+    }
+  | {
+      kind: 'continue';
+      plan: AiPlan;
+      sourceText: string;
+      mergedFromClarify: boolean;
+    };
 
 export function buildMappedCommandPreview(commandText: string): string {
   return `我准备按这条记录写入：\n${commandText}\n${AI_CONFIRMATION_GUIDE}`;
@@ -47,7 +66,7 @@ export function handleCancelPendingAction(
 export function handlePendingAiAction(
   text: string,
   timestamp: Date,
-): CommandHandlingResult | null {
+): PendingAiResolution | null {
   const pendingAction = getPendingAiAction(timestamp);
 
   if (!pendingAction) {
@@ -55,24 +74,80 @@ export function handlePendingAiAction(
   }
 
   if (isCancellationText(text)) {
-    return handleCancelPendingAction(timestamp);
+    return {
+      kind: 'result',
+      result: handleCancelPendingAction(timestamp),
+    };
+  }
+
+  if (pendingAction.kind === 'clarify') {
+    return handlePendingClarificationAction(pendingAction, text, timestamp);
   }
 
   if (!isConfirmationText(text)) {
-    return buildAiResult(
-      `我这里还有一条待确认的操作。\n${pendingAction.previewText}`,
-      'ignored',
-      truncateAiNote(`pending-action=blocked; kind=${pendingAction.kind}`),
-    );
+    return {
+      kind: 'result',
+      result: buildAiResult(
+        `我这里还有一条待确认的操作。\n${pendingAction.previewText}`,
+        'ignored',
+        truncateAiNote(`pending-action=blocked; kind=${pendingAction.kind}`),
+      ),
+    };
   }
 
   clearPendingAiAction();
 
   if (pendingAction.kind === 'meal-record') {
-    return executePendingMealRecordAction(pendingAction, timestamp);
+    return {
+      kind: 'result',
+      result: executePendingMealRecordAction(pendingAction, timestamp),
+    };
   }
 
-  return executePendingMappedCommandAction(pendingAction, timestamp);
+  return {
+    kind: 'result',
+    result: executePendingMappedCommandAction(pendingAction, timestamp),
+  };
+}
+
+function handlePendingClarificationAction(
+  action: PendingClarificationAction,
+  text: string,
+  timestamp: Date,
+): PendingAiResolution | null {
+  if (!looksLikeClarificationFollowup(text)) {
+    return null;
+  }
+
+  try {
+    const plan = geminiService.planClarificationFollowup(
+      action.sourceText,
+      action.clarificationReply,
+      text,
+      action.partialPlan,
+      timestamp,
+    );
+
+    clearPendingAiAction();
+
+    return {
+      kind: 'continue',
+      plan,
+      sourceText: buildClarificationSourceText(action.sourceText, text),
+      mergedFromClarify: true,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return {
+      kind: 'result',
+      result: buildAiResult(
+        AI_MESSAGES.CLARIFICATION_FOLLOWUP_FAILED,
+        'failed',
+        appendAiNote(action.note, `clarify-followup=failed; error=${message}`),
+      ),
+    };
+  }
 }
 
 function isConfirmationText(text: string): boolean {
