@@ -10,6 +10,7 @@ import {
 } from '../../utils/ai-command';
 import { executeCommandRoute } from '../command-router';
 import { handleFoodAiMessage } from './food';
+import { handleNutritionSummaryAiMessage } from './nutrition';
 import { buildMappedCommandPreview } from './pending';
 import { buildAiResult } from './result';
 import type { ResolvedAiTurn } from './turn';
@@ -23,6 +24,7 @@ type SpecialExecutor = (
 const SPECIAL_EXECUTORS: Partial<Record<AiIntent, SpecialExecutor>> = {
   [AI_INTENTS.FOOD]: handleFoodAiMessage,
   [AI_INTENTS.FOOD_ESTIMATE]: handleFoodAiMessage,
+  [AI_INTENTS.NUTRITION_SUMMARY]: handleNutritionSummaryAiMessage,
   [AI_INTENTS.STOCK_ADJUST]: handleStockAiMessage,
   [AI_INTENTS.STOCK_SET]: handleStockAiMessage,
 };

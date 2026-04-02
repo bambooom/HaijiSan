@@ -8,6 +8,7 @@ export const AI_INTENTS = {
   WORKOUT: 'workout',
   FOOD: 'food',
   FOOD_ESTIMATE: 'food_estimate',
+  NUTRITION_SUMMARY: 'nutrition_summary',
   STOCK_ADJUST: 'stock_adjust',
   STOCK_SET: 'stock_set',
   STOCK_CHECK: 'stock_check',

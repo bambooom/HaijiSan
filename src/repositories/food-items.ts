@@ -48,6 +48,21 @@ export class FoodItemsRepository {
       )
       .map(({ values }) => this.mapRow(values));
   }
+
+  listByFoodLogIds(foodLogIds: string[]): FoodItemEntry[] {
+    const normalizedIds = new Set(
+      foodLogIds.map((id) => id.trim()).filter(Boolean),
+    );
+
+    if (normalizedIds.size === 0) {
+      return [];
+    }
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .filter(({ values }) => normalizedIds.has(String(values[0] ?? '').trim()))
+      .map(({ values }) => this.mapRow(values));
+  }
 }
 
 export const foodItemsRepository = new FoodItemsRepository();

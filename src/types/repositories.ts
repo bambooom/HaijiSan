@@ -7,6 +7,9 @@ export type FoodReference = {
   servingSize: number | null;
   unit: string;
   calories: number;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
 };
 
 export type StockListItem = {

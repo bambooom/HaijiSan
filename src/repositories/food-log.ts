@@ -23,6 +23,24 @@ export class FoodLogRepository {
     this.spreadsheet.appendRecord(this.layout.name, this.fields, entry);
   }
 
+  listByDate(date: Date): FoodLogEntry[] {
+    const datePrefix = this.spreadsheet.getTimestamp(false, date).slice(0, 10);
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .filter(({ values }) => String(values[1] ?? '').startsWith(datePrefix))
+      .map(({ values }) => ({
+        food_log_id: String(values[0] ?? ''),
+        logged_at: String(values[1] ?? ''),
+        meal_type: values[2] as FoodLogEntry['meal_type'],
+        meal_text: String(values[3] ?? ''),
+        estimated_calories: values[4] === '' ? null : Number(values[4]),
+        parse_status: values[5] as ParseStatus,
+        note: String(values[6] ?? ''),
+      }))
+      .filter((entry) => entry.food_log_id.trim() !== '');
+  }
+
   createMealEntry(
     timestamp: Date,
     mealType: FoodLogEntry['meal_type'],

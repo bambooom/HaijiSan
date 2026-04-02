@@ -20,7 +20,23 @@ export class RefCaloriesRepository {
       servingSize: row[3] === '' ? null : Number(row[3]),
       unit: String(row[4] ?? ''),
       calories: row[5] === '' ? 0 : Number(row[5]),
+      protein: row[6] === '' ? null : Number(row[6]),
+      fat: row[7] === '' ? null : Number(row[7]),
+      carbs: row[8] === '' ? null : Number(row[8]),
     };
+  }
+
+  findByIds(ids: string[]): FoodReference[] {
+    const normalizedIds = new Set(ids.map((id) => id.trim()).filter(Boolean));
+
+    if (normalizedIds.size === 0) {
+      return [];
+    }
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .filter(({ values }) => normalizedIds.has(String(values[0] ?? '').trim()))
+      .map(({ values }) => this.mapRow(values));
   }
 
   append(entry: FoodReferenceEntry): void {

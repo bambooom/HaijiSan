@@ -222,6 +222,7 @@ export function buildCommandFromAiPlan(plan: AiPlan): string | null {
     case AI_INTENTS.FOOD:
       return buildFoodCommand(plan);
     case AI_INTENTS.FOOD_ESTIMATE:
+    case AI_INTENTS.NUTRITION_SUMMARY:
       return null;
     case AI_INTENTS.STOCK_ADJUST:
     case AI_INTENTS.STOCK_SET:

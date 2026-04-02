@@ -21,6 +21,20 @@ export class BodyLogRepository {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
   }
 
+  getLatestWeight(): number | null {
+    const rows = this.spreadsheet.getRows(this.layout.name);
+
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const value = rows[index]?.[1];
+
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
   logWeight(timestamp: Date, weight: string): void {
     this.append({
       body_log_id: this.createEntryId(timestamp),
