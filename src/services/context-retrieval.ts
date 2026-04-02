@@ -1,13 +1,19 @@
 import {
+  bodyLogRepository,
   foodLogRepository,
   refCaloriesRepository,
+  sleepLogRepository,
   stockRepository,
+  statusLogRepository,
   workoutLogRepository,
 } from '../repositories';
 import type {
+  BodyLogEntry,
   FoodReference,
   FoodLogEntry,
+  SleepLogEntry,
   StockListItem,
+  StatusLogEntry,
   WorkoutLogEntry,
 } from '../types';
 
@@ -19,6 +25,18 @@ export interface PlanningContext {
   recentWorkouts: Pick<
     WorkoutLogEntry,
     'logged_at' | 'workout_name' | 'duration_min'
+  >[];
+  recentBodyMetrics: Pick<
+    BodyLogEntry,
+    'logged_at' | 'weight_kg' | 'bmi' | 'body_fat_pct'
+  >[];
+  recentSleep: Pick<
+    SleepLogEntry,
+    'logged_at' | 'sleep_hours' | 'sleep_quality'
+  >[];
+  recentStatus: Pick<
+    StatusLogEntry,
+    'logged_at' | 'entry_type' | 'value' | 'cycle_day'
   >[];
   stockCandidates: StockListItem[];
   referenceCandidates: Pick<
@@ -83,6 +101,14 @@ function shouldRetrieveWorkoutContext(text: string): boolean {
   return includesAny(text, [/运动|跑步|跟练|workout/i, /^\/workout\b/i]);
 }
 
+function shouldRetrieveHealthContext(text: string): boolean {
+  return includesAny(text, [
+    /健康|状态|最近|这几天|恢复|疲劳|累|精神|建议|适合|需要注意/,
+    /体重|体脂|bmi|睡眠|失眠|困|经期|姨妈|症状|腹痛|头痛|排便/,
+    /减脂|增肌|控制饮食|吃够|吃多|碳水|蛋白|蔬菜/,
+  ]);
+}
+
 function findStockCandidates(keywords: string[]): StockListItem[] {
   if (keywords.length === 0) {
     return [];
@@ -128,6 +154,7 @@ export function retrievePlanningContext(
   const includeMeal = shouldRetrieveMealContext(text);
   const includeStock = shouldRetrieveStockContext(text);
   const includeWorkout = shouldRetrieveWorkoutContext(text);
+  const includeHealth = shouldRetrieveHealthContext(text);
 
   return {
     recentMeals: includeMeal
@@ -143,6 +170,29 @@ export function retrievePlanningContext(
           logged_at: workout.logged_at,
           workout_name: workout.workout_name,
           duration_min: workout.duration_min,
+        }))
+      : [],
+    recentBodyMetrics: includeHealth
+      ? bodyLogRepository.listRecent(3).map((entry) => ({
+          logged_at: entry.logged_at,
+          weight_kg: entry.weight_kg,
+          bmi: entry.bmi,
+          body_fat_pct: entry.body_fat_pct,
+        }))
+      : [],
+    recentSleep: includeHealth
+      ? sleepLogRepository.listRecent(3).map((entry) => ({
+          logged_at: entry.logged_at,
+          sleep_hours: entry.sleep_hours,
+          sleep_quality: entry.sleep_quality,
+        }))
+      : [],
+    recentStatus: includeHealth
+      ? statusLogRepository.listRecent(5).map((entry) => ({
+          logged_at: entry.logged_at,
+          entry_type: entry.entry_type,
+          value: entry.value,
+          cycle_day: entry.cycle_day,
         }))
       : [],
     stockCandidates:
@@ -173,6 +223,42 @@ export function formatPlanningContext(context: PlanningContext): string {
         ...context.recentWorkouts.map(
           (workout) =>
             `- ${workout.logged_at}: ${workout.workout_name}${workout.duration_min === null ? '' : `, ${workout.duration_min} min`}`,
+        ),
+      ].join('\n'),
+    );
+  }
+
+  if (context.recentBodyMetrics.length > 0) {
+    sections.push(
+      [
+        'Recent body metrics:',
+        ...context.recentBodyMetrics.map(
+          (entry) =>
+            `- ${entry.logged_at}: weight=${entry.weight_kg ?? 'unknown'} kg, BMI=${entry.bmi ?? 'unknown'}, bodyFat=${entry.body_fat_pct ?? 'unknown'}%`,
+        ),
+      ].join('\n'),
+    );
+  }
+
+  if (context.recentSleep.length > 0) {
+    sections.push(
+      [
+        'Recent sleep:',
+        ...context.recentSleep.map(
+          (entry) =>
+            `- ${entry.logged_at}: ${entry.sleep_hours ?? 'unknown'} h, quality=${entry.sleep_quality}`,
+        ),
+      ].join('\n'),
+    );
+  }
+
+  if (context.recentStatus.length > 0) {
+    sections.push(
+      [
+        'Recent status events:',
+        ...context.recentStatus.map(
+          (entry) =>
+            `- ${entry.logged_at}: ${entry.entry_type}=${String(entry.value)}${entry.cycle_day === null ? '' : `, cycleDay=${entry.cycle_day}`}`,
         ),
       ].join('\n'),
     );

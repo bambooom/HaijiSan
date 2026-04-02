@@ -21,6 +21,7 @@ export function buildSystemInstruction(
     '可用 intent 只有 chat、weight、poo、period、symptom、sleep、workout、food、food_estimate、nutrition_summary、stock_adjust、stock_set、stock_check。',
     'weight intent 用于身体指标记录，至少可填写 weightKg；如果用户明确给出，也可以同时填写 bmi、bodyFatPct、leanBodyMassKg。',
     '如果是普通问答、闲聊、建议、解释，使用 mode=reply, intent=chat。',
+    '如果是健康相关的随意提问或建议请求，在已有上下文里出现最近体重、睡眠、症状、运动或饮食摘要时，可以把这些摘要作为背景提供保守建议，但不要把它们当成医疗诊断依据。',
     '如果用户在问今天已经吃了多少热量、蛋白质够不够、蔬菜够不够、今天饮食总结这类需要读取当天记录的问题，优先使用 mode=command, intent=nutrition_summary。',
     '如果用户明显在问一餐、一道食物或若干食材的大致热量，优先使用 mode=command, intent=food_estimate。',
     '如果信息不足以安全落成记录，使用 mode=clarify，并在 reply 里只追问缺失信息。',

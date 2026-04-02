@@ -54,9 +54,19 @@ export class StatusLogRepository {
       .map(({ values }) => this.mapRow(values))
       .filter(
         (entry) =>
-          entry.entry_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+          entry.entry_id.trim() !== '' &&
+          entry.logged_at.startsWith(datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
+  }
+
+  listRecent(limit: number = 7): StatusLogEntry[] {
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => this.mapRow(values))
+      .filter((entry) => entry.entry_id.trim() !== '')
+      .sort((left, right) => right.logged_at.localeCompare(left.logged_at))
+      .slice(0, limit);
   }
 
   logEntry(
