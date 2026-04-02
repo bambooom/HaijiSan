@@ -125,11 +125,18 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
       'note',
     ],
     sideEffects: ['write-food-log', 'write-food-items'],
-    validate(input: LogMealInput) {
+    validate(input: LogMealInput, context: ToolExecutionContext) {
       if (!input.mealText.trim()) {
         return clarifyValidationResult([
           missingFieldIssue('mealText', '需要更明确的饮食内容才能继续记录。'),
         ]);
+      }
+
+      if (
+        context.source === 'ai-plan' ||
+        context.source === 'pending-confirmation'
+      ) {
+        return okValidationResult();
       }
 
       if (
