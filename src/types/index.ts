@@ -6,3 +6,4 @@ export * from './pending';
 export * from './repositories';
 export * from './food-analysis';
 export * from './spreadsheet';
+export * from './ocr';
