@@ -192,6 +192,10 @@ export function appendAiNote(note: string, detail: string): string {
 export function summarizeAiPlan(plan: AiPlan, commandText?: string): string {
   const parts = [`mode=${plan.mode}`, `intent=${plan.intent}`];
 
+  if (typeof plan.confidence === 'number') {
+    parts.push(`confidence=${plan.confidence.toFixed(2)}`);
+  }
+
   if (commandText) {
     parts.push(`command=${commandText}`);
   }

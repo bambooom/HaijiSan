@@ -13,6 +13,7 @@ export interface PendingMealRecordInput {
 
 export interface PendingMappedCommandAction {
   kind: 'mapped-command';
+  traceId?: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -22,6 +23,7 @@ export interface PendingMappedCommandAction {
 
 export interface PendingMealRecordAction {
   kind: 'meal-record';
+  traceId?: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -31,6 +33,7 @@ export interface PendingMealRecordAction {
 
 export interface PendingStockBatchAction {
   kind: 'stock-batch';
+  traceId?: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -41,6 +44,7 @@ export interface PendingStockBatchAction {
 
 export interface PendingClarificationAction {
   kind: 'clarify';
+  traceId?: string;
   createdAt: string;
   sourceText: string;
   clarificationReply: string;

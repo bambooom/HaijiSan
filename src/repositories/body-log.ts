@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
-import type { BodyLogEntry } from '../types';
+import type { BodyLogEntry, HealthDataSource } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -21,6 +21,33 @@ export class BodyLogRepository {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
   }
 
+  logMetrics(
+    timestamp: Date,
+    metrics: {
+      weightKg?: number | null;
+      bmi?: number | null;
+      bodyFatPct?: number | null;
+      leanBodyMassKg?: number | null;
+      source?: HealthDataSource;
+      note?: string;
+    },
+  ): BodyLogEntry {
+    const entry: BodyLogEntry = {
+      body_log_id: this.createEntryId(timestamp),
+      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
+      weight_kg: metrics.weightKg ?? null,
+      bmi: metrics.bmi ?? null,
+      body_fat_pct: metrics.bodyFatPct ?? null,
+      lean_body_mass_kg: metrics.leanBodyMassKg ?? null,
+      source: metrics.source ?? 'manual',
+      note: metrics.note ?? '',
+    };
+
+    this.append(entry);
+
+    return entry;
+  }
+
   getLatestWeight(): number | null {
     const rows = this.spreadsheet.getRows(this.layout.name);
 
@@ -36,13 +63,8 @@ export class BodyLogRepository {
   }
 
   logWeight(timestamp: Date, weight: string): void {
-    this.append({
-      body_log_id: this.createEntryId(timestamp),
-      logged_at: formatLoggedAt(this.spreadsheet, timestamp),
-      weight_kg: Number(weight),
-      bmi: null,
-      body_fat_pct: null,
-      lean_body_mass_kg: null,
+    this.logMetrics(timestamp, {
+      weightKg: Number(weight),
       source: 'manual',
       note: '',
     });

@@ -48,7 +48,11 @@ export interface AiPlan {
   mode: AiResponseMode;
   intent: AiIntent;
   reply: string;
+  confidence?: number | null;
   weightKg?: number | null;
+  bmi?: number | null;
+  bodyFatPct?: number | null;
+  leanBodyMassKg?: number | null;
   cycleDay?: number | null;
   symptom?: string;
   periodNote?: string;
@@ -60,6 +64,7 @@ export interface AiPlan {
   workoutLevel?: WorkoutLevel;
   mealType?: MealType;
   mealText?: string;
+  stockQuery?: string;
   stockItemName?: string;
   stockQuantity?: number | null;
   stockUnit?: string;

@@ -8,6 +8,7 @@ import { persistMealRecord } from './meal-recording';
 
 type CreatePendingMealRecordActionInput = {
   timestamp: Date;
+  traceId?: string;
   sourceText: string;
   previewText: string;
   note: string;
@@ -24,6 +25,7 @@ export function createPendingMealRecordAction(
 ): PendingMealRecordAction {
   return {
     kind: 'meal-record',
+    traceId: input.traceId,
     createdAt: input.timestamp.toISOString(),
     sourceText: input.sourceText,
     previewText: input.previewText,

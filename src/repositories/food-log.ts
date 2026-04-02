@@ -41,6 +41,27 @@ export class FoodLogRepository {
       .filter((entry) => entry.food_log_id.trim() !== '');
   }
 
+  listRecent(referenceDate: Date, limit: number = 5): FoodLogEntry[] {
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => ({
+        food_log_id: String(values[0] ?? ''),
+        logged_at: String(values[1] ?? ''),
+        meal_type: values[2] as FoodLogEntry['meal_type'],
+        meal_text: String(values[3] ?? ''),
+        estimated_calories: values[4] === '' ? null : Number(values[4]),
+        parse_status: values[5] as ParseStatus,
+        note: String(values[6] ?? ''),
+      }))
+      .filter((entry) => entry.food_log_id.trim() !== '')
+      .filter(
+        (entry) =>
+          new Date(entry.logged_at).getTime() <= referenceDate.getTime(),
+      )
+      .sort((left, right) => right.logged_at.localeCompare(left.logged_at))
+      .slice(0, limit);
+  }
+
   createMealEntry(
     timestamp: Date,
     mealType: FoodLogEntry['meal_type'],

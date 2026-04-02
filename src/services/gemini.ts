@@ -1,5 +1,6 @@
 import { GEMINI_API_KEY, GEMINI_MODEL } from '../app-config';
 import { AI_INTENT_VALUES } from '../constants/ai';
+import { buildPlanningFewShotExamples } from './gemini-few-shot';
 import type {
   AiIntent,
   AiPlan,
@@ -84,14 +85,19 @@ function formatDateForPrompt(timestamp: Date): string {
   ].join('-');
 }
 
-function buildSystemInstruction(timestamp: Date): string {
-  return [
+function roundConfidence(value: number): number {
+  return Math.max(0, Math.min(1, Number(value.toFixed(2))));
+}
+
+function buildSystemInstruction(timestamp: Date, contextText?: string): string {
+  const lines = [
     '你是一个 Telegram 个人记录助手的自然语言理解层。',
     '你只能输出一个 JSON 对象，不要输出 Markdown，不要输出代码块。',
     `今天日期是 ${formatDateForPrompt(timestamp)}。`,
     '你的任务是在聊天回复和结构化记录意图之间做判断。',
     '可用 mode 只有 reply、command、clarify。',
     '可用 intent 只有 chat、weight、poo、period、symptom、sleep、workout、food、food_estimate、nutrition_summary、stock_adjust、stock_set、stock_check。',
+    'weight intent 用于身体指标记录，至少可填写 weightKg；如果用户明确给出，也可以同时填写 bmi、bodyFatPct、leanBodyMassKg。',
     '如果是普通问答、闲聊、建议、解释，使用 mode=reply, intent=chat。',
     '如果用户在问今天已经吃了多少热量、蛋白质够不够、蔬菜够不够、今天饮食总结这类需要读取当天记录的问题，优先使用 mode=command, intent=nutrition_summary。',
     '如果用户明显在问一餐、一道食物或若干食材的大致热量，优先使用 mode=command, intent=food_estimate。',
@@ -107,13 +113,24 @@ function buildSystemInstruction(timestamp: Date): string {
     'workoutLevel 只能是 easy、medium、hard。',
     'mealType 只能是 breakfast、lunch、dinner、snack。',
     'food_estimate 至少应填写 mealText；如果用户已经说明餐次，也可以填写 mealType。',
+    'stock_check 用于查询库存；如果用户明确提到某个食材，也可以填写 stockQuery。',
     'stockQuantity 在 stock_adjust 中使用正负数字，在 stock_set 中使用非负数字。',
     '如果是库存变更且一句话里包含多项物品，优先填写 stockItems 数组；每项包含 name、quantity、unit、purchaseChannel。',
     'stockItems 在 stock_adjust 中使用正负数字，在 stock_set 中使用非负数字。',
     '如果只有单项库存，也可以继续填写 stockItemName、stockQuantity、stockUnit、purchaseChannel。',
     '不要发明不存在的能力，不要要求直接操作数据库，不要输出额外字段。',
     '回复语言使用简体中文，尽量简洁。',
-  ].join('\n');
+    buildPlanningFewShotExamples(),
+  ];
+
+  if (contextText?.trim()) {
+    lines.push(
+      '以下是这条消息可参考的结构化上下文，只能作为辅助判断，不能覆盖用户当前明确表达：',
+    );
+    lines.push(contextText.trim());
+  }
+
+  return lines.join('\n');
 }
 
 function buildClarificationFollowupInstruction(timestamp: Date): string {
@@ -337,11 +354,14 @@ function normalizePlan(raw: Record<string, unknown>): AiPlan {
       ? '我还差一点关键信息。你再补充一下，我就能继续处理。'
       : '我知道你的意思了。');
 
-  return {
+  const plan: AiPlan = {
     mode,
     intent,
     reply,
     weightKg: asNullableNumber(raw.weightKg),
+    bmi: asNullableNumber(raw.bmi),
+    bodyFatPct: asNullableNumber(raw.bodyFatPct),
+    leanBodyMassKg: asNullableNumber(raw.leanBodyMassKg),
     cycleDay: asNullableNumber(raw.cycleDay),
     symptom: asString(raw.symptom),
     periodNote: asString(raw.periodNote),
@@ -353,6 +373,7 @@ function normalizePlan(raw: Record<string, unknown>): AiPlan {
     workoutLevel: asWorkoutLevel(raw.workoutLevel),
     mealType: asMealType(raw.mealType),
     mealText: asString(raw.mealText),
+    stockQuery: asString(raw.stockQuery),
     stockItemName: asString(raw.stockItemName),
     stockQuantity: asNullableNumber(raw.stockQuantity),
     stockUnit: asString(raw.stockUnit),
@@ -360,6 +381,68 @@ function normalizePlan(raw: Record<string, unknown>): AiPlan {
     purchaseChannel: asString(raw.purchaseChannel),
     note: asString(raw.note),
   };
+
+  plan.confidence = computePlanConfidence(plan);
+
+  return plan;
+}
+
+function computePlanConfidence(plan: AiPlan): number {
+  if (plan.mode === 'reply') {
+    return roundConfidence(plan.intent === 'chat' ? 0.92 : 0.72);
+  }
+
+  if (plan.mode === 'clarify') {
+    return roundConfidence(plan.reply.trim() ? 0.8 : 0.55);
+  }
+
+  switch (plan.intent) {
+    case 'weight':
+      return roundConfidence(
+        [plan.weightKg, plan.bmi, plan.bodyFatPct, plan.leanBodyMassKg].some(
+          (value) => typeof value === 'number',
+        )
+          ? 0.95
+          : 0.35,
+      );
+    case 'poo':
+      return 0.95;
+    case 'period':
+      return roundConfidence(
+        typeof plan.cycleDay === 'number' || Boolean(plan.periodNote)
+          ? 0.8
+          : 0.65,
+      );
+    case 'symptom':
+      return roundConfidence(plan.symptom ? 0.82 : 0.4);
+    case 'sleep':
+      return roundConfidence(plan.sleepStart && plan.sleepEnd ? 0.9 : 0.35);
+    case 'workout':
+      return roundConfidence(
+        plan.workoutName && typeof plan.durationMin === 'number' ? 0.88 : 0.38,
+      );
+    case 'food':
+    case 'food_estimate':
+      return roundConfidence(
+        plan.mealText ? (plan.mealType ? 0.85 : 0.72) : 0.32,
+      );
+    case 'nutrition_summary':
+      return 0.95;
+    case 'stock_adjust':
+    case 'stock_set': {
+      const hasBatchItems =
+        Array.isArray(plan.stockItems) && plan.stockItems.length > 0;
+      const hasSingleItem = Boolean(
+        plan.stockItemName && typeof plan.stockQuantity === 'number',
+      );
+
+      return roundConfidence(hasBatchItems || hasSingleItem ? 0.9 : 0.3);
+    }
+    case 'stock_check':
+      return 0.95;
+    case 'chat':
+      return 0.9;
+  }
 }
 
 function postJsonRequest(
@@ -401,9 +484,9 @@ function postJsonRequest(
 }
 
 export class GeminiService {
-  planMessage(message: string, timestamp: Date): AiPlan {
+  planMessage(message: string, timestamp: Date, contextText?: string): AiPlan {
     return normalizePlan(
-      postJsonRequest(buildSystemInstruction(timestamp), message),
+      postJsonRequest(buildSystemInstruction(timestamp, contextText), message),
     );
   }
 

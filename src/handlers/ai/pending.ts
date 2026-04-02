@@ -96,7 +96,9 @@ export function handlePendingAiAction(
       result: buildAiResult(
         `${AI_MESSAGES.PENDING_ACTION_BLOCKED}\n${pendingAction.previewText}`,
         'ignored',
-        truncateAiNote(`pending-action=blocked; kind=${pendingAction.kind}`),
+        truncateAiNote(
+          `pending-action=blocked; kind=${pendingAction.kind}${pendingAction.traceId ? `; trace=${pendingAction.traceId}` : ''}`,
+        ),
       ),
     };
   }
@@ -205,22 +207,28 @@ function executePendingMealRecordAction(
 ): CommandHandlingResult {
   try {
     const persisted = confirmPendingMealRecordAction(action, fallbackTimestamp);
+    const notedAction = action.traceId
+      ? appendAiNote(action.note, `trace=${action.traceId}`)
+      : action.note;
 
     return buildAiResult(
       buildMealRecordSuccessReply(action, persisted.stockSync.updatedCount),
       'success',
       appendAiNote(
-        action.note,
+        notedAction,
         `confirmed=true; stock-updated=${persisted.stockSync.updatedCount}`,
       ),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const notedAction = action.traceId
+      ? appendAiNote(action.note, `trace=${action.traceId}`)
+      : action.note;
 
     return buildAiResult(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
-      appendAiNote(action.note, `confirmed=true; persist-error=${message}`),
+      appendAiNote(notedAction, `confirmed=true; persist-error=${message}`),
     );
   }
 }

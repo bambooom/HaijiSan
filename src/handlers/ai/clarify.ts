@@ -10,6 +10,7 @@ export function handleClarifyStage(
 ): CommandHandlingResult {
   savePendingAiAction({
     kind: 'clarify',
+    traceId: turn.traceId,
     createdAt: timestamp.toISOString(),
     sourceText: turn.sourceText,
     clarificationReply: turn.plan.reply,

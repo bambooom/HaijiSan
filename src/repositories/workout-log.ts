@@ -43,6 +43,27 @@ export class WorkoutLogRepository {
       note,
     });
   }
+
+  listRecent(limit: number = 5): WorkoutLogEntry[] {
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => ({
+        workout_id: String(values[0] ?? ''),
+        logged_at: String(values[1] ?? ''),
+        workout_name: String(values[2] ?? ''),
+        workout_video_url: String(values[3] ?? ''),
+        workout_level: values[4] as WorkoutLogEntry['workout_level'],
+        duration_min: values[5] === '' ? null : Number(values[5]),
+        avg_hr: values[6] === '' ? null : Number(values[6]),
+        max_hr: values[7] === '' ? null : Number(values[7]),
+        min_hr: values[8] === '' ? null : Number(values[8]),
+        calories_kcal: values[9] === '' ? null : Number(values[9]),
+        note: String(values[10] ?? ''),
+      }))
+      .filter((entry) => entry.workout_id.trim() !== '')
+      .sort((left, right) => right.logged_at.localeCompare(left.logged_at))
+      .slice(0, limit);
+  }
 }
 
 export const workoutLogRepository = new WorkoutLogRepository();

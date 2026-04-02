@@ -4,6 +4,7 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
+import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
 
 export class RefCaloriesRepository {
   constructor(
@@ -11,6 +12,10 @@ export class RefCaloriesRepository {
   ) {}
 
   private readonly layout = SHEET_LAYOUTS.REF_CALORIES;
+
+  createEntryId(timestamp: Date): string {
+    return createTimestampedEntryId(this.spreadsheet, 'ref', timestamp);
+  }
 
   private mapRow(row: SheetRow): FoodReference {
     return {
@@ -41,6 +46,41 @@ export class RefCaloriesRepository {
 
   append(entry: FoodReferenceEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  logReference(
+    timestamp: Date,
+    entry: {
+      foodName: string;
+      brand?: string;
+      servingSize?: number | null;
+      servingUnit?: string;
+      caloriesKcal?: number | null;
+      proteinG?: number | null;
+      fatG?: number | null;
+      carbsG?: number | null;
+      source?: FoodReferenceEntry['source'];
+      note?: string;
+    },
+  ): FoodReferenceEntry {
+    const record: FoodReferenceEntry = {
+      food_ref_id: this.createEntryId(timestamp),
+      food_name: entry.foodName,
+      brand: entry.brand ?? '',
+      serving_size: entry.servingSize ?? null,
+      serving_unit: entry.servingUnit ?? '',
+      calories_kcal: entry.caloriesKcal ?? null,
+      protein_g: entry.proteinG ?? null,
+      fat_g: entry.fatG ?? null,
+      carbs_g: entry.carbsG ?? null,
+      source: entry.source ?? 'manual_entry',
+      updated_at: formatLoggedAt(this.spreadsheet, timestamp),
+      note: entry.note ?? '',
+    };
+
+    this.append(record);
+
+    return record;
   }
 
   listAll(): FoodReference[] {

@@ -36,6 +36,7 @@ export function handleFoodAiMessage(
   plan: AiPlan,
   originalText: string,
   timestamp: Date,
+  traceId?: string,
 ): CommandHandlingResult {
   const mealInput = buildMealInput(plan, originalText);
   const preMatchedEstimate = estimateMealCalories(mealInput);
@@ -63,6 +64,7 @@ export function handleFoodAiMessage(
         savePendingAiAction(
           createPendingMealRecordAction({
             timestamp,
+            traceId,
             sourceText: originalText,
             previewText,
             note: `mode=command; intent=food_estimate; resolution=single-pass`.slice(
@@ -181,6 +183,7 @@ export function handleFoodAiMessage(
     savePendingAiAction(
       createPendingMealRecordAction({
         timestamp,
+        traceId,
         sourceText: originalText,
         previewText,
         note: `mode=command; intent=food_estimate; pending-confirmation=true`.slice(
