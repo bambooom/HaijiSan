@@ -2,6 +2,10 @@ import { MY_CHAT_ID } from './app-config';
 import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
 import { buildDailySummaryMessage } from './services/daily-summary';
+import {
+  disableDailyDigestTrigger,
+  installDailyDigestTrigger,
+} from './services/digest-trigger';
 import { importHealthDataPhoto } from './services/reference-ocr';
 import {
   downloadTelegramFile,
@@ -118,25 +122,16 @@ function sendDailyDigest(): void {
   sendText(MY_CHAT_ID, buildDailySummaryMessage(new Date()));
 }
 
-function installDailyDigestTrigger(): void {
-  const handler = 'sendDailyDigest';
-
-  ScriptApp.getProjectTriggers()
-    .filter((trigger) => trigger.getHandlerFunction() === handler)
-    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
-
-  ScriptApp.newTrigger(handler)
-    .timeBased()
-    .atHour(23)
-    .nearMinute(30)
-    .everyDays(1)
-    .create();
-}
-
 Object.assign(globalThis, {
   doPost,
   sendDailyDigest,
   installDailyDigestTrigger,
+  disableDailyDigestTrigger,
 });
 
-export { doPost, installDailyDigestTrigger, sendDailyDigest };
+export {
+  disableDailyDigestTrigger,
+  doPost,
+  installDailyDigestTrigger,
+  sendDailyDigest,
+};
