@@ -199,12 +199,28 @@
   },
   "BOT_LOG": {
     "name": "Bot_Log",
-    "fields": ["logged_at", "raw_text", "handling_mode", "status", "note"],
+    "fields": [
+      "logged_at",
+      "raw_text",
+      "handling_mode",
+      "status",
+      "trace_id",
+      "intent",
+      "tool",
+      "confirmation_state",
+      "result_code",
+      "note"
+    ],
     "headers": [
       "记录时间(logged_at)",
       "原始输入(raw_text)",
       "处理方式(handling_mode)",
       "处理结果(status)",
+      "追踪ID(trace_id)",
+      "意图(intent)",
+      "工具(tool)",
+      "确认状态(confirmation_state)",
+      "结果代码(result_code)",
       "备注(note)"
     ]
   }

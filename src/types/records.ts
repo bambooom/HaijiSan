@@ -1,4 +1,5 @@
 import type {
+  BotLogConfirmationState,
   HealthDataSource,
   HandlingMode,
   HandlingStatus,
@@ -95,6 +96,11 @@ export interface BotLogEntry {
   raw_text: string;
   handling_mode: HandlingMode;
   status: HandlingStatus;
+  trace_id: string;
+  intent: string;
+  tool: string;
+  confirmation_state: BotLogConfirmationState | '';
+  result_code: string;
   note: string;
 }
 

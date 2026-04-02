@@ -1,8 +1,13 @@
 import { handleAiMessage, handleCancelPendingAction } from './handlers/ai';
 import { SLASH_COMMANDS, START_HELP_COMMANDS } from './constants/commands';
 import { executeCommandRoute } from './handlers/command-router';
-import type { CommandHandlingResult, HandlingMode } from './types';
+import type {
+  CommandHandlingResult,
+  CommandLogFields,
+  HandlingMode,
+} from './types';
 import { buildAiErrorReply } from './utils/ai-error';
+import { buildCommandLogFields } from './utils/log-meta';
 
 const HELP_MESSAGE = `你好，我是清濑灰二。下面这份可以直接当速查表使用。
 
@@ -72,6 +77,9 @@ export function handleCommand(
         'rule',
         'empty-message',
         'ignored',
+        {
+          resultCode: 'empty-message',
+        },
       );
     }
 
@@ -85,6 +93,9 @@ export function handleCommand(
         'ai',
         `ai-error=${message}`.slice(0, 500),
         'failed',
+        {
+          resultCode: 'ai-error',
+        },
       );
     }
   }
@@ -92,7 +103,9 @@ export function handleCommand(
   if (
     START_HELP_COMMANDS.some((command) => normalizedText.startsWith(command))
   ) {
-    return buildResult(HELP_MESSAGE, 'command', 'help');
+    return buildResult(HELP_MESSAGE, 'command', 'help', 'success', {
+      resultCode: 'help',
+    });
   }
 
   if (normalizedText.startsWith(SLASH_COMMANDS.CANCEL)) {
@@ -102,13 +115,22 @@ export function handleCommand(
       ...cancelResult,
       handlingMode: 'command',
       note: `slash-cancel; ${cancelResult.note}`.slice(0, 500),
+      resultCode: cancelResult.resultCode || 'cancelled',
     };
   }
 
   const routedCommand = executeCommandRoute(normalizedText, timestamp);
 
   if (routedCommand) {
-    return buildResult(routedCommand.reply, 'command', routedCommand.note);
+    return buildResult(
+      routedCommand.reply,
+      'command',
+      routedCommand.note,
+      'success',
+      {
+        resultCode: routedCommand.note,
+      },
+    );
   }
 
   return buildResult(
@@ -116,6 +138,9 @@ export function handleCommand(
     'rule',
     'unknown-command',
     'ignored',
+    {
+      resultCode: 'unknown-command',
+    },
   );
 }
 
@@ -124,11 +149,17 @@ function buildResult(
   handlingMode: HandlingMode,
   note = '',
   status: CommandHandlingResult['status'] = 'success',
+  logFields?: Partial<CommandLogFields>,
 ): CommandHandlingResult {
   return {
     reply,
     handlingMode,
     status,
     note,
+    ...buildCommandLogFields(undefined, {
+      confirmationState: 'none',
+      resultCode: status,
+      ...logFields,
+    }),
   };
 }

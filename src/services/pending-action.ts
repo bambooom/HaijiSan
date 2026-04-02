@@ -117,10 +117,14 @@ export function consumePendingAiActionForConfirmation(
 
     savePendingConfirmationReceipt({
       traceId: action.traceId,
+      intent: action.intent,
+      tool: action.tool,
       kind: action.kind,
       confirmedAt: now.toISOString(),
       status: 'processing',
       reply: '',
+      confirmationState: 'processing',
+      resultCode: 'duplicate-confirmation',
       note: action.note,
     });
     clearPendingAiAction();

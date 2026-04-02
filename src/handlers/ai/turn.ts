@@ -4,7 +4,11 @@ import {
   retrievePlanningContext,
 } from '../../services/context-retrieval';
 import { validateAiPlanAgainstTool } from '../../tools/registry';
-import type { AiPlan, CommandHandlingResult } from '../../types';
+import type {
+  AiPlan,
+  CommandHandlingResult,
+  CommandLogFields,
+} from '../../types';
 import {
   appendAiNote,
   formatToolArgsForNote,
@@ -21,6 +25,7 @@ export type ResolvedAiTurn = {
   traceId: string;
   toolName: string | null;
   toolArgsNote: string | null;
+  logFieldsBase: CommandLogFields;
   note: string;
   stage: AiStage;
 };
@@ -129,6 +134,14 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
     note = appendAiNote(note, 'clarify-followup=merged');
   }
 
+  const logFieldsBase: CommandLogFields = {
+    traceId,
+    intent: plan.intent,
+    tool: toolName ?? '',
+    confirmationState: 'none',
+    resultCode: '',
+  };
+
   return {
     kind: 'turn',
     turn: {
@@ -137,6 +150,7 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
       traceId,
       toolName,
       toolArgsNote,
+      logFieldsBase,
       note,
       stage: toAiStage(plan),
     },

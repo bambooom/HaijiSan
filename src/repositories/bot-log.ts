@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
-import type { BotLogEntry, HandlingMode, HandlingStatus } from '../types';
+import type { BotLogEntry, CommandHandlingResult } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -19,16 +19,19 @@ export class BotLogRepository {
   appendMessageLog(
     timestamp: Date,
     text: string,
-    handlingMode: HandlingMode = 'command',
-    status: HandlingStatus = 'success',
-    note = '',
+    result: CommandHandlingResult,
   ): void {
     this.append({
       logged_at: this.spreadsheet.getTimestamp(true, timestamp),
       raw_text: text,
-      handling_mode: handlingMode,
-      status,
-      note,
+      handling_mode: result.handlingMode,
+      status: result.status,
+      trace_id: result.traceId,
+      intent: result.intent,
+      tool: result.tool,
+      confirmation_state: result.confirmationState,
+      result_code: result.resultCode,
+      note: result.note,
     });
   }
 }

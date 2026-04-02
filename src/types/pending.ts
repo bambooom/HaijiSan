@@ -1,4 +1,10 @@
-import type { AiPlan, AiStockItem, MealType, ParseStatus } from './core';
+import type {
+  AiPlan,
+  AiStockItem,
+  CommandLogFields,
+  MealType,
+  ParseStatus,
+} from './core';
 import type { FoodItemEntry } from './records';
 
 export interface PendingMealRecordInput {
@@ -11,9 +17,9 @@ export interface PendingMealRecordInput {
   items: FoodItemEntry[];
 }
 
-export interface PendingMappedCommandAction {
+export interface PendingMappedCommandAction extends CommandLogFields {
   kind: 'mapped-command';
-  traceId?: string;
+  traceId: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -21,9 +27,9 @@ export interface PendingMappedCommandAction {
   note: string;
 }
 
-export interface PendingMealRecordAction {
+export interface PendingMealRecordAction extends CommandLogFields {
   kind: 'meal-record';
-  traceId?: string;
+  traceId: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -31,9 +37,9 @@ export interface PendingMealRecordAction {
   note: string;
 }
 
-export interface PendingStockBatchAction {
+export interface PendingStockBatchAction extends CommandLogFields {
   kind: 'stock-batch';
-  traceId?: string;
+  traceId: string;
   createdAt: string;
   sourceText: string;
   previewText: string;
@@ -42,9 +48,9 @@ export interface PendingStockBatchAction {
   note: string;
 }
 
-export interface PendingClarificationAction {
+export interface PendingClarificationAction extends CommandLogFields {
   kind: 'clarify';
-  traceId?: string;
+  traceId: string;
   createdAt: string;
   sourceText: string;
   clarificationReply: string;
@@ -52,14 +58,14 @@ export interface PendingClarificationAction {
   note: string;
 }
 
-export interface PendingConfirmationReceipt {
-  traceId?: string;
+export type PendingConfirmationReceipt = {
+  traceId: string;
   kind: Exclude<PendingAiAction['kind'], 'clarify'>;
   confirmedAt: string;
   status: 'processing' | 'completed' | 'failed';
   reply: string;
   note: string;
-}
+} & CommandLogFields;
 
 export type PendingAiAction =
   | PendingMappedCommandAction

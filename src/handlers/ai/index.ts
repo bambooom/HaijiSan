@@ -1,4 +1,5 @@
 import type { CommandHandlingResult } from '../../types';
+import { buildCommandLogFields } from '../../utils/log-meta';
 import { handleClarifyStage } from './clarify';
 import { handleExecuteStage } from './execute';
 import { buildAiResult } from './result';
@@ -20,7 +21,14 @@ export function handleAiMessage(
 
   switch (turn.stage) {
     case 'reply':
-      return buildAiResult(turn.plan.reply, 'success', turn.note);
+      return buildAiResult(
+        turn.plan.reply,
+        'success',
+        turn.note,
+        buildCommandLogFields(turn.logFieldsBase, {
+          resultCode: 'reply',
+        }),
+      );
     case 'clarify':
       return handleClarifyStage(turn, timestamp);
     case 'execute':

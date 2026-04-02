@@ -1,4 +1,5 @@
 import type {
+  CommandLogFields,
   FoodItemEntry,
   MealPersistResult,
   ParseStatus,
@@ -12,6 +13,7 @@ type CreatePendingMealRecordActionInput = {
   sourceText: string;
   previewText: string;
   note: string;
+  logFields: CommandLogFields;
   mealType: PendingMealRecordAction['mealRecord']['mealType'];
   mealText: string;
   estimatedCalories: number | null;
@@ -25,11 +27,11 @@ export function createPendingMealRecordAction(
 ): PendingMealRecordAction {
   return {
     kind: 'meal-record',
-    traceId: input.traceId,
     createdAt: input.timestamp.toISOString(),
     sourceText: input.sourceText,
     previewText: input.previewText,
     note: input.note,
+    ...input.logFields,
     mealRecord: {
       createdAt: input.timestamp.toISOString(),
       mealType: input.mealType,

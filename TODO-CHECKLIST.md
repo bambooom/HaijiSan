@@ -97,7 +97,7 @@ Use it as the working checklist for the next architecture pass.
 - [x] Record confirmation state.
 - [x] Record final write result.
 - [x] Record later correction or cancellation.
-- [ ] Decide whether to add a dedicated action trace repository or extend the current bot log.
+- [x] Decide whether to add a dedicated action trace repository or extend the current bot log.
 
 ---
 
@@ -135,6 +135,6 @@ Use it as the working checklist for the next architecture pass.
 
 - [x] Phase 1: explicit tool contracts
 - [x] Phase 2: context retrieval
-- [ ] Phase 3: structured tracing
+- [x] Phase 3: structured tracing
 - [ ] Phase 4: executable evals
 - [ ] Phase 5: reassess broader orchestration only after the first four are stable

@@ -26,6 +26,7 @@ import {
   buildStockMutationCommandText,
   truncateAiNote,
 } from '../../utils/ai-command';
+import { buildCommandLogFields } from '../../utils/log-meta';
 import { buildAiErrorReply } from '../../utils/ai-error';
 import { executeCommandRoute } from '../command-router';
 import {
@@ -60,6 +61,10 @@ export function handleCancelPendingAction(
       AI_MESSAGES.NO_PENDING_ACTION,
       'ignored',
       'pending-action=none',
+      {
+        confirmationState: 'none',
+        resultCode: 'cancel-no-pending',
+      },
     );
   }
 
@@ -69,6 +74,11 @@ export function handleCancelPendingAction(
     AI_MESSAGES.PENDING_ACTION_CANCELLED,
     'ignored',
     truncateAiNote(`pending-action=cancelled; kind=${pendingAction.kind}`),
+    buildCommandLogFields(pendingAction, {
+      traceId: pendingAction.traceId,
+      confirmationState: 'cancelled',
+      resultCode: 'cancelled',
+    }),
   );
 }
 
@@ -109,6 +119,11 @@ export function handlePendingAiAction(
         truncateAiNote(
           `pending-action=blocked; kind=${pendingAction.kind}${pendingAction.traceId ? `; trace=${pendingAction.traceId}` : ''}`,
         ),
+        buildCommandLogFields(pendingAction, {
+          traceId: pendingAction.traceId,
+          confirmationState: 'pending',
+          resultCode: 'pending-blocked',
+        }),
       ),
     };
   }
@@ -177,6 +192,10 @@ function handlePendingClarificationAction(
         buildAiErrorReply(message, AI_MESSAGES.CLARIFICATION_FOLLOWUP_FAILED),
         'failed',
         appendAiNote(action.note, `clarify-followup=failed; error=${message}`),
+        buildCommandLogFields(action, {
+          traceId: action.traceId,
+          resultCode: 'clarify-followup-failed',
+        }),
       ),
     };
   }
@@ -200,6 +219,10 @@ function buildRepeatedConfirmationResult(
       AI_MESSAGES.NO_PENDING_CONFIRMATION,
       'ignored',
       'pending-confirmation=none',
+      {
+        confirmationState: 'none',
+        resultCode: 'confirm-no-pending',
+      },
     );
   }
 
@@ -208,6 +231,11 @@ function buildRepeatedConfirmationResult(
       AI_MESSAGES.PENDING_ACTION_CONFIRMING,
       'ignored',
       appendAiNote(receipt.note, 'duplicate-confirmation=processing'),
+      buildCommandLogFields(receipt, {
+        traceId: receipt.traceId,
+        confirmationState: 'processing',
+        resultCode: 'duplicate-confirmation',
+      }),
     );
   }
 
@@ -215,6 +243,11 @@ function buildRepeatedConfirmationResult(
     receipt.reply || AI_MESSAGES.PENDING_ACTION_ALREADY_CONFIRMED,
     receipt.status === 'failed' ? 'failed' : 'success',
     appendAiNote(receipt.note, `duplicate-confirmation=${receipt.status}`),
+    buildCommandLogFields(receipt, {
+      traceId: receipt.traceId,
+      confirmationState: 'duplicate',
+      resultCode: 'duplicate-confirmation',
+    }),
   );
 }
 
@@ -236,6 +269,11 @@ function executePendingMappedCommandAction(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
       appendAiNote(action.note, 'confirmed=true; execute=failed'),
+      buildCommandLogFields(action, {
+        traceId: action.traceId,
+        confirmationState: 'failed',
+        resultCode: 'confirmed-write',
+      }),
     );
 
     savePendingConfirmationReceipt({
@@ -245,6 +283,10 @@ function executePendingMappedCommandAction(
       status: 'failed',
       reply: result.reply,
       note: result.note,
+      intent: result.intent,
+      tool: result.tool,
+      confirmationState: result.confirmationState,
+      resultCode: result.resultCode,
     });
 
     return result;
@@ -254,6 +296,11 @@ function executePendingMappedCommandAction(
     commandReply,
     'success',
     appendAiNote(action.note, 'confirmed=true; execute=success'),
+    buildCommandLogFields(action, {
+      traceId: action.traceId,
+      confirmationState: 'confirmed',
+      resultCode: 'confirmed-write',
+    }),
   );
 
   savePendingConfirmationReceipt({
@@ -263,6 +310,10 @@ function executePendingMappedCommandAction(
     status: 'completed',
     reply: result.reply,
     note: result.note,
+    intent: result.intent,
+    tool: result.tool,
+    confirmationState: result.confirmationState,
+    resultCode: result.resultCode,
   });
 
   return result;
@@ -286,6 +337,11 @@ function executePendingMealRecordAction(
         notedAction,
         `confirmed=true; stock-updated=${persisted.stockSync.updatedCount}`,
       ),
+      buildCommandLogFields(action, {
+        traceId: action.traceId,
+        confirmationState: 'confirmed',
+        resultCode: 'confirmed-write',
+      }),
     );
 
     savePendingConfirmationReceipt({
@@ -295,6 +351,10 @@ function executePendingMealRecordAction(
       status: 'completed',
       reply: result.reply,
       note: result.note,
+      intent: result.intent,
+      tool: result.tool,
+      confirmationState: result.confirmationState,
+      resultCode: result.resultCode,
     });
 
     return result;
@@ -308,6 +368,11 @@ function executePendingMealRecordAction(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
       appendAiNote(notedAction, `confirmed=true; persist-error=${message}`),
+      buildCommandLogFields(action, {
+        traceId: action.traceId,
+        confirmationState: 'failed',
+        resultCode: 'confirmed-write',
+      }),
     );
 
     savePendingConfirmationReceipt({
@@ -317,6 +382,10 @@ function executePendingMealRecordAction(
       status: 'failed',
       reply: result.reply,
       note: result.note,
+      intent: result.intent,
+      tool: result.tool,
+      confirmationState: result.confirmationState,
+      resultCode: result.resultCode,
     });
 
     return result;
@@ -355,6 +424,11 @@ function executePendingStockBatchAction(
         action.note,
         `confirmed=true; stock-batch=0/${action.items.length}`,
       ),
+      buildCommandLogFields(action, {
+        traceId: action.traceId,
+        confirmationState: 'failed',
+        resultCode: 'confirmed-write',
+      }),
     );
 
     savePendingConfirmationReceipt({
@@ -364,6 +438,10 @@ function executePendingStockBatchAction(
       status: 'failed',
       reply: result.reply,
       note: result.note,
+      intent: result.intent,
+      tool: result.tool,
+      confirmationState: result.confirmationState,
+      resultCode: result.resultCode,
     });
 
     return result;
@@ -376,6 +454,11 @@ function executePendingStockBatchAction(
       action.note,
       `confirmed=true; stock-batch=${successReplies.length}/${action.items.length}`,
     ),
+    buildCommandLogFields(action, {
+      traceId: action.traceId,
+      confirmationState: failedItems.length === 0 ? 'confirmed' : 'failed',
+      resultCode: 'confirmed-write',
+    }),
   );
 
   savePendingConfirmationReceipt({
@@ -385,6 +468,10 @@ function executePendingStockBatchAction(
     status: failedItems.length === 0 ? 'completed' : 'failed',
     reply: result.reply,
     note: result.note,
+    intent: result.intent,
+    tool: result.tool,
+    confirmationState: result.confirmationState,
+    resultCode: result.resultCode,
   });
 
   return result;

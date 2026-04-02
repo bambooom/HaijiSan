@@ -5,7 +5,12 @@ import {
   getToolContract,
 } from '../../tools/registry';
 import { type ToolInputMap, type ToolName } from '../../tools/schemas';
-import type { AiIntent, AiPlan, CommandHandlingResult } from '../../types';
+import type {
+  AiIntent,
+  AiPlan,
+  CommandHandlingResult,
+  CommandLogFields,
+} from '../../types';
 import {
   appendAiNote,
   buildStockBatchPreview,
@@ -13,6 +18,7 @@ import {
   resolveAiStockItems,
   summarizeAiPlan,
 } from '../../utils/ai-command';
+import { buildCommandLogFields } from '../../utils/log-meta';
 import { executeCommandRoute } from '../command-router';
 import { handleFoodAiMessage } from './food';
 import { buildMappedCommandPreview } from './pending';
@@ -29,6 +35,7 @@ type SpecialExecutor = (
   timestamp: Date,
   traceId?: string,
   baseNote?: string,
+  baseLogFields?: CommandLogFields,
 ) => CommandHandlingResult;
 
 const SPECIAL_EXECUTORS: Partial<Record<AiIntent, SpecialExecutor>> = {
@@ -51,6 +58,7 @@ export function handleExecuteStage(
       timestamp,
       turn.traceId,
       turn.note,
+      turn.logFieldsBase,
     );
 
     return {
@@ -99,6 +107,9 @@ function executeToolFromRegistry(
       turn.plan.reply || AI_MESSAGES.INCOMPLETE_COMMAND,
       'ignored',
       appendAiNote(summarizeAiPlan(turn.plan), `tool=${toolName}`),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'tool-input-missing',
+      }),
     );
   }
 
@@ -114,6 +125,11 @@ function executeToolFromRegistry(
       validation.issues[0]?.message || AI_MESSAGES.INCOMPLETE_COMMAND,
       validation.shouldClarify ? 'ignored' : 'failed',
       appendAiNote(summarizeAiPlan(turn.plan), `tool=${toolName}`),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: validation.shouldClarify
+          ? 'tool-validation-clarify'
+          : 'tool-validation-failed',
+      }),
     );
   }
 
@@ -144,6 +160,9 @@ function executeReadOnlyTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=missing`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'tool-execute-missing',
+      }),
     );
   }
 
@@ -161,6 +180,9 @@ function executeReadOnlyTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=success`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'read-executed',
+      }),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -172,6 +194,9 @@ function executeReadOnlyTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=failed; error=${message}`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'read-execution-failed',
+      }),
     );
   }
 }
@@ -192,6 +217,9 @@ function executeImmediateWriteTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=missing`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'tool-execute-missing',
+      }),
     );
   }
 
@@ -209,6 +237,9 @@ function executeImmediateWriteTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=success`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'write-executed',
+      }),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -220,6 +251,9 @@ function executeImmediateWriteTool(
         summarizeAiPlan(turn.plan),
         `tool=${toolName}; execute=failed; error=${message}`,
       ),
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'write-execution-failed',
+      }),
     );
   }
 }
@@ -235,6 +269,9 @@ function executeMappedCommand(
       turn.plan.reply || AI_MESSAGES.INCOMPLETE_COMMAND,
       'ignored',
       turn.note,
+      buildCommandLogFields(turn.logFieldsBase, {
+        resultCode: 'mapped-command-missing',
+      }),
     );
   }
 
@@ -243,18 +280,26 @@ function executeMappedCommand(
 
   savePendingAiAction({
     kind: 'mapped-command',
-    traceId: turn.traceId,
     createdAt: timestamp.toISOString(),
     sourceText: turn.sourceText,
     previewText,
     commandText,
     note: commandNote,
+    ...buildCommandLogFields(turn.logFieldsBase, {
+      traceId: turn.traceId,
+      confirmationState: 'pending',
+      resultCode: 'pending-write',
+    }),
   });
 
   return buildAiResult(
     previewText,
     'success',
     appendAiNote(commandNote, 'pending-confirmation=true'),
+    buildCommandLogFields(turn.logFieldsBase, {
+      confirmationState: 'pending',
+      resultCode: 'pending-write',
+    }),
   );
 }
 
@@ -264,6 +309,7 @@ function handleStockAiMessage(
   timestamp: Date,
   traceId?: string,
   baseNote?: string,
+  baseLogFields?: CommandLogFields,
 ): CommandHandlingResult {
   const items = resolveAiStockItems(plan);
 
@@ -272,6 +318,10 @@ function handleStockAiMessage(
       plan.reply || AI_MESSAGES.INCOMPLETE_COMMAND,
       'ignored',
       summarizeAiPlan(plan),
+      buildCommandLogFields(baseLogFields, {
+        intent: plan.intent,
+        resultCode: 'stock-items-missing',
+      }),
     );
   }
 
@@ -288,18 +338,28 @@ function handleStockAiMessage(
 
   savePendingAiAction({
     kind: 'stock-batch',
-    traceId,
     createdAt: timestamp.toISOString(),
     sourceText,
     previewText,
     operation,
     items,
     note: notedCommand,
+    ...buildCommandLogFields(baseLogFields, {
+      traceId,
+      intent: plan.intent,
+      confirmationState: 'pending',
+      resultCode: 'pending-write',
+    }),
   });
 
   return buildAiResult(
     previewText,
     'success',
     appendAiNote(notedCommand, 'pending-confirmation=true'),
+    buildCommandLogFields(baseLogFields, {
+      intent: plan.intent,
+      confirmationState: 'pending',
+      resultCode: 'pending-write',
+    }),
   );
 }

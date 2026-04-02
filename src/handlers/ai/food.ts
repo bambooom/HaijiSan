@@ -28,8 +28,10 @@ import {
 import type {
   AiPlan,
   CommandHandlingResult,
+  CommandLogFields,
   IngredientEstimateResult,
 } from '../../types';
+import { buildCommandLogFields } from '../../utils/log-meta';
 import { buildAiResult } from './result';
 
 export function handleFoodAiMessage(
@@ -38,6 +40,7 @@ export function handleFoodAiMessage(
   timestamp: Date,
   traceId?: string,
   baseNote?: string,
+  baseLogFields?: CommandLogFields,
 ): CommandHandlingResult {
   const mealInput = buildMealInput(plan, originalText);
   const preMatchedEstimate = estimateMealCalories(mealInput);
@@ -72,6 +75,11 @@ export function handleFoodAiMessage(
               baseNote,
               `resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
             ),
+            logFields: buildCommandLogFields(baseLogFields, {
+              intent: plan.intent,
+              confirmationState: 'pending',
+              resultCode: 'pending-write',
+            }),
             mealType: resolvedMeal.mealType,
             mealText: resolvedMeal.mealText,
             estimatedCalories: resolvedMeal.estimatedCalories,
@@ -88,6 +96,11 @@ export function handleFoodAiMessage(
             baseNote,
             `pending-confirmation=true; resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
           ),
+          buildCommandLogFields(baseLogFields, {
+            intent: plan.intent,
+            confirmationState: 'pending',
+            resultCode: 'pending-write',
+          }),
         );
       }
 
@@ -98,6 +111,10 @@ export function handleFoodAiMessage(
           baseNote,
           `meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}; persisted=false`,
         ),
+        buildCommandLogFields(baseLogFields, {
+          intent: plan.intent,
+          resultCode: 'food-estimated',
+        }),
       );
     }
   } catch {
@@ -112,6 +129,10 @@ export function handleFoodAiMessage(
       buildUnableToEstimateReply(),
       'ignored',
       appendMealExecutionNote(baseNote, 'estimate=unparseable'),
+      buildCommandLogFields(baseLogFields, {
+        intent: plan.intent,
+        resultCode: 'estimate-unparseable',
+      }),
     );
   }
 
@@ -123,6 +144,10 @@ export function handleFoodAiMessage(
         baseNote,
         `meal=${estimate.mealText}; estimate=no-weighted-items`,
       ),
+      buildCommandLogFields(baseLogFields, {
+        intent: plan.intent,
+        resultCode: 'estimate-no-weighted-items',
+      }),
     );
   }
 
@@ -159,6 +184,10 @@ export function handleFoodAiMessage(
         baseNote,
         `meal=${estimate.mealText}; estimate=no-calories`,
       ),
+      buildCommandLogFields(baseLogFields, {
+        intent: plan.intent,
+        resultCode: 'estimate-no-calories',
+      }),
     );
   }
 
@@ -188,6 +217,11 @@ export function handleFoodAiMessage(
         sourceText: originalText,
         previewText,
         note: appendMealExecutionNote(baseNote, 'pending-confirmation=true'),
+        logFields: buildCommandLogFields(baseLogFields, {
+          intent: plan.intent,
+          confirmationState: 'pending',
+          resultCode: 'pending-write',
+        }),
         mealType: estimate.mealType,
         mealText: estimate.mealText,
         estimatedCalories: totalEstimatedCalories,
@@ -208,6 +242,11 @@ export function handleFoodAiMessage(
         baseNote,
         `meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; pending-confirmation=true`,
       ),
+      buildCommandLogFields(baseLogFields, {
+        intent: plan.intent,
+        confirmationState: 'pending',
+        resultCode: 'pending-write',
+      }),
     );
   }
 
@@ -218,6 +257,10 @@ export function handleFoodAiMessage(
       baseNote,
       `meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; persisted=false`,
     ),
+    buildCommandLogFields(baseLogFields, {
+      intent: plan.intent,
+      resultCode: 'food-estimated',
+    }),
   );
 }
 
