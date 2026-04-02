@@ -16,6 +16,113 @@ type PhotoImportInput = {
   caption?: string;
 };
 
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isWithinRange(
+  value: number | null | undefined,
+  minimum: number,
+  maximum: number,
+): value is number {
+  return isFiniteNumber(value) && value >= minimum && value <= maximum;
+}
+
+function hasValidNutritionMetrics(extracted: {
+  servingSize: number | null;
+  caloriesKcal: number | null;
+  proteinG: number | null;
+  fatG: number | null;
+  carbsG: number | null;
+}): boolean {
+  if (!isWithinRange(extracted.caloriesKcal, 0, 5000)) {
+    return false;
+  }
+
+  if (
+    extracted.servingSize !== null &&
+    !isWithinRange(extracted.servingSize, 0.1, 5000)
+  ) {
+    return false;
+  }
+
+  const macroValues = [extracted.proteinG, extracted.fatG, extracted.carbsG];
+  return macroValues.every(
+    (value) => value === null || isWithinRange(value, 0, 1000),
+  );
+}
+
+function hasValidBodyMetrics(extracted: {
+  weightKg: number | null;
+  bmi: number | null;
+  bodyFatPct: number | null;
+  leanBodyMassKg: number | null;
+}): boolean {
+  const hasAnyMetric =
+    extracted.weightKg !== null ||
+    extracted.bmi !== null ||
+    extracted.bodyFatPct !== null ||
+    extracted.leanBodyMassKg !== null;
+
+  if (!hasAnyMetric) {
+    return false;
+  }
+
+  if (
+    extracted.weightKg !== null &&
+    !isWithinRange(extracted.weightKg, 20, 400)
+  ) {
+    return false;
+  }
+
+  if (extracted.bmi !== null && !isWithinRange(extracted.bmi, 8, 80)) {
+    return false;
+  }
+
+  if (
+    extracted.bodyFatPct !== null &&
+    !isWithinRange(extracted.bodyFatPct, 1, 80)
+  ) {
+    return false;
+  }
+
+  if (
+    extracted.leanBodyMassKg !== null &&
+    !isWithinRange(extracted.leanBodyMassKg, 10, 250)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function hasValidSleepHours(value: number): boolean {
+  return isWithinRange(value, 0.5, 20);
+}
+
+function hasValidWorkoutMetrics(extracted: {
+  workoutName: string | null;
+  durationMin: number | null;
+  workoutCaloriesKcal: number | null;
+}): boolean {
+  if (!extracted.workoutName?.trim()) {
+    return false;
+  }
+
+  if (!isWithinRange(extracted.durationMin, 1, 24 * 60)) {
+    return false;
+  }
+
+  if (
+    extracted.workoutCaloriesKcal !== null &&
+    !isWithinRange(extracted.workoutCaloriesKcal, 0, 10000)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 function buildOcrNote(parts: Array<string | null | undefined>): string {
   return parts
     .map((part) => part?.trim())
@@ -113,7 +220,7 @@ export function importReferenceFromNutritionLabelPhoto(
   if (
     (extracted.confidence ?? 0) < MIN_OCR_CONFIDENCE ||
     !extracted.foodName ||
-    extracted.caloriesKcal === null
+    !hasValidNutritionMetrics(extracted)
   ) {
     return buildLowConfidenceResult(
       'nutrition_label',
@@ -178,12 +285,7 @@ export function importHealthDataPhoto(
   }
 
   if (extracted.kind === 'body_metrics') {
-    if (
-      extracted.weightKg === null &&
-      extracted.bmi === null &&
-      extracted.bodyFatPct === null &&
-      extracted.leanBodyMassKg === null
-    ) {
+    if (!hasValidBodyMetrics(extracted)) {
       return buildUnsupportedResult(extracted.note);
     }
 
@@ -245,6 +347,10 @@ export function importHealthDataPhoto(
         ).toFixed(1),
       );
 
+    if (!hasValidSleepHours(sleepHours)) {
+      return buildUnsupportedResult(extracted.note);
+    }
+
     sleepLogRepository.logSleep(
       timestamp,
       sleepStart,
@@ -278,14 +384,22 @@ export function importHealthDataPhoto(
   }
 
   if (extracted.kind === 'workout_summary') {
-    if (!extracted.workoutName || extracted.durationMin === null) {
+    if (!hasValidWorkoutMetrics(extracted)) {
       return buildUnsupportedResult(extracted.note);
     }
 
+    const { workoutName: rawWorkoutName, durationMin } = extracted;
+
+    if (!rawWorkoutName || durationMin === null) {
+      return buildUnsupportedResult(extracted.note);
+    }
+
+    const workoutName = rawWorkoutName.trim();
+
     workoutLogRepository.logWorkout(
       timestamp,
-      extracted.workoutName,
-      extracted.durationMin,
+      workoutName,
+      durationMin,
       extracted.workoutLevel ?? 'medium',
       buildOcrNote([
         'photo-ocr',
@@ -299,7 +413,7 @@ export function importHealthDataPhoto(
     );
 
     return buildAiResult(
-      `✅ 已记录运动：${extracted.workoutName}，时长 ${extracted.durationMin} 分钟，强度${extracted.workoutLevel ?? 'medium'}。`,
+      `✅ 已记录运动：${workoutName}，时长 ${durationMin} 分钟，强度${extracted.workoutLevel ?? 'medium'}。`,
       'success',
       buildOcrNote([
         'photo-kind=workout_summary',
