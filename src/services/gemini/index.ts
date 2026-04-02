@@ -19,6 +19,7 @@ import {
 } from './parsers';
 import {
   buildClarificationFollowupInstruction,
+  buildDailyInsightInstruction,
   buildHealthScreenshotInstruction,
   buildIngredientEstimateInstruction,
   buildMealResolutionInstruction,
@@ -152,6 +153,25 @@ export class GeminiService {
     ) as HealthScreenshotEnvelope;
 
     return parseHealthScreenshot(raw);
+  }
+
+  generateDailyInsight(input: {
+    timestamp: Date;
+    deterministicSummary: string;
+    context: Record<string, unknown>;
+  }): string | null {
+    const raw = postJsonRequest(
+      buildDailyInsightInstruction(input.timestamp),
+      JSON.stringify({
+        deterministicSummary: input.deterministicSummary,
+        context: input.context,
+      }),
+    );
+    const insight = raw.insight;
+
+    return typeof insight === 'string' && insight.trim() !== ''
+      ? insight.trim()
+      : null;
   }
 }
 

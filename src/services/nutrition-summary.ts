@@ -4,12 +4,13 @@ import {
   foodLogRepository,
   refCaloriesRepository,
 } from '../repositories';
-import type { FoodItemEntry, FoodLogEntry } from '../types';
+import type { FoodItemEntry, FoodLogEntry, MealType } from '../types';
 import type { FoodReference } from '../types/repositories';
 import { convertQuantity } from './food-analysis';
 
 const DAILY_VEGETABLE_TARGET_G = 300;
 const PROTEIN_TARGET_PER_KG = 1.2;
+const HIGH_CARB_CALORIE_SHARE_THRESHOLD = 0.6;
 const VEGETABLE_KEYWORDS = [
   '菠菜',
   '生菜',
@@ -50,17 +51,49 @@ const VEGETABLE_KEYWORDS = [
 
 export type NutritionSummary = {
   meals: FoodLogEntry[];
+  mealSummaries: MealNutritionSummary[];
   totalCalories: number | null;
   coveredCaloriesMealCount: number;
   totalProtein: number | null;
+  totalFat: number | null;
+  totalCarbs: number | null;
   proteinCoveredItemCount: number;
+  fatCoveredItemCount: number;
+  carbsCoveredItemCount: number;
   proteinTarget: number | null;
   latestWeightKg: number | null;
   proteinUnresolvedItems: string[];
+  fatUnresolvedItems: string[];
+  carbsUnresolvedItems: string[];
+  proteinStatus: 'enough' | 'low' | 'unknown';
+  vegetableStatus: 'enough' | 'low' | 'unknown';
+  carbsStatus: 'high' | 'moderate' | 'unknown';
+  carbCalorieShare: number | null;
   totalVegetableGrams: number | null;
   vegetableCoveredItemCount: number;
   vegetableUnresolvedItems: string[];
 };
+
+export type MealNutritionSummary = {
+  meal: FoodLogEntry;
+  totalCalories: number | null;
+  totalProtein: number | null;
+  totalFat: number | null;
+  totalCarbs: number | null;
+  totalVegetableGrams: number | null;
+  proteinCoveredItemCount: number;
+  fatCoveredItemCount: number;
+  carbsCoveredItemCount: number;
+  vegetableCoveredItemCount: number;
+  proteinUnresolvedItems: string[];
+  fatUnresolvedItems: string[];
+  carbsUnresolvedItems: string[];
+  vegetableUnresolvedItems: string[];
+};
+
+type NutrientKey = 'protein' | 'fat' | 'carbs';
+
+type MealNutritionAccumulator = MealNutritionSummary;
 
 function roundToOneDecimal(value: number): number {
   return Number(value.toFixed(1));
@@ -78,121 +111,223 @@ function buildReferenceMap(items: FoodReference[]): Map<string, FoodReference> {
   return new Map(items.map((item) => [item.id, item]));
 }
 
-function sumCalories(meals: FoodLogEntry[]): {
-  totalCalories: number | null;
-  coveredCaloriesMealCount: number;
-} {
-  let totalCalories = 0;
-  let coveredCaloriesMealCount = 0;
-
-  for (const meal of meals) {
-    if (typeof meal.estimated_calories !== 'number') {
-      continue;
-    }
-
-    totalCalories += meal.estimated_calories;
-    coveredCaloriesMealCount += 1;
-  }
-
+function createEmptyMealSummary(meal: FoodLogEntry): MealNutritionAccumulator {
   return {
-    totalCalories:
-      coveredCaloriesMealCount > 0 ? roundToOneDecimal(totalCalories) : null,
-    coveredCaloriesMealCount,
+    meal,
+    totalCalories: meal.estimated_calories,
+    totalProtein: null,
+    totalFat: null,
+    totalCarbs: null,
+    totalVegetableGrams: null,
+    proteinCoveredItemCount: 0,
+    fatCoveredItemCount: 0,
+    carbsCoveredItemCount: 0,
+    vegetableCoveredItemCount: 0,
+    proteinUnresolvedItems: [],
+    fatUnresolvedItems: [],
+    carbsUnresolvedItems: [],
+    vegetableUnresolvedItems: [],
   };
 }
 
-function sumProtein(
+function getReferenceNutrientValue(
+  item: FoodItemEntry,
+  referenceMap: Map<string, FoodReference>,
+  nutrientKey: NutrientKey,
+): number | null {
+  if (item.quantity === null || !item.linked_food_ref_id) {
+    return null;
+  }
+
+  const reference = referenceMap.get(item.linked_food_ref_id);
+
+  if (
+    !reference ||
+    reference.servingSize === null ||
+    reference.servingSize <= 0
+  ) {
+    return null;
+  }
+
+  const nutrientValue = reference[nutrientKey];
+
+  if (nutrientValue === null) {
+    return null;
+  }
+
+  const convertedQuantity = convertQuantity(
+    item.quantity,
+    item.unit,
+    reference.unit,
+  );
+
+  if (convertedQuantity === null) {
+    return null;
+  }
+
+  return (convertedQuantity * nutrientValue) / reference.servingSize;
+}
+
+function getVegetableGrams(item: FoodItemEntry): number | null {
+  if (!isVegetableItem(item.item_name) || item.quantity === null) {
+    return null;
+  }
+
+  return convertQuantity(item.quantity, item.unit, 'g');
+}
+
+function addRounded(currentValue: number | null, nextValue: number): number {
+  return roundToOneDecimal((currentValue ?? 0) + nextValue);
+}
+
+function buildMealSummaries(
+  meals: FoodLogEntry[],
   items: FoodItemEntry[],
   referenceMap: Map<string, FoodReference>,
-): {
-  totalProtein: number | null;
-  proteinCoveredItemCount: number;
-  proteinUnresolvedItems: string[];
-} {
-  let totalProtein = 0;
-  let proteinCoveredItemCount = 0;
-  const proteinUnresolvedItems: string[] = [];
+): MealNutritionSummary[] {
+  const itemsByMeal = new Map<string, FoodItemEntry[]>();
 
   for (const item of items) {
-    if (item.quantity === null || !item.linked_food_ref_id) {
-      proteinUnresolvedItems.push(item.item_name);
-      continue;
-    }
-
-    const reference = referenceMap.get(item.linked_food_ref_id);
-
-    if (
-      !reference ||
-      reference.protein === null ||
-      reference.servingSize === null ||
-      reference.servingSize <= 0
-    ) {
-      proteinUnresolvedItems.push(item.item_name);
-      continue;
-    }
-
-    const convertedQuantity = convertQuantity(
-      item.quantity,
-      item.unit,
-      reference.unit,
-    );
-
-    if (convertedQuantity === null) {
-      proteinUnresolvedItems.push(item.item_name);
-      continue;
-    }
-
-    totalProtein +=
-      (convertedQuantity * reference.protein) / reference.servingSize;
-    proteinCoveredItemCount += 1;
+    const mealItems = itemsByMeal.get(item.parent_food_log_id) ?? [];
+    mealItems.push(item);
+    itemsByMeal.set(item.parent_food_log_id, mealItems);
   }
 
-  return {
-    totalProtein:
-      proteinCoveredItemCount > 0 ? roundToOneDecimal(totalProtein) : null,
-    proteinCoveredItemCount,
-    proteinUnresolvedItems: uniqNames(proteinUnresolvedItems),
-  };
+  return meals.map((meal) => {
+    const summary = createEmptyMealSummary(meal);
+    const mealItems = itemsByMeal.get(meal.food_log_id) ?? [];
+    let fallbackCalories = 0;
+    let fallbackCaloriesCount = 0;
+
+    for (const item of mealItems) {
+      if (item.estimated_calories !== null) {
+        fallbackCalories += item.estimated_calories;
+        fallbackCaloriesCount += 1;
+      }
+
+      const protein = getReferenceNutrientValue(item, referenceMap, 'protein');
+      if (protein === null) {
+        summary.proteinUnresolvedItems.push(item.item_name);
+      } else {
+        summary.totalProtein = addRounded(summary.totalProtein, protein);
+        summary.proteinCoveredItemCount += 1;
+      }
+
+      const fat = getReferenceNutrientValue(item, referenceMap, 'fat');
+      if (fat === null) {
+        summary.fatUnresolvedItems.push(item.item_name);
+      } else {
+        summary.totalFat = addRounded(summary.totalFat, fat);
+        summary.fatCoveredItemCount += 1;
+      }
+
+      const carbs = getReferenceNutrientValue(item, referenceMap, 'carbs');
+      if (carbs === null) {
+        summary.carbsUnresolvedItems.push(item.item_name);
+      } else {
+        summary.totalCarbs = addRounded(summary.totalCarbs, carbs);
+        summary.carbsCoveredItemCount += 1;
+      }
+
+      if (!isVegetableItem(item.item_name)) {
+        continue;
+      }
+
+      const grams = getVegetableGrams(item);
+      if (grams === null) {
+        summary.vegetableUnresolvedItems.push(item.item_name);
+      } else {
+        summary.totalVegetableGrams = addRounded(
+          summary.totalVegetableGrams,
+          grams,
+        );
+        summary.vegetableCoveredItemCount += 1;
+      }
+    }
+
+    if (summary.totalCalories === null && fallbackCaloriesCount > 0) {
+      summary.totalCalories = roundToOneDecimal(fallbackCalories);
+    }
+
+    return {
+      ...summary,
+      proteinUnresolvedItems: uniqNames(summary.proteinUnresolvedItems),
+      fatUnresolvedItems: uniqNames(summary.fatUnresolvedItems),
+      carbsUnresolvedItems: uniqNames(summary.carbsUnresolvedItems),
+      vegetableUnresolvedItems: uniqNames(summary.vegetableUnresolvedItems),
+    };
+  });
 }
 
-function sumVegetables(items: FoodItemEntry[]): {
-  totalVegetableGrams: number | null;
-  vegetableCoveredItemCount: number;
-  vegetableUnresolvedItems: string[];
-} {
-  let totalVegetableGrams = 0;
-  let vegetableCoveredItemCount = 0;
-  const vegetableUnresolvedItems: string[] = [];
+function sumNullable(values: Array<number | null>): number | null {
+  const definedValues = values.filter(
+    (value): value is number => typeof value === 'number',
+  );
 
-  for (const item of items) {
-    if (!isVegetableItem(item.item_name)) {
-      continue;
-    }
-
-    if (item.quantity === null) {
-      vegetableUnresolvedItems.push(item.item_name);
-      continue;
-    }
-
-    const grams = convertQuantity(item.quantity, item.unit, 'g');
-
-    if (grams === null) {
-      vegetableUnresolvedItems.push(item.item_name);
-      continue;
-    }
-
-    totalVegetableGrams += grams;
-    vegetableCoveredItemCount += 1;
+  if (definedValues.length === 0) {
+    return null;
   }
 
-  return {
-    totalVegetableGrams:
-      vegetableCoveredItemCount > 0
-        ? roundToOneDecimal(totalVegetableGrams)
-        : null,
-    vegetableCoveredItemCount,
-    vegetableUnresolvedItems: uniqNames(vegetableUnresolvedItems),
-  };
+  return roundToOneDecimal(
+    definedValues.reduce((sum, value) => sum + value, 0),
+  );
+}
+
+function getProteinStatus(
+  totalProtein: number | null,
+  proteinTarget: number | null,
+): NutritionSummary['proteinStatus'] {
+  if (totalProtein === null || proteinTarget === null) {
+    return 'unknown';
+  }
+
+  return totalProtein >= proteinTarget ? 'enough' : 'low';
+}
+
+function getVegetableStatus(
+  totalVegetableGrams: number | null,
+): NutritionSummary['vegetableStatus'] {
+  if (totalVegetableGrams === null) {
+    return 'unknown';
+  }
+
+  return totalVegetableGrams >= DAILY_VEGETABLE_TARGET_G ? 'enough' : 'low';
+}
+
+function getCarbCalorieShare(
+  totalCarbs: number | null,
+  totalCalories: number | null,
+): number | null {
+  if (totalCarbs === null || totalCalories === null || totalCalories <= 0) {
+    return null;
+  }
+
+  return roundToOneDecimal((totalCarbs * 4) / totalCalories);
+}
+
+function getCarbsStatus(
+  carbCalorieShare: number | null,
+): NutritionSummary['carbsStatus'] {
+  if (carbCalorieShare === null) {
+    return 'unknown';
+  }
+
+  return carbCalorieShare >= HIGH_CARB_CALORIE_SHARE_THRESHOLD
+    ? 'high'
+    : 'moderate';
+}
+
+function formatMealType(mealType: MealType): string {
+  switch (mealType) {
+    case 'breakfast':
+      return '早餐';
+    case 'lunch':
+      return '午餐';
+    case 'dinner':
+      return '晚餐';
+    case 'snack':
+      return '加餐';
+  }
 }
 
 export function buildNutritionSummaryFromRecords(input: {
@@ -202,27 +337,85 @@ export function buildNutritionSummaryFromRecords(input: {
   latestWeightKg: number | null;
 }): NutritionSummary {
   const referenceMap = buildReferenceMap(input.references);
-  const { totalCalories, coveredCaloriesMealCount } = sumCalories(input.meals);
-  const { totalProtein, proteinCoveredItemCount, proteinUnresolvedItems } =
-    sumProtein(input.items, referenceMap);
-  const {
-    totalVegetableGrams,
-    vegetableCoveredItemCount,
-    vegetableUnresolvedItems,
-  } = sumVegetables(input.items);
+  const mealSummaries = buildMealSummaries(
+    input.meals,
+    input.items,
+    referenceMap,
+  );
+  const totalCalories = sumNullable(
+    mealSummaries.map((mealSummary) => mealSummary.totalCalories),
+  );
+  const totalProtein = sumNullable(
+    mealSummaries.map((mealSummary) => mealSummary.totalProtein),
+  );
+  const totalFat = sumNullable(
+    mealSummaries.map((mealSummary) => mealSummary.totalFat),
+  );
+  const totalCarbs = sumNullable(
+    mealSummaries.map((mealSummary) => mealSummary.totalCarbs),
+  );
+  const totalVegetableGrams = sumNullable(
+    mealSummaries.map((mealSummary) => mealSummary.totalVegetableGrams),
+  );
+  const coveredCaloriesMealCount = mealSummaries.filter(
+    (mealSummary) => mealSummary.totalCalories !== null,
+  ).length;
+  const proteinCoveredItemCount = mealSummaries.reduce(
+    (sum, mealSummary) => sum + mealSummary.proteinCoveredItemCount,
+    0,
+  );
+  const fatCoveredItemCount = mealSummaries.reduce(
+    (sum, mealSummary) => sum + mealSummary.fatCoveredItemCount,
+    0,
+  );
+  const carbsCoveredItemCount = mealSummaries.reduce(
+    (sum, mealSummary) => sum + mealSummary.carbsCoveredItemCount,
+    0,
+  );
+  const vegetableCoveredItemCount = mealSummaries.reduce(
+    (sum, mealSummary) => sum + mealSummary.vegetableCoveredItemCount,
+    0,
+  );
+  const proteinUnresolvedItems = uniqNames(
+    mealSummaries.flatMap((mealSummary) => mealSummary.proteinUnresolvedItems),
+  );
+  const fatUnresolvedItems = uniqNames(
+    mealSummaries.flatMap((mealSummary) => mealSummary.fatUnresolvedItems),
+  );
+  const carbsUnresolvedItems = uniqNames(
+    mealSummaries.flatMap((mealSummary) => mealSummary.carbsUnresolvedItems),
+  );
+  const vegetableUnresolvedItems = uniqNames(
+    mealSummaries.flatMap(
+      (mealSummary) => mealSummary.vegetableUnresolvedItems,
+    ),
+  );
+  const proteinTarget =
+    input.latestWeightKg === null
+      ? null
+      : roundToOneDecimal(input.latestWeightKg * PROTEIN_TARGET_PER_KG);
+  const carbCalorieShare = getCarbCalorieShare(totalCarbs, totalCalories);
 
   return {
     meals: input.meals,
+    mealSummaries,
     totalCalories,
     coveredCaloriesMealCount,
     totalProtein,
+    totalFat,
+    totalCarbs,
     proteinCoveredItemCount,
-    proteinTarget:
-      input.latestWeightKg === null
-        ? null
-        : roundToOneDecimal(input.latestWeightKg * PROTEIN_TARGET_PER_KG),
+    fatCoveredItemCount,
+    carbsCoveredItemCount,
+    proteinTarget,
     latestWeightKg: input.latestWeightKg,
     proteinUnresolvedItems,
+    fatUnresolvedItems,
+    carbsUnresolvedItems,
+    proteinStatus: getProteinStatus(totalProtein, proteinTarget),
+    vegetableStatus: getVegetableStatus(totalVegetableGrams),
+    carbsStatus: getCarbsStatus(carbCalorieShare),
+    carbCalorieShare,
     totalVegetableGrams,
     vegetableCoveredItemCount,
     vegetableUnresolvedItems,
@@ -281,6 +474,53 @@ function buildVegetableLine(summary: NutritionSummary): string {
   return `蔬菜：已识别约 ${summary.totalVegetableGrams} g，离基础目标 ${DAILY_VEGETABLE_TARGET_G} g 还差约 ${roundToOneDecimal(DAILY_VEGETABLE_TARGET_G - summary.totalVegetableGrams)} g。`;
 }
 
+function buildFatCarbLine(summary: NutritionSummary): string {
+  const fatText =
+    summary.totalFat === null
+      ? '脂肪暂无足够参考数据'
+      : `脂肪约 ${summary.totalFat} g`;
+  const carbsText =
+    summary.totalCarbs === null
+      ? '碳水暂无足够参考数据'
+      : `碳水约 ${summary.totalCarbs} g`;
+
+  return `宏量：${fatText}；${carbsText}。`;
+}
+
+function buildMealBreakdownLines(summary: NutritionSummary): string[] {
+  if (summary.mealSummaries.length === 0) {
+    return [];
+  }
+
+  return [
+    '分餐：',
+    ...summary.mealSummaries.map((mealSummary) => {
+      const caloriesText =
+        mealSummary.totalCalories === null
+          ? '热量待补'
+          : `${mealSummary.totalCalories} kcal`;
+      const proteinText =
+        mealSummary.totalProtein === null
+          ? '蛋白 --'
+          : `蛋白 ${mealSummary.totalProtein} g`;
+      const fatText =
+        mealSummary.totalFat === null
+          ? '脂肪 --'
+          : `脂肪 ${mealSummary.totalFat} g`;
+      const carbsText =
+        mealSummary.totalCarbs === null
+          ? '碳水 --'
+          : `碳水 ${mealSummary.totalCarbs} g`;
+      const vegetableText =
+        mealSummary.totalVegetableGrams === null
+          ? '蔬菜 --'
+          : `蔬菜 ${mealSummary.totalVegetableGrams} g`;
+
+      return `${formatMealType(mealSummary.meal.meal_type)} ${mealSummary.meal.meal_text}：${caloriesText}；${proteinText}；${fatText}；${carbsText}；${vegetableText}。`;
+    }),
+  ];
+}
+
 function buildCoverageLines(summary: NutritionSummary): string[] {
   const lines: string[] = [];
 
@@ -292,6 +532,14 @@ function buildCoverageLines(summary: NutritionSummary): string[] {
 
   if (summary.proteinUnresolvedItems.length > 0) {
     lines.push(`蛋白未纳入：${summary.proteinUnresolvedItems.join('、')}。`);
+  }
+
+  if (summary.fatUnresolvedItems.length > 0) {
+    lines.push(`脂肪未纳入：${summary.fatUnresolvedItems.join('、')}。`);
+  }
+
+  if (summary.carbsUnresolvedItems.length > 0) {
+    lines.push(`碳水未纳入：${summary.carbsUnresolvedItems.join('、')}。`);
   }
 
   if (summary.vegetableUnresolvedItems.length > 0) {
@@ -310,7 +558,9 @@ export function buildTodayNutritionReply(summary: NutritionSummary): string {
   return [
     caloriesLine,
     buildProteinLine(summary),
+    buildFatCarbLine(summary),
     buildVegetableLine(summary),
+    ...buildMealBreakdownLines(summary),
     ...buildCoverageLines(summary),
   ].join('\n');
 }
