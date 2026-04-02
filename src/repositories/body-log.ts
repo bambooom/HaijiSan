@@ -1,10 +1,23 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
 import type { BodyLogEntry, HealthDataSource } from '../types';
+import type { SheetRow } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
+
+function asStringCell(value: SheetRow[number]): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
+}
 
 export class BodyLogRepository {
   constructor(
@@ -13,12 +26,47 @@ export class BodyLogRepository {
 
   private readonly layout = SHEET_LAYOUTS.BODY_LOG;
 
+  private mapRow(row: SheetRow): BodyLogEntry {
+    return {
+      body_log_id: asStringCell(row[0]),
+      logged_at: asStringCell(row[1]),
+      weight_kg: row[2] === '' ? null : Number(row[2]),
+      bmi: row[3] === '' ? null : Number(row[3]),
+      body_fat_pct: row[4] === '' ? null : Number(row[4]),
+      lean_body_mass_kg: row[5] === '' ? null : Number(row[5]),
+      source: row[6] as BodyLogEntry['source'],
+      note: asStringCell(row[7]),
+    };
+  }
+
   createEntryId(timestamp: Date): string {
     return createTimestampedEntryId(this.spreadsheet, 'body', timestamp);
   }
 
   append(entry: BodyLogEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  listByDate(date: Date): BodyLogEntry[] {
+    const datePrefix = this.spreadsheet.getTimestamp(false, date).slice(0, 10);
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => this.mapRow(values))
+      .filter(
+        (entry) =>
+          entry.body_log_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+      )
+      .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
+  }
+
+  listRecent(limit: number = 7): BodyLogEntry[] {
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => this.mapRow(values))
+      .filter((entry) => entry.body_log_id.trim() !== '')
+      .sort((left, right) => right.logged_at.localeCompare(left.logged_at))
+      .slice(0, limit);
   }
 
   logMetrics(
@@ -52,7 +100,7 @@ export class BodyLogRepository {
     const rows = this.spreadsheet.getRows(this.layout.name);
 
     for (let index = rows.length - 1; index >= 0; index -= 1) {
-      const value = rows[index]?.[1];
+      const value = rows[index]?.[2];
 
       if (typeof value === 'number' && Number.isFinite(value)) {
         return value;

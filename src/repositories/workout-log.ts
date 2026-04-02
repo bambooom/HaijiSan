@@ -1,10 +1,23 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
 import type { WorkoutLevel, WorkoutLogEntry } from '../types';
+import type { SheetRow } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
+
+function asStringCell(value: SheetRow[number]): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
+}
 
 export class WorkoutLogRepository {
   constructor(
@@ -13,8 +26,37 @@ export class WorkoutLogRepository {
 
   private readonly layout = SHEET_LAYOUTS.WORKOUT_LOG;
 
+  private mapRow(row: SheetRow): WorkoutLogEntry {
+    return {
+      workout_id: asStringCell(row[0]),
+      logged_at: asStringCell(row[1]),
+      workout_name: asStringCell(row[2]),
+      workout_video_url: asStringCell(row[3]),
+      workout_level: row[4] as WorkoutLogEntry['workout_level'],
+      duration_min: row[5] === '' ? null : Number(row[5]),
+      avg_hr: row[6] === '' ? null : Number(row[6]),
+      max_hr: row[7] === '' ? null : Number(row[7]),
+      min_hr: row[8] === '' ? null : Number(row[8]),
+      calories_kcal: row[9] === '' ? null : Number(row[9]),
+      note: asStringCell(row[10]),
+    };
+  }
+
   append(entry: WorkoutLogEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  listByDate(date: Date): WorkoutLogEntry[] {
+    const datePrefix = this.spreadsheet.getTimestamp(false, date).slice(0, 10);
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => this.mapRow(values))
+      .filter(
+        (entry) =>
+          entry.workout_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+      )
+      .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }
 
   createEntryId(timestamp: Date): string {
@@ -47,19 +89,7 @@ export class WorkoutLogRepository {
   listRecent(limit: number = 5): WorkoutLogEntry[] {
     return this.spreadsheet
       .getDataRows(this.layout.name)
-      .map(({ values }) => ({
-        workout_id: String(values[0] ?? ''),
-        logged_at: String(values[1] ?? ''),
-        workout_name: String(values[2] ?? ''),
-        workout_video_url: String(values[3] ?? ''),
-        workout_level: values[4] as WorkoutLogEntry['workout_level'],
-        duration_min: values[5] === '' ? null : Number(values[5]),
-        avg_hr: values[6] === '' ? null : Number(values[6]),
-        max_hr: values[7] === '' ? null : Number(values[7]),
-        min_hr: values[8] === '' ? null : Number(values[8]),
-        calories_kcal: values[9] === '' ? null : Number(values[9]),
-        note: String(values[10] ?? ''),
-      }))
+      .map(({ values }) => this.mapRow(values))
       .filter((entry) => entry.workout_id.trim() !== '')
       .sort((left, right) => right.logged_at.localeCompare(left.logged_at))
       .slice(0, limit);

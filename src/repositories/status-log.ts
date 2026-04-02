@@ -1,10 +1,23 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
 import type { StatusLogEntry } from '../types';
+import type { SheetRow } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
 import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
+
+function asStringCell(value: SheetRow[number]): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
+}
 
 export class StatusLogRepository {
   constructor(
@@ -13,12 +26,37 @@ export class StatusLogRepository {
 
   private readonly layout = SHEET_LAYOUTS.STATUS_LOG;
 
+  private mapRow(row: SheetRow): StatusLogEntry {
+    return {
+      entry_id: asStringCell(row[0]),
+      logged_at: asStringCell(row[1]),
+      entry_type: row[2] as StatusLogEntry['entry_type'],
+      value: row[3] === '' ? '' : (row[3] as StatusLogEntry['value']),
+      unit: asStringCell(row[4]),
+      note: asStringCell(row[5]),
+      cycle_day: row[6] === '' ? null : Number(row[6]),
+    };
+  }
+
   private createEntryId(timestamp: Date): string {
     return createTimestampedEntryId(this.spreadsheet, 'status', timestamp);
   }
 
   append(entry: StatusLogEntry): void {
     this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+  }
+
+  listByDate(date: Date): StatusLogEntry[] {
+    const datePrefix = this.spreadsheet.getTimestamp(false, date).slice(0, 10);
+
+    return this.spreadsheet
+      .getDataRows(this.layout.name)
+      .map(({ values }) => this.mapRow(values))
+      .filter(
+        (entry) =>
+          entry.entry_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+      )
+      .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }
 
   logEntry(
