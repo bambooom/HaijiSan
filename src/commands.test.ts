@@ -81,4 +81,18 @@ describe('handleCommand digest trigger commands', () => {
     expect(mocks.getDailyDigestTriggerStatus).toHaveBeenCalledTimes(1);
     expect(result.reply).toContain('日报定时当前未开启');
   });
+
+  it('returns a reauthorization hint when digest trigger scope is missing', () => {
+    mocks.installDailyDigestTrigger.mockImplementation(() => {
+      throw new Error(
+        'You do not have permission to call ScriptApp.getProjectTriggers. Required permissions: https://www.googleapis.com/auth/script.scriptapp.',
+      );
+    });
+
+    const result = handleCommand('/digeston', new Date('2026-04-02T12:00:00'));
+
+    expect(result.status).toBe('failed');
+    expect(result.resultCode).toBe('digest-trigger-auth-required');
+    expect(result.reply).toContain('需要额外授权');
+  });
 });

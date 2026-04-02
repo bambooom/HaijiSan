@@ -101,6 +101,20 @@ function buildDigestCommandReply(command: string): string {
     : '日报定时当前未开启。你可以发送 /digeston 来安装。';
 }
 
+function isDigestTriggerAuthorizationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    message.includes('ScriptApp.getProjectTriggers') ||
+    message.includes('ScriptApp.newTrigger') ||
+    message.includes('script.scriptapp')
+  );
+}
+
+function buildDigestAuthorizationReply(): string {
+  return '日报定时需要额外授权后才能管理触发器。请在重新部署后，到 Apps Script 编辑器手动运行一次 digest 相关函数并完成授权，然后再试 /digeston。';
+}
+
 export function handleCommand(
   text: string,
   timestamp: Date,
@@ -157,15 +171,31 @@ export function handleCommand(
   }
 
   if (DIGEST_COMMANDS.some((command) => normalizedText.startsWith(command))) {
-    return buildResult(
-      buildDigestCommandReply(normalizedText),
-      'command',
-      'digest-trigger-command',
-      'success',
-      {
-        resultCode: 'digest-trigger-command',
-      },
-    );
+    try {
+      return buildResult(
+        buildDigestCommandReply(normalizedText),
+        'command',
+        'digest-trigger-command',
+        'success',
+        {
+          resultCode: 'digest-trigger-command',
+        },
+      );
+    } catch (error) {
+      if (isDigestTriggerAuthorizationError(error)) {
+        return buildResult(
+          buildDigestAuthorizationReply(),
+          'command',
+          'digest-trigger-auth-required',
+          'failed',
+          {
+            resultCode: 'digest-trigger-auth-required',
+          },
+        );
+      }
+
+      throw error;
+    }
   }
 
   const routedCommand = executeCommandRoute(normalizedText, timestamp);
