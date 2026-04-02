@@ -62,7 +62,8 @@ ${SLASH_COMMANDS.FOOD} - 记录一餐内容，支持居家称重或外食描述
 ${SLASH_COMMANDS.REFERENCE} - 查看热量参考表
 例如：${SLASH_COMMANDS.REFERENCE}
 ${SLASH_COMMANDS.REFERENCE} 关键词 - 按名称或品牌搜索
-例如：${SLASH_COMMANDS.REFERENCE} 鸡蛋`;
+例如：${SLASH_COMMANDS.REFERENCE} 鸡蛋
+也可以直接发商品包装营养成分表的照片，或体重/运动/睡眠类 App 截图，我会尽量提取并写入对应记录。`;
 
 export function handleCommand(
   text: string,

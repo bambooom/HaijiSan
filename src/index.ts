@@ -1,7 +1,13 @@
 import { MY_CHAT_ID } from './app-config';
 import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
-import { sendChatAction, sendText } from './services/telegram';
+import { buildDailySummaryMessage } from './services/daily-summary';
+import { importHealthDataPhoto } from './services/reference-ocr';
+import {
+  downloadTelegramFile,
+  sendChatAction,
+  sendText,
+} from './services/telegram';
 
 interface TelegramUpdate {
   message?: {
@@ -9,7 +15,58 @@ interface TelegramUpdate {
       id: number | string;
     };
     text?: string;
+    caption?: string;
+    photo?: Array<{
+      file_id: string;
+      width: number;
+      height: number;
+      file_size?: number;
+    }>;
   };
+}
+
+function pickLargestPhoto(
+  photos: Array<{
+    file_id: string;
+    width: number;
+    height: number;
+    file_size?: number;
+  }>,
+): { file_id: string } | null {
+  if (photos.length === 0) {
+    return null;
+  }
+
+  return photos.reduce((largest, current) => {
+    const largestScore =
+      (largest.file_size ?? largest.width * largest.height) || 0;
+    const currentScore =
+      (current.file_size ?? current.width * current.height) || 0;
+
+    return currentScore >= largestScore ? current : largest;
+  });
+}
+
+function handlePhotoUpdate(
+  message: NonNullable<TelegramUpdate['message']>,
+  timestamp: Date,
+) {
+  const photo = pickLargestPhoto(message.photo ?? []);
+
+  if (!photo) {
+    throw new Error('Photo update did not include a downloadable image');
+  }
+
+  const downloaded = downloadTelegramFile(photo.file_id);
+
+  return importHealthDataPhoto(
+    {
+      base64Data: downloaded.base64Data,
+      mimeType: downloaded.mimeType,
+      caption: message.caption,
+    },
+    timestamp,
+  );
 }
 
 function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
@@ -31,7 +88,6 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
     }
 
     const chatId = String(update.message.chat.id);
-    const text = update.message.text ?? '';
     const timestamp = new Date();
 
     if (chatId !== MY_CHAT_ID) {
@@ -41,16 +97,46 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
 
     sendChatAction(chatId, 'typing');
 
-    const result = handleCommand(text, timestamp);
+    const result =
+      update.message.photo && update.message.photo.length > 0
+        ? handlePhotoUpdate(update.message, timestamp)
+        : handleCommand(update.message.text ?? '', timestamp);
 
     sendText(chatId, result.reply);
-    botLogRepository.appendMessageLog(timestamp, text, result);
+    botLogRepository.appendMessageLog(
+      timestamp,
+      update.message.text ?? update.message.caption ?? '[photo]',
+      result,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);
   }
 }
 
-Object.assign(globalThis, { doPost });
+function sendDailyDigest(): void {
+  sendText(MY_CHAT_ID, buildDailySummaryMessage(new Date()));
+}
 
-export { doPost };
+function installDailyDigestTrigger(): void {
+  const handler = 'sendDailyDigest';
+
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === handler)
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+
+  ScriptApp.newTrigger(handler)
+    .timeBased()
+    .atHour(23)
+    .nearMinute(30)
+    .everyDays(1)
+    .create();
+}
+
+Object.assign(globalThis, {
+  doPost,
+  sendDailyDigest,
+  installDailyDigestTrigger,
+});
+
+export { doPost, installDailyDigestTrigger, sendDailyDigest };

@@ -77,6 +77,23 @@ interface NutritionLabelEnvelope {
   note?: unknown;
 }
 
+interface HealthScreenshotEnvelope extends NutritionLabelEnvelope {
+  kind?: unknown;
+  appSource?: unknown;
+  weightKg?: unknown;
+  bmi?: unknown;
+  bodyFatPct?: unknown;
+  leanBodyMassKg?: unknown;
+  sleepStart?: unknown;
+  sleepEnd?: unknown;
+  sleepHours?: unknown;
+  sleepQuality?: unknown;
+  workoutName?: unknown;
+  durationMin?: unknown;
+  workoutLevel?: unknown;
+  workoutCaloriesKcal?: unknown;
+}
+
 interface StockItemEnvelope {
   name?: unknown;
   quantity?: unknown;
@@ -98,6 +115,20 @@ const ESTIMATE_CONFIDENCES = new Set<IngredientEstimateConfidence>([
   'medium',
   'high',
 ]);
+const HEALTH_SCREENSHOT_KINDS = new Set([
+  'nutrition_label',
+  'body_metrics',
+  'sleep_summary',
+  'workout_summary',
+  'unsupported',
+] as const);
+
+type HealthScreenshotKind =
+  | 'nutrition_label'
+  | 'body_metrics'
+  | 'sleep_summary'
+  | 'workout_summary'
+  | 'unsupported';
 
 function formatDateForPrompt(timestamp: Date): string {
   return [
@@ -248,6 +279,37 @@ function buildNutritionLabelInstruction(caption?: string): string {
   return lines.join('\n');
 }
 
+function buildHealthScreenshotInstruction(
+  timestamp: Date,
+  caption?: string,
+): string {
+  const lines = [
+    '你是一个健康类截图 OCR 与结构化提取助手。',
+    `今天日期是 ${formatDateForPrompt(timestamp)}。`,
+    '输入是一张截图或照片，可能来自体重秤、Apple Health、AutoSleep、运动应用，也可能是商品包装营养成分表。',
+    '你只能输出一个 JSON 对象，不要输出 Markdown，不要输出代码块。',
+    'kind 只能是 nutrition_label、body_metrics、sleep_summary、workout_summary、unsupported。',
+    'appSource 尽量返回 smart_scale、ios_health、autosleep、workout_app、unknown 之一。',
+    '返回格式必须是 {"kind":"...","appSource":"...","confidence":0.8,"foodName":null,"brand":"","servingSize":null,"servingUnit":"","caloriesKcal":null,"proteinG":null,"fatG":null,"carbsG":null,"weightKg":null,"bmi":null,"bodyFatPct":null,"leanBodyMassKg":null,"sleepStart":null,"sleepEnd":null,"sleepHours":null,"sleepQuality":null,"workoutName":null,"durationMin":null,"workoutLevel":null,"workoutCaloriesKcal":null,"note":"..."}。',
+    'nutrition_label 用于商品包装营养成分表，尽量提取 foodName、brand、servingSize、servingUnit、caloriesKcal、proteinG、fatG、carbsG。',
+    'body_metrics 用于体重和身体成分截图，尽量提取 weightKg、bmi、bodyFatPct、leanBodyMassKg。',
+    'sleep_summary 用于睡眠截图，尽量提取 sleepStart、sleepEnd、sleepHours、sleepQuality。',
+    'sleepStart 和 sleepEnd 优先返回 YYYY-MM-DD HH:mm；如果图里没有日期只有时间，也可以返回 HH:mm。',
+    'sleepQuality 只能是 good、normal、poor 或 null。',
+    'workout_summary 用于运动截图，尽量提取 workoutName、durationMin、workoutLevel、workoutCaloriesKcal。',
+    'workoutLevel 只能是 easy、medium、hard 或 null。',
+    '如果图片里热量使用 kJ，必须换算成 kcal，换算公式是 kJ / 4.184。',
+    '如果无法可靠识别，就把 kind 设为 unsupported，并把 confidence 调低。',
+    'note 用简体中文简短说明你的判断依据或不确定点。',
+  ];
+
+  if (caption?.trim()) {
+    lines.push(`补充文字提示：${caption.trim()}`);
+  }
+
+  return lines.join('\n');
+}
+
 function stripCodeFence(text: string): string {
   return text
     .replace(/^```(?:json)?\s*/i, '')
@@ -376,6 +438,13 @@ function asBoolean(value: unknown): boolean {
 
 function asResolvedItemSource(value: unknown): 'reference' | 'ai' {
   return value === 'reference' ? 'reference' : 'ai';
+}
+
+function asHealthScreenshotKind(value: unknown): HealthScreenshotKind {
+  return typeof value === 'string' &&
+    HEALTH_SCREENSHOT_KINDS.has(value as HealthScreenshotKind)
+    ? (value as HealthScreenshotKind)
+    : 'unsupported';
 }
 
 function extractResponseText(response: GeminiGenerateContentResponse): string {
@@ -728,6 +797,82 @@ export class GeminiService {
       fatG: asNullableNumber(raw.fatG) ?? null,
       carbsG: asNullableNumber(raw.carbsG) ?? null,
       confidence: asNullableNumber(raw.confidence) ?? null,
+      note: asString(raw.note) ?? '',
+    };
+  }
+
+  extractHealthScreenshot(input: {
+    base64Data: string;
+    mimeType: string;
+    caption?: string;
+    timestamp: Date;
+  }): {
+    kind: HealthScreenshotKind;
+    appSource: string;
+    confidence: number | null;
+    foodName: string | null;
+    brand: string;
+    servingSize: number | null;
+    servingUnit: string;
+    caloriesKcal: number | null;
+    proteinG: number | null;
+    fatG: number | null;
+    carbsG: number | null;
+    weightKg: number | null;
+    bmi: number | null;
+    bodyFatPct: number | null;
+    leanBodyMassKg: number | null;
+    sleepStart: string | null;
+    sleepEnd: string | null;
+    sleepHours: number | null;
+    sleepQuality: SleepQuality | null;
+    workoutName: string | null;
+    durationMin: number | null;
+    workoutLevel: WorkoutLevel | null;
+    workoutCaloriesKcal: number | null;
+    note: string;
+  } {
+    const raw = postJsonPartsRequest(
+      buildHealthScreenshotInstruction(input.timestamp, input.caption),
+      [
+        {
+          text: input.caption?.trim()
+            ? `请结合这张图片和这段补充文字一起提取：${input.caption.trim()}`
+            : '请识别这张健康类截图或照片，并按指定 JSON 返回。',
+        },
+        {
+          inlineData: {
+            mimeType: input.mimeType,
+            data: input.base64Data,
+          },
+        },
+      ],
+    ) as HealthScreenshotEnvelope;
+
+    return {
+      kind: asHealthScreenshotKind(raw.kind),
+      appSource: asString(raw.appSource) ?? 'unknown',
+      confidence: asNullableNumber(raw.confidence) ?? null,
+      foodName: asString(raw.foodName) ?? null,
+      brand: asString(raw.brand) ?? '',
+      servingSize: asNullableNumber(raw.servingSize) ?? null,
+      servingUnit: asString(raw.servingUnit) ?? '',
+      caloriesKcal: asNullableNumber(raw.caloriesKcal) ?? null,
+      proteinG: asNullableNumber(raw.proteinG) ?? null,
+      fatG: asNullableNumber(raw.fatG) ?? null,
+      carbsG: asNullableNumber(raw.carbsG) ?? null,
+      weightKg: asNullableNumber(raw.weightKg) ?? null,
+      bmi: asNullableNumber(raw.bmi) ?? null,
+      bodyFatPct: asNullableNumber(raw.bodyFatPct) ?? null,
+      leanBodyMassKg: asNullableNumber(raw.leanBodyMassKg) ?? null,
+      sleepStart: asString(raw.sleepStart) ?? null,
+      sleepEnd: asString(raw.sleepEnd) ?? null,
+      sleepHours: asNullableNumber(raw.sleepHours) ?? null,
+      sleepQuality: asSleepQuality(raw.sleepQuality) ?? null,
+      workoutName: asString(raw.workoutName) ?? null,
+      durationMin: asNullableNumber(raw.durationMin) ?? null,
+      workoutLevel: asWorkoutLevel(raw.workoutLevel) ?? null,
+      workoutCaloriesKcal: asNullableNumber(raw.workoutCaloriesKcal) ?? null,
       note: asString(raw.note) ?? '',
     };
   }

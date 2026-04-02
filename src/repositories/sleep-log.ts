@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
-import type { SleepLogEntry, SleepQuality } from '../types';
+import type { HealthDataSource, SleepLogEntry, SleepQuality } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -28,6 +28,7 @@ export class SleepLogRepository {
     sleepHours: number,
     sleepQuality: SleepQuality,
     note = '',
+    source: HealthDataSource = 'manual',
   ): void {
     this.append({
       sleep_log_id: this.createEntryId(timestamp),
@@ -36,7 +37,7 @@ export class SleepLogRepository {
       sleep_end_at: formatLoggedAt(this.spreadsheet, sleepEndAt),
       sleep_hours: sleepHours,
       sleep_quality: sleepQuality,
-      source: 'manual',
+      source,
       note,
     });
   }
