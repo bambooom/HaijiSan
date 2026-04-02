@@ -1,9 +1,4 @@
 import type { IngredientEstimateConfidence } from '../../types';
-import type {
-  HealthScreenshotExtractionResult,
-  HealthScreenshotKind,
-  NutritionLabelReferenceResult,
-} from '../../types';
 
 export interface GeminiTextPart {
   text?: string;

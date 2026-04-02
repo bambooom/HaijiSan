@@ -187,22 +187,31 @@ describe('daily summary', () => {
     expect(result).toContain('状态：排便已记录。');
     expect(result).toContain('💡 AI insight');
     expect(result).toContain('今天蛋白和运动都还不错');
-    expect(mocks.generateDailyInsight).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: expect.objectContaining({
-          ruleSignals: {
-            proteinStatus: 'low',
-            proteinTarget: 66,
-            totalProtein: 56.7,
-            vegetableStatus: 'enough',
-            totalVegetableGrams: 380,
-            carbsStatus: 'moderate',
-            totalCarbs: 19.1,
-            carbCalorieShare: 0.1,
-          },
-        }),
-      }),
-    );
+    const firstCallArg = mocks.generateDailyInsight.mock.calls[0]?.[0] as {
+      context: {
+        ruleSignals: {
+          proteinStatus: string;
+          proteinTarget: number | null;
+          totalProtein: number | null;
+          vegetableStatus: string;
+          totalVegetableGrams: number | null;
+          carbsStatus: string;
+          totalCarbs: number | null;
+          carbCalorieShare: number | null;
+        };
+      };
+    };
+
+    expect(firstCallArg.context.ruleSignals).toEqual({
+      proteinStatus: 'low',
+      proteinTarget: 66,
+      totalProtein: 56.7,
+      vegetableStatus: 'enough',
+      totalVegetableGrams: 380,
+      carbsStatus: 'moderate',
+      totalCarbs: 19.1,
+      carbCalorieShare: 0.1,
+    });
   });
 
   it('falls back to deterministic output when AI insight generation fails', () => {

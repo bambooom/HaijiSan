@@ -1,38 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../repositories', () => ({
-  bodyLogRepository: {
-    listRecent: vi.fn(),
-  },
-  foodLogRepository: {
-    listRecent: vi.fn(),
-  },
-  refCaloriesRepository: {
-    searchByKeyword: vi.fn(),
-  },
-  sleepLogRepository: {
-    listRecent: vi.fn(),
-  },
-  statusLogRepository: {
-    listRecent: vi.fn(),
-  },
-  stockRepository: {
-    listStock: vi.fn(),
-  },
-  workoutLogRepository: {
-    listRecent: vi.fn(),
-  },
+const mocks = vi.hoisted(() => ({
+  listRecentBody: vi.fn(),
+  listRecentFood: vi.fn(),
+  searchReference: vi.fn(),
+  listRecentSleep: vi.fn(),
+  listRecentStatus: vi.fn(),
+  listStock: vi.fn(),
+  listRecentWorkout: vi.fn(),
 }));
 
-import {
-  bodyLogRepository,
-  foodLogRepository,
-  refCaloriesRepository,
-  sleepLogRepository,
-  statusLogRepository,
-  stockRepository,
-  workoutLogRepository,
-} from '../repositories';
+vi.mock('../repositories', () => ({
+  bodyLogRepository: {
+    listRecent: mocks.listRecentBody,
+  },
+  foodLogRepository: {
+    listRecent: mocks.listRecentFood,
+  },
+  refCaloriesRepository: {
+    searchByKeyword: mocks.searchReference,
+  },
+  sleepLogRepository: {
+    listRecent: mocks.listRecentSleep,
+  },
+  statusLogRepository: {
+    listRecent: mocks.listRecentStatus,
+  },
+  stockRepository: {
+    listStock: mocks.listStock,
+  },
+  workoutLogRepository: {
+    listRecent: mocks.listRecentWorkout,
+  },
+}));
 import {
   formatPlanningContext,
   retrievePlanningContext,
@@ -41,17 +41,17 @@ import {
 describe('context retrieval', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(bodyLogRepository.listRecent).mockReturnValue([]);
-    vi.mocked(foodLogRepository.listRecent).mockReturnValue([]);
-    vi.mocked(refCaloriesRepository.searchByKeyword).mockReturnValue([]);
-    vi.mocked(sleepLogRepository.listRecent).mockReturnValue([]);
-    vi.mocked(statusLogRepository.listRecent).mockReturnValue([]);
-    vi.mocked(stockRepository.listStock).mockReturnValue([]);
-    vi.mocked(workoutLogRepository.listRecent).mockReturnValue([]);
+    mocks.listRecentBody.mockReturnValue([]);
+    mocks.listRecentFood.mockReturnValue([]);
+    mocks.searchReference.mockReturnValue([]);
+    mocks.listRecentSleep.mockReturnValue([]);
+    mocks.listRecentStatus.mockReturnValue([]);
+    mocks.listStock.mockReturnValue([]);
+    mocks.listRecentWorkout.mockReturnValue([]);
   });
 
   it('attaches recent health context for lightweight health questions', () => {
-    vi.mocked(bodyLogRepository.listRecent).mockReturnValue([
+    mocks.listRecentBody.mockReturnValue([
       {
         body_log_id: 'body_1',
         logged_at: '2026-04-02 08:00:00',
@@ -63,7 +63,7 @@ describe('context retrieval', () => {
         note: '',
       },
     ]);
-    vi.mocked(sleepLogRepository.listRecent).mockReturnValue([
+    mocks.listRecentSleep.mockReturnValue([
       {
         sleep_log_id: 'sleep_1',
         logged_at: '2026-04-02 07:10:00',
@@ -75,7 +75,7 @@ describe('context retrieval', () => {
         note: '',
       },
     ]);
-    vi.mocked(statusLogRepository.listRecent).mockReturnValue([
+    mocks.listRecentStatus.mockReturnValue([
       {
         entry_id: 'status_1',
         logged_at: '2026-04-02 10:00:00',
@@ -86,7 +86,7 @@ describe('context retrieval', () => {
         cycle_day: 2,
       },
     ]);
-    vi.mocked(workoutLogRepository.listRecent).mockReturnValue([
+    mocks.listRecentWorkout.mockReturnValue([
       {
         workout_id: 'workout_1',
         logged_at: '2026-04-01 19:00:00',
