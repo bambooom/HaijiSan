@@ -19,7 +19,6 @@ import {
   summarizeAiPlan,
 } from '../../utils/ai-command';
 import { buildCommandLogFields } from '../../utils/log-meta';
-import { executeCommandRoute } from '../command-router';
 import { handleFoodAiMessage } from './food';
 import { buildMappedCommandPreview } from './pending';
 import { buildAiResult } from './result';

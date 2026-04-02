@@ -38,7 +38,11 @@ function sanitizeTraceValue(value: unknown, depth: number = 0): unknown {
     return Object.fromEntries(entries);
   }
 
-  return String(value);
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  return '[unsupported]';
 }
 
 function joinCommandParts(parts: Array<string | null | undefined>): string {

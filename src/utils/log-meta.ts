@@ -1,5 +1,4 @@
 import type {
-  BotLogConfirmationState,
   CommandHandlingResult,
   CommandLogFields,
 } from '../types';

@@ -22,8 +22,17 @@ interface GeminiTextPart {
   text?: string;
 }
 
+interface GeminiInlineDataPart {
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
+}
+
+type GeminiRequestPart = GeminiTextPart | GeminiInlineDataPart;
+
 interface GeminiContent {
-  parts?: GeminiTextPart[];
+  parts?: GeminiRequestPart[];
 }
 
 interface GeminiCandidate {
@@ -52,6 +61,19 @@ interface MealResolutionEnvelope {
   shouldPersist?: unknown;
   estimatedCalories?: unknown;
   items?: Array<Record<string, unknown>>;
+  note?: unknown;
+}
+
+interface NutritionLabelEnvelope {
+  foodName?: unknown;
+  brand?: unknown;
+  servingSize?: unknown;
+  servingUnit?: unknown;
+  caloriesKcal?: unknown;
+  proteinG?: unknown;
+  fatG?: unknown;
+  carbsG?: unknown;
+  confidence?: unknown;
   note?: unknown;
 }
 
@@ -202,6 +224,30 @@ function buildMealResolutionInstruction(timestamp: Date): string {
   ].join('\n');
 }
 
+function buildNutritionLabelInstruction(caption?: string): string {
+  const lines = [
+    '你是一个食品包装营养成分表 OCR 与结构化提取助手。',
+    '输入包含一张商品包装图片，可能含有营养成分表、品牌名、商品名和规格。',
+    '你只能输出一个 JSON 对象，不要输出 Markdown，不要输出代码块。',
+    '返回格式必须是 {"foodName":"...","brand":"...","servingSize":100,"servingUnit":"g","caloriesKcal":123,"proteinG":1.2,"fatG":3.4,"carbsG":5.6,"confidence":0.8,"note":"..."}。',
+    'caloriesKcal、proteinG、fatG、carbsG 都必须是最终可写入表格的数值，无法确认时返回 null。',
+    '如果图片里热量使用 kJ，必须换算成 kcal，换算公式是 kJ / 4.184。',
+    '优先返回每 100g 或每 100ml 的营养值；如果图里只有每份数据，再返回每份。',
+    'servingUnit 只能返回 g、ml、份、个、包、瓶、罐 这类简单单位。',
+    'foodName 应尽量是商品名或食物名，不要只写“营养成分表”。',
+    'brand 可以为空字符串。',
+    'confidence 取 0 到 1 之间的小数。',
+    'note 用简体中文简短说明你采用了哪组口径，例如“按每100g换算”或“包装仅提供每份数据”。',
+    '如果看不清楚或无法确认商品名与热量，foodName 或 caloriesKcal 至少有一个应为 null。',
+  ];
+
+  if (caption?.trim()) {
+    lines.push(`补充文字提示：${caption.trim()}`);
+  }
+
+  return lines.join('\n');
+}
+
 function stripCodeFence(text: string): string {
   return text
     .replace(/^```(?:json)?\s*/i, '')
@@ -334,7 +380,7 @@ function asResolvedItemSource(value: unknown): 'reference' | 'ai' {
 
 function extractResponseText(response: GeminiGenerateContentResponse): string {
   const text = response.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text ?? '')
+    ?.map((part) => ('text' in part ? (part.text ?? '') : ''))
     .join('')
     .trim();
 
@@ -449,6 +495,13 @@ function postJsonRequest(
   systemInstruction: string,
   userText: string,
 ): Record<string, unknown> {
+  return postJsonPartsRequest(systemInstruction, [{ text: userText }]);
+}
+
+function postJsonPartsRequest(
+  systemInstruction: string,
+  parts: GeminiRequestPart[],
+): Record<string, unknown> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
   const payload = {
     systemInstruction: {
@@ -456,7 +509,7 @@ function postJsonRequest(
     },
     contents: [
       {
-        parts: [{ text: userText }],
+        parts,
       },
     ],
     generationConfig: {
@@ -628,6 +681,53 @@ export class GeminiService {
       shouldPersist: asBoolean(raw.shouldPersist),
       estimatedCalories,
       items,
+      note: asString(raw.note) ?? '',
+    };
+  }
+
+  extractNutritionLabelReference(input: {
+    base64Data: string;
+    mimeType: string;
+    caption?: string;
+  }): {
+    foodName: string | null;
+    brand: string;
+    servingSize: number | null;
+    servingUnit: string;
+    caloriesKcal: number | null;
+    proteinG: number | null;
+    fatG: number | null;
+    carbsG: number | null;
+    confidence: number | null;
+    note: string;
+  } {
+    const raw = postJsonPartsRequest(
+      buildNutritionLabelInstruction(input.caption),
+      [
+        {
+          text: input.caption?.trim()
+            ? `请结合这张图片和这段补充文字一起提取：${input.caption.trim()}`
+            : '请提取这张商品包装图中的营养成分表。',
+        },
+        {
+          inlineData: {
+            mimeType: input.mimeType,
+            data: input.base64Data,
+          },
+        },
+      ],
+    ) as NutritionLabelEnvelope;
+
+    return {
+      foodName: asString(raw.foodName) ?? null,
+      brand: asString(raw.brand) ?? '',
+      servingSize: asNullableNumber(raw.servingSize) ?? null,
+      servingUnit: asString(raw.servingUnit) ?? '',
+      caloriesKcal: asNullableNumber(raw.caloriesKcal) ?? null,
+      proteinG: asNullableNumber(raw.proteinG) ?? null,
+      fatG: asNullableNumber(raw.fatG) ?? null,
+      carbsG: asNullableNumber(raw.carbsG) ?? null,
+      confidence: asNullableNumber(raw.confidence) ?? null,
       note: asString(raw.note) ?? '',
     };
   }
