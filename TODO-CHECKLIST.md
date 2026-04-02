@@ -79,7 +79,7 @@ Use it as the working checklist for the next architecture pass.
 ## G. Improve Safety And Recovery
 
 - [x] Add a trace id that survives initial turn, clarify turn, and confirmation turn.
-- [ ] Define repeated-confirmation dedupe behavior.
+- [x] Define repeated-confirmation dedupe behavior.
 - [x] Define what happens when a linked multi-step write partially fails.
 - [x] Keep `/cancel` behavior as a first-class safety mechanism.
 - [x] Re-check which AI-assisted writes should always require confirmation.
@@ -92,7 +92,7 @@ Use it as the working checklist for the next architecture pass.
 - [x] Record raw input.
 - [x] Record selected intent.
 - [x] Record selected tool.
-- [ ] Record tool arguments.
+- [x] Record tool arguments.
 - [x] Record confidence.
 - [x] Record confirmation state.
 - [x] Record final write result.

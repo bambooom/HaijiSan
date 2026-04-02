@@ -829,6 +829,7 @@ export function validateAiPlanAgainstTool(
   context: ToolExecutionContext,
 ): {
   toolName: ToolName | null;
+  input: ToolInputMap[keyof ToolInputMap] | null;
   validation: ReturnType<AnyToolContract['validate']> | null;
 } {
   const toolName = resolveToolNameForIntent(plan.intent);
@@ -836,6 +837,7 @@ export function validateAiPlanAgainstTool(
   if (!toolName) {
     return {
       toolName: null,
+      input: null,
       validation: null,
     };
   }
@@ -845,6 +847,7 @@ export function validateAiPlanAgainstTool(
   if (!input) {
     return {
       toolName,
+      input: null,
       validation: clarifyValidationResult([
         {
           code: 'clarification-required',
@@ -856,6 +859,7 @@ export function validateAiPlanAgainstTool(
 
   return {
     toolName,
+    input,
     validation: getToolContract(toolName).validate(input as never, context),
   };
 }

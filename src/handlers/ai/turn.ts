@@ -5,7 +5,11 @@ import {
 } from '../../services/context-retrieval';
 import { validateAiPlanAgainstTool } from '../../tools/registry';
 import type { AiPlan, CommandHandlingResult } from '../../types';
-import { appendAiNote, summarizeAiPlan } from '../../utils/ai-command';
+import {
+  appendAiNote,
+  formatToolArgsForNote,
+  summarizeAiPlan,
+} from '../../utils/ai-command';
 import { geminiService } from '../../services/gemini';
 import { handlePendingAiAction } from './pending';
 
@@ -16,6 +20,7 @@ export type ResolvedAiTurn = {
   sourceText: string;
   traceId: string;
   toolName: string | null;
+  toolArgsNote: string | null;
   note: string;
   stage: AiStage;
 };
@@ -68,14 +73,18 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
     pendingActionResult?.kind === 'continue'
       ? pendingActionResult.plan
       : geminiService.planMessage(text, timestamp, planningContext);
-  const { toolName, validation } = validateAiPlanAgainstTool(plan, sourceText, {
-    timestamp,
-    source:
-      pendingActionResult?.kind === 'continue'
-        ? 'pending-confirmation'
-        : 'ai-plan',
-    traceId,
-  });
+  const { toolName, input, validation } = validateAiPlanAgainstTool(
+    plan,
+    sourceText,
+    {
+      timestamp,
+      source:
+        pendingActionResult?.kind === 'continue'
+          ? 'pending-confirmation'
+          : 'ai-plan',
+      traceId,
+    },
+  );
 
   if (
     pendingActionResult?.kind !== 'continue' &&
@@ -106,6 +115,12 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
     note = appendAiNote(note, `tool=${toolName}`);
   }
 
+  const toolArgsNote = input ? formatToolArgsForNote(input) : null;
+
+  if (toolArgsNote) {
+    note = appendAiNote(note, `toolArgs=${toolArgsNote}`);
+  }
+
   if (planningContext) {
     note = appendAiNote(note, 'context=attached');
   }
@@ -121,6 +136,7 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
       sourceText,
       traceId,
       toolName,
+      toolArgsNote,
       note,
       stage: toAiStage(plan),
     },

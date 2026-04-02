@@ -6,6 +6,7 @@ import {
   buildStockBatchPreview,
   buildStockMutationCommandText,
   buildCommandFromAiPlan,
+  formatToolArgsForNote,
   resolveAiStockItems,
   summarizeAiPlan,
 } from './ai-command';
@@ -122,6 +123,20 @@ describe('AI note helpers', () => {
     expect(
       appendAiNote('mode=command; intent=sleep', 'pending-confirmation=true'),
     ).toBe('mode=command; intent=sleep; pending-confirmation=true');
+  });
+
+  it('formats tool arguments into a compact trace string', () => {
+    expect(
+      formatToolArgsForNote({
+        mealText: '鸡胸肉沙拉加一杯很长很长很长很长很长的酸奶描述',
+        items: [
+          { name: '鸡胸肉', quantity: 150, unit: 'g' },
+          { name: '生菜', quantity: 80, unit: 'g' },
+          { name: '酸奶', quantity: 200, unit: 'ml' },
+          { name: '橄榄油', quantity: 10, unit: 'ml' },
+        ],
+      }),
+    ).toContain('mealText');
   });
 
   it('normalizes stock items from either stockItems or legacy single-item fields', () => {

@@ -41,8 +41,12 @@ export const AI_CLARIFICATION_NEW_TOPIC_PATTERN =
 
 export const AI_MESSAGES = {
   NO_PENDING_ACTION: '现在没有待确认的操作，不需要取消。',
+  NO_PENDING_CONFIRMATION: '现在没有待确认的操作，不需要再确认。',
   PENDING_ACTION_CANCELLED: '已取消刚才的待确认操作。',
   PENDING_ACTION_BLOCKED: '我这里还有一条待确认的操作。',
+  PENDING_ACTION_CONFIRMING: '刚才那条确认正在处理中，我先不重复写入。',
+  PENDING_ACTION_ALREADY_CONFIRMED:
+    '刚才那条确认已经处理过了，我不再重复写入。',
   PENDING_ACTION_FAILED: '我收到了确认，但这次写入没有成功。你可以重新发一次。',
   MEAL_RECORD_WRITTEN: '已按刚才的预览写入。',
   MEAL_RECORD_SYNC_NONE: '这次没有同步到库存项。',

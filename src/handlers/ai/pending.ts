@@ -7,8 +7,11 @@ import {
 import { geminiService } from '../../services/gemini';
 import { confirmPendingMealRecordAction } from '../../services/meal-action';
 import {
+  consumePendingAiActionForConfirmation,
   clearPendingAiAction,
   getPendingAiAction,
+  getRecentPendingConfirmationReceipt,
+  savePendingConfirmationReceipt,
 } from '../../services/pending-action';
 import type {
   AiPlan,
@@ -76,6 +79,13 @@ export function handlePendingAiAction(
   const pendingAction = getPendingAiAction(timestamp);
 
   if (!pendingAction) {
+    if (isConfirmationText(text)) {
+      return {
+        kind: 'result',
+        result: buildRepeatedConfirmationResult(timestamp),
+      };
+    }
+
     return null;
   }
 
@@ -103,25 +113,32 @@ export function handlePendingAiAction(
     };
   }
 
-  clearPendingAiAction();
+  const claimedAction = consumePendingAiActionForConfirmation(timestamp);
 
-  if (pendingAction.kind === 'meal-record') {
+  if (!claimedAction) {
     return {
       kind: 'result',
-      result: executePendingMealRecordAction(pendingAction, timestamp),
+      result: buildRepeatedConfirmationResult(timestamp),
     };
   }
 
-  if (pendingAction.kind === 'stock-batch') {
+  if (claimedAction.kind === 'meal-record') {
     return {
       kind: 'result',
-      result: executePendingStockBatchAction(pendingAction, timestamp),
+      result: executePendingMealRecordAction(claimedAction, timestamp),
+    };
+  }
+
+  if (claimedAction.kind === 'stock-batch') {
+    return {
+      kind: 'result',
+      result: executePendingStockBatchAction(claimedAction, timestamp),
     };
   }
 
   return {
     kind: 'result',
-    result: executePendingMappedCommandAction(pendingAction, timestamp),
+    result: executePendingMappedCommandAction(claimedAction, timestamp),
   };
 }
 
@@ -173,6 +190,34 @@ function isCancellationText(text: string): boolean {
   return AI_CANCELLATION_PATTERN.test(text.trim());
 }
 
+function buildRepeatedConfirmationResult(
+  timestamp: Date,
+): CommandHandlingResult {
+  const receipt = getRecentPendingConfirmationReceipt(timestamp);
+
+  if (!receipt) {
+    return buildAiResult(
+      AI_MESSAGES.NO_PENDING_CONFIRMATION,
+      'ignored',
+      'pending-confirmation=none',
+    );
+  }
+
+  if (receipt.status === 'processing') {
+    return buildAiResult(
+      AI_MESSAGES.PENDING_ACTION_CONFIRMING,
+      'ignored',
+      appendAiNote(receipt.note, 'duplicate-confirmation=processing'),
+    );
+  }
+
+  return buildAiResult(
+    receipt.reply || AI_MESSAGES.PENDING_ACTION_ALREADY_CONFIRMED,
+    receipt.status === 'failed' ? 'failed' : 'success',
+    appendAiNote(receipt.note, `duplicate-confirmation=${receipt.status}`),
+  );
+}
+
 function executePendingMappedCommandAction(
   action: PendingMappedCommandAction,
   fallbackTimestamp: Date,
@@ -187,18 +232,40 @@ function executePendingMappedCommandAction(
   )?.reply;
 
   if (!commandReply) {
-    return buildAiResult(
+    const result = buildAiResult(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
       appendAiNote(action.note, 'confirmed=true; execute=failed'),
     );
+
+    savePendingConfirmationReceipt({
+      traceId: action.traceId,
+      kind: action.kind,
+      confirmedAt: timestamp.toISOString(),
+      status: 'failed',
+      reply: result.reply,
+      note: result.note,
+    });
+
+    return result;
   }
 
-  return buildAiResult(
+  const result = buildAiResult(
     commandReply,
     'success',
     appendAiNote(action.note, 'confirmed=true; execute=success'),
   );
+
+  savePendingConfirmationReceipt({
+    traceId: action.traceId,
+    kind: action.kind,
+    confirmedAt: timestamp.toISOString(),
+    status: 'completed',
+    reply: result.reply,
+    note: result.note,
+  });
+
+  return result;
 }
 
 function executePendingMealRecordAction(
@@ -206,12 +273,13 @@ function executePendingMealRecordAction(
   fallbackTimestamp: Date,
 ): CommandHandlingResult {
   try {
+    const timestamp = fallbackTimestamp;
     const persisted = confirmPendingMealRecordAction(action, fallbackTimestamp);
     const notedAction = action.traceId
       ? appendAiNote(action.note, `trace=${action.traceId}`)
       : action.note;
 
-    return buildAiResult(
+    const result = buildAiResult(
       buildMealRecordSuccessReply(action, persisted.stockSync.updatedCount),
       'success',
       appendAiNote(
@@ -219,17 +287,39 @@ function executePendingMealRecordAction(
         `confirmed=true; stock-updated=${persisted.stockSync.updatedCount}`,
       ),
     );
+
+    savePendingConfirmationReceipt({
+      traceId: action.traceId,
+      kind: action.kind,
+      confirmedAt: timestamp.toISOString(),
+      status: 'completed',
+      reply: result.reply,
+      note: result.note,
+    });
+
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const notedAction = action.traceId
       ? appendAiNote(action.note, `trace=${action.traceId}`)
       : action.note;
 
-    return buildAiResult(
+    const result = buildAiResult(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
       appendAiNote(notedAction, `confirmed=true; persist-error=${message}`),
     );
+
+    savePendingConfirmationReceipt({
+      traceId: action.traceId,
+      kind: action.kind,
+      confirmedAt: fallbackTimestamp.toISOString(),
+      status: 'failed',
+      reply: result.reply,
+      note: result.note,
+    });
+
+    return result;
   }
 }
 
@@ -258,7 +348,7 @@ function executePendingStockBatchAction(
   }
 
   if (successReplies.length === 0) {
-    return buildAiResult(
+    const result = buildAiResult(
       AI_MESSAGES.PENDING_ACTION_FAILED,
       'failed',
       appendAiNote(
@@ -266,9 +356,20 @@ function executePendingStockBatchAction(
         `confirmed=true; stock-batch=0/${action.items.length}`,
       ),
     );
+
+    savePendingConfirmationReceipt({
+      traceId: action.traceId,
+      kind: action.kind,
+      confirmedAt: timestamp.toISOString(),
+      status: 'failed',
+      reply: result.reply,
+      note: result.note,
+    });
+
+    return result;
   }
 
-  return buildAiResult(
+  const result = buildAiResult(
     buildStockBatchSuccessReply(successReplies, failedItems),
     failedItems.length === 0 ? 'success' : 'failed',
     appendAiNote(
@@ -276,6 +377,17 @@ function executePendingStockBatchAction(
       `confirmed=true; stock-batch=${successReplies.length}/${action.items.length}`,
     ),
   );
+
+  savePendingConfirmationReceipt({
+    traceId: action.traceId,
+    kind: action.kind,
+    confirmedAt: timestamp.toISOString(),
+    status: failedItems.length === 0 ? 'completed' : 'failed',
+    reply: result.reply,
+    note: result.note,
+  });
+
+  return result;
 }
 
 function buildMealRecordSuccessReply(

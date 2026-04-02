@@ -52,6 +52,15 @@ export interface PendingClarificationAction {
   note: string;
 }
 
+export interface PendingConfirmationReceipt {
+  traceId?: string;
+  kind: Exclude<PendingAiAction['kind'], 'clarify'>;
+  confirmedAt: string;
+  status: 'processing' | 'completed' | 'failed';
+  reply: string;
+  note: string;
+}
+
 export type PendingAiAction =
   | PendingMappedCommandAction
   | PendingMealRecordAction

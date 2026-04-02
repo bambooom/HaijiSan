@@ -3,6 +3,44 @@ import { SLASH_COMMANDS } from '../constants/commands';
 import { MEAL_TYPE_LABELS } from '../shared/meal';
 import type { AiPlan, AiStockItem } from '../types';
 
+const TRACE_VALUE_MAX_LENGTH = 180;
+
+function sanitizeTraceValue(value: unknown, depth: number = 0): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > 40 ? `${value.slice(0, 37)}...` : value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (depth >= 2) {
+    return '[nested]';
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 3).map((item) => sanitizeTraceValue(item, depth + 1));
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .slice(0, 8)
+      .map(([key, entryValue]) => [
+        key,
+        sanitizeTraceValue(entryValue, depth + 1),
+      ]);
+
+    return Object.fromEntries(entries);
+  }
+
+  return String(value);
+}
+
 function joinCommandParts(parts: Array<string | null | undefined>): string {
   return parts.filter((part): part is string => Boolean(part)).join(' ');
 }
@@ -187,6 +225,25 @@ export function truncateAiNote(note: string): string {
 
 export function appendAiNote(note: string, detail: string): string {
   return truncateAiNote(`${note}; ${detail}`);
+}
+
+export function formatToolArgsForNote(input: unknown): string | null {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const serialized = JSON.stringify(sanitizeTraceValue(input)).replace(
+    /;/g,
+    ',',
+  );
+
+  if (!serialized || serialized === '{}') {
+    return null;
+  }
+
+  return serialized.length > TRACE_VALUE_MAX_LENGTH
+    ? `${serialized.slice(0, TRACE_VALUE_MAX_LENGTH - 3)}...`
+    : serialized;
 }
 
 export function summarizeAiPlan(plan: AiPlan, commandText?: string): string {

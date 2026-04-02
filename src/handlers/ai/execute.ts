@@ -28,6 +28,7 @@ type SpecialExecutor = (
   sourceText: string,
   timestamp: Date,
   traceId?: string,
+  baseNote?: string,
 ) => CommandHandlingResult;
 
 const SPECIAL_EXECUTORS: Partial<Record<AiIntent, SpecialExecutor>> = {
@@ -49,24 +50,26 @@ export function handleExecuteStage(
       turn.sourceText,
       timestamp,
       turn.traceId,
+      turn.note,
     );
 
     return {
       ...result,
-      note: appendAiNote(
-        result.note,
-        `trace=${turn.traceId}${turn.toolName ? `; tool=${turn.toolName}` : ''}`,
-      ),
+      note: result.note,
     };
   }
 
   const registryResult = executeToolFromRegistry(turn, timestamp);
 
   if (registryResult) {
+    const enrichedNote = turn.toolArgsNote
+      ? appendAiNote(registryResult.note, `toolArgs=${turn.toolArgsNote}`)
+      : registryResult.note;
+
     return {
       ...registryResult,
       note: appendAiNote(
-        registryResult.note,
+        enrichedNote,
         `trace=${turn.traceId}${turn.toolName ? `; tool=${turn.toolName}` : ''}`,
       ),
     };
@@ -260,6 +263,7 @@ function handleStockAiMessage(
   sourceText: string,
   timestamp: Date,
   traceId?: string,
+  baseNote?: string,
 ): CommandHandlingResult {
   const items = resolveAiStockItems(plan);
 
@@ -274,7 +278,7 @@ function handleStockAiMessage(
   const previewText = buildStockBatchPreview(plan.intent, items);
   const operation = plan.intent === AI_INTENTS.STOCK_SET ? 'set' : 'adjust';
   const commandNote = appendAiNote(
-    summarizeAiPlan(plan),
+    baseNote ?? summarizeAiPlan(plan),
     `stock-items=${items.length}`,
   );
 

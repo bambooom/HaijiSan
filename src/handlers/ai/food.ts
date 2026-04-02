@@ -37,6 +37,7 @@ export function handleFoodAiMessage(
   originalText: string,
   timestamp: Date,
   traceId?: string,
+  baseNote?: string,
 ): CommandHandlingResult {
   const mealInput = buildMealInput(plan, originalText);
   const preMatchedEstimate = estimateMealCalories(mealInput);
@@ -67,9 +68,9 @@ export function handleFoodAiMessage(
             traceId,
             sourceText: originalText,
             previewText,
-            note: `mode=command; intent=food_estimate; resolution=single-pass`.slice(
-              0,
-              500,
+            note: appendMealExecutionNote(
+              baseNote,
+              `resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
             ),
             mealType: resolvedMeal.mealType,
             mealText: resolvedMeal.mealText,
@@ -83,9 +84,9 @@ export function handleFoodAiMessage(
         return buildAiResult(
           previewText,
           'success',
-          `mode=command; intent=food_estimate; pending-confirmation=true; resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`.slice(
-            0,
-            500,
+          appendMealExecutionNote(
+            baseNote,
+            `pending-confirmation=true; resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
           ),
         );
       }
@@ -93,9 +94,9 @@ export function handleFoodAiMessage(
       return buildAiResult(
         resolvedMealReply,
         'success',
-        `mode=command; intent=food_estimate; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}; persisted=false`.slice(
-          0,
-          500,
+        appendMealExecutionNote(
+          baseNote,
+          `meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}; persisted=false`,
         ),
       );
     }
@@ -110,7 +111,7 @@ export function handleFoodAiMessage(
     return buildAiResult(
       buildUnableToEstimateReply(),
       'ignored',
-      'mode=command; intent=food_estimate; estimate=unparseable',
+      appendMealExecutionNote(baseNote, 'estimate=unparseable'),
     );
   }
 
@@ -118,9 +119,9 @@ export function handleFoodAiMessage(
     return buildAiResult(
       buildMissingQuantityReply(),
       'ignored',
-      `mode=command; intent=food_estimate; meal=${estimate.mealText}; estimate=no-weighted-items`.slice(
-        0,
-        500,
+      appendMealExecutionNote(
+        baseNote,
+        `meal=${estimate.mealText}; estimate=no-weighted-items`,
       ),
     );
   }
@@ -154,9 +155,9 @@ export function handleFoodAiMessage(
     return buildAiResult(
       buildNoCaloriesReply(detailLines, aiFallbackFailed),
       'ignored',
-      `mode=command; intent=food_estimate; meal=${estimate.mealText}; estimate=no-calories`.slice(
-        0,
-        500,
+      appendMealExecutionNote(
+        baseNote,
+        `meal=${estimate.mealText}; estimate=no-calories`,
       ),
     );
   }
@@ -186,10 +187,7 @@ export function handleFoodAiMessage(
         traceId,
         sourceText: originalText,
         previewText,
-        note: `mode=command; intent=food_estimate; pending-confirmation=true`.slice(
-          0,
-          500,
-        ),
+        note: appendMealExecutionNote(baseNote, 'pending-confirmation=true'),
         mealType: estimate.mealType,
         mealText: estimate.mealText,
         estimatedCalories: totalEstimatedCalories,
@@ -206,9 +204,9 @@ export function handleFoodAiMessage(
     return buildAiResult(
       previewText,
       'success',
-      `mode=command; intent=food_estimate; meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; pending-confirmation=true`.slice(
-        0,
-        500,
+      appendMealExecutionNote(
+        baseNote,
+        `meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; pending-confirmation=true`,
       ),
     );
   }
@@ -216,9 +214,19 @@ export function handleFoodAiMessage(
   return buildAiResult(
     estimatedMealReply,
     'success',
-    `mode=command; intent=food_estimate; meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; persisted=false`.slice(
-      0,
-      500,
+    appendMealExecutionNote(
+      baseNote,
+      `meal=${estimate.mealText}; kcal=${totalEstimatedCalories}; ref=${estimate.matchedCount}; ai=${aiResolvedCount}; pending=${pendingParts.length}; persisted=false`,
     ),
+  );
+}
+
+function appendMealExecutionNote(
+  baseNote: string | undefined,
+  detail: string,
+): string {
+  return `${baseNote ?? 'mode=command; intent=food_estimate'}; ${detail}`.slice(
+    0,
+    500,
   );
 }
