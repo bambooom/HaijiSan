@@ -3,8 +3,8 @@ import { handleCommand } from './commands';
 import { botLogRepository } from './repositories';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
-  disableDailyDigestTrigger,
-  installDailyDigestTrigger,
+  disableDailyDigestTrigger as disableDailyDigestTriggerService,
+  installDailyDigestTrigger as installDailyDigestTriggerService,
 } from './services/digest-trigger';
 import { importHealthDataPhoto } from './services/reference-ocr';
 import {
@@ -122,11 +122,22 @@ function sendDailyDigest(): void {
   sendText(MY_CHAT_ID, buildDailySummaryMessage(new Date()));
 }
 
+function installDailyDigestTrigger() {
+  return installDailyDigestTriggerService();
+}
+
+function disableDailyDigestTrigger() {
+  return disableDailyDigestTriggerService();
+}
+
 Object.assign(globalThis, {
   doPost,
   sendDailyDigest,
   installDailyDigestTrigger,
   disableDailyDigestTrigger,
+  __haijisanSendDailyDigest: sendDailyDigest,
+  __haijisanInstallDailyDigestTrigger: installDailyDigestTrigger,
+  __haijisanDisableDailyDigestTrigger: disableDailyDigestTrigger,
 });
 
 export {

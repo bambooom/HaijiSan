@@ -49,7 +49,7 @@ const adminSheetLayouts = Object.values(sheetLayouts).map((layout) => ({
 async function buildGasEntry(
   entryFile,
   outputFile,
-  { bundle = true, format = 'iife', define = {} } = {},
+  { bundle = true, format = 'iife', define = {}, footer = {} } = {},
 ) {
   await build({
     entryPoints: [path.join(projectRoot, 'src', ...entryFile)],
@@ -61,6 +61,7 @@ async function buildGasEntry(
     logLevel: 'info',
     legalComments: 'none',
     define,
+    footer,
   });
 }
 
@@ -70,6 +71,21 @@ mkdirSync(distDir, { recursive: true });
 await buildGasEntry(['index.ts'], 'Code.js', {
   define: {
     __APP_CONFIG__: JSON.stringify(appConfig),
+  },
+  footer: {
+    js: `
+function sendDailyDigest() {
+  return globalThis.__haijisanSendDailyDigest();
+}
+
+function installDailyDigestTrigger() {
+  return globalThis.__haijisanInstallDailyDigestTrigger();
+}
+
+function disableDailyDigestTrigger() {
+  return globalThis.__haijisanDisableDailyDigestTrigger();
+}
+`,
   },
 });
 
