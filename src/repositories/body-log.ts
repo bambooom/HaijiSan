@@ -5,19 +5,11 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
-
-function asStringCell(value: SheetRow[number]): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  return '';
-}
+import {
+  createTimestampedEntryId,
+  formatLoggedAt,
+  formatSheetCellAsString,
+} from '../shared/records';
 
 export class BodyLogRepository {
   constructor(
@@ -28,14 +20,14 @@ export class BodyLogRepository {
 
   private mapRow(row: SheetRow): BodyLogEntry {
     return {
-      body_log_id: asStringCell(row[0]),
-      logged_at: asStringCell(row[1]),
+      body_log_id: formatSheetCellAsString(this.spreadsheet, row[0]),
+      logged_at: formatSheetCellAsString(this.spreadsheet, row[1]),
       weight_kg: row[2] === '' ? null : Number(row[2]),
       bmi: row[3] === '' ? null : Number(row[3]),
       body_fat_pct: row[4] === '' ? null : Number(row[4]),
       lean_body_mass_kg: row[5] === '' ? null : Number(row[5]),
       source: row[6] as BodyLogEntry['source'],
-      note: asStringCell(row[7]),
+      note: formatSheetCellAsString(this.spreadsheet, row[7]),
     };
   }
 
@@ -55,7 +47,8 @@ export class BodyLogRepository {
       .map(({ values }) => this.mapRow(values))
       .filter(
         (entry) =>
-          entry.body_log_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+          entry.body_log_id.trim() !== '' &&
+          entry.logged_at.startsWith(datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }

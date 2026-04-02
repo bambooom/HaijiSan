@@ -5,19 +5,11 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
-
-function asStringCell(value: SheetRow[number]): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  return '';
-}
+import {
+  createTimestampedEntryId,
+  formatLoggedAt,
+  formatSheetCellAsString,
+} from '../shared/records';
 
 export class StatusLogRepository {
   constructor(
@@ -28,12 +20,12 @@ export class StatusLogRepository {
 
   private mapRow(row: SheetRow): StatusLogEntry {
     return {
-      entry_id: asStringCell(row[0]),
-      logged_at: asStringCell(row[1]),
+      entry_id: formatSheetCellAsString(this.spreadsheet, row[0]),
+      logged_at: formatSheetCellAsString(this.spreadsheet, row[1]),
       entry_type: row[2] as StatusLogEntry['entry_type'],
       value: row[3] === '' ? '' : (row[3] as StatusLogEntry['value']),
-      unit: asStringCell(row[4]),
-      note: asStringCell(row[5]),
+      unit: formatSheetCellAsString(this.spreadsheet, row[4]),
+      note: formatSheetCellAsString(this.spreadsheet, row[5]),
       cycle_day: row[6] === '' ? null : Number(row[6]),
     };
   }

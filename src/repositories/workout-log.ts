@@ -5,19 +5,11 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
-
-function asStringCell(value: SheetRow[number]): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  return '';
-}
+import {
+  createTimestampedEntryId,
+  formatLoggedAt,
+  formatSheetCellAsString,
+} from '../shared/records';
 
 export class WorkoutLogRepository {
   constructor(
@@ -28,17 +20,17 @@ export class WorkoutLogRepository {
 
   private mapRow(row: SheetRow): WorkoutLogEntry {
     return {
-      workout_id: asStringCell(row[0]),
-      logged_at: asStringCell(row[1]),
-      workout_name: asStringCell(row[2]),
-      workout_video_url: asStringCell(row[3]),
+      workout_id: formatSheetCellAsString(this.spreadsheet, row[0]),
+      logged_at: formatSheetCellAsString(this.spreadsheet, row[1]),
+      workout_name: formatSheetCellAsString(this.spreadsheet, row[2]),
+      workout_video_url: formatSheetCellAsString(this.spreadsheet, row[3]),
       workout_level: row[4] as WorkoutLogEntry['workout_level'],
       duration_min: row[5] === '' ? null : Number(row[5]),
       avg_hr: row[6] === '' ? null : Number(row[6]),
       max_hr: row[7] === '' ? null : Number(row[7]),
       min_hr: row[8] === '' ? null : Number(row[8]),
       calories_kcal: row[9] === '' ? null : Number(row[9]),
-      note: asStringCell(row[10]),
+      note: formatSheetCellAsString(this.spreadsheet, row[10]),
     };
   }
 
@@ -54,7 +46,8 @@ export class WorkoutLogRepository {
       .map(({ values }) => this.mapRow(values))
       .filter(
         (entry) =>
-          entry.workout_id.trim() !== '' && entry.logged_at.startsWith(datePrefix),
+          entry.workout_id.trim() !== '' &&
+          entry.logged_at.startsWith(datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }

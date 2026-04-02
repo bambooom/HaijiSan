@@ -5,23 +5,11 @@ import {
   spreadsheetService,
   type SpreadsheetService,
 } from '../services/spreadsheet';
-import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
-
-function asStringCell(value: SheetRow[number]): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-
-  return '';
-}
+import {
+  createTimestampedEntryId,
+  formatLoggedAt,
+  formatSheetCellAsString,
+} from '../shared/records';
 
 export class SleepLogRepository {
   constructor(
@@ -32,14 +20,14 @@ export class SleepLogRepository {
 
   private mapRow(row: SheetRow): SleepLogEntry {
     return {
-      sleep_log_id: asStringCell(row[0]),
-      logged_at: asStringCell(row[1]),
-      sleep_start_at: asStringCell(row[2]),
-      sleep_end_at: asStringCell(row[3]),
+      sleep_log_id: formatSheetCellAsString(this.spreadsheet, row[0]),
+      logged_at: formatSheetCellAsString(this.spreadsheet, row[1]),
+      sleep_start_at: formatSheetCellAsString(this.spreadsheet, row[2]),
+      sleep_end_at: formatSheetCellAsString(this.spreadsheet, row[3]),
       sleep_hours: row[4] === '' ? null : Number(row[4]),
       sleep_quality: row[5] as SleepLogEntry['sleep_quality'],
       source: row[6] as SleepLogEntry['source'],
-      note: asStringCell(row[7]),
+      note: formatSheetCellAsString(this.spreadsheet, row[7]),
     };
   }
 
