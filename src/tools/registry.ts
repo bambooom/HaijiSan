@@ -9,6 +9,10 @@ import {
 } from '../repositories';
 import { persistMealRecord } from '../services/meal-recording';
 import { getTodayNutritionSummary } from '../services/nutrition-summary';
+import {
+  appendBackfillDateNote,
+  resolveTargetDateTimestamp,
+} from '../shared/date-reference';
 import type { AiIntent, AiPlan } from '../types';
 import { resolveAiStockItems } from '../utils/ai-command';
 import {
@@ -266,7 +270,11 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
         bodyFatPct: input.bodyFatPct,
         leanBodyMassKg: input.leanBodyMassKg,
         source: input.source,
-        note: input.note,
+        note: appendBackfillDateNote(
+          input.note,
+          input.targetDate,
+          context.timestamp,
+        ),
       });
 
       return {
@@ -422,8 +430,10 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
 
       return okValidationResult();
     },
-    execute(_input, context) {
-      const summary = getTodayNutritionSummary(context.timestamp);
+    execute(input, context) {
+      const summary = getTodayNutritionSummary(
+        resolveTargetDateTimestamp(context.timestamp, input.targetDate),
+      );
 
       if (!summary) {
         return {
@@ -481,20 +491,20 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
         throw new Error('sleep time must be HH:MM');
       }
 
+      const sleepBaseDate = resolveTargetDateTimestamp(
+        context.timestamp,
+        input.targetDate,
+      );
       const isOvernight =
         start.hour > end.hour ||
         (start.hour === end.hour && start.minute > end.minute);
       const sleepStartAt = buildClockDate(
-        context.timestamp,
+        sleepBaseDate,
         start.hour,
         start.minute,
         isOvernight ? -1 : 0,
       );
-      const sleepEndAt = buildClockDate(
-        context.timestamp,
-        end.hour,
-        end.minute,
-      );
+      const sleepEndAt = buildClockDate(sleepBaseDate, end.hour, end.minute);
       const sleepHours = Number(
         (
           (sleepEndAt.getTime() - sleepStartAt.getTime()) /
@@ -512,7 +522,7 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
         sleepEndAt,
         sleepHours,
         input.sleepQuality ?? 'normal',
-        input.note ?? '',
+        appendBackfillDateNote(input.note, input.targetDate, context.timestamp),
       );
 
       return {
@@ -565,7 +575,7 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
         input.workoutName,
         durationMin,
         input.workoutLevel ?? 'medium',
-        input.note ?? '',
+        appendBackfillDateNote(input.note, input.targetDate, context.timestamp),
         input.workoutVideoUrl ?? '',
       );
 
@@ -609,7 +619,11 @@ const TOOL_REGISTRY: Record<ToolName, AnyToolContract> = {
         entryType: input.entryType,
         value: normalizeStatusValue(input),
         unit: input.unit,
-        note: input.note,
+        note: appendBackfillDateNote(
+          input.note,
+          input.targetDate,
+          context.timestamp,
+        ),
         cycleDay: input.cycleDay,
       });
 

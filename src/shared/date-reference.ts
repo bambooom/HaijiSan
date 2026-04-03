@@ -10,6 +10,8 @@ const BACKFILL_SUPPORTED_INTENTS = new Set<AiIntent>([
   'food',
   'nutrition_summary',
 ]);
+const BACKFILL_DATE_NOTE_PATTERN =
+  /(?:^|[;\s])backfillDate=(\d{4}-\d{2}-\d{2})(?=$|[;\s])/;
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -165,6 +167,42 @@ export function resolveTargetDateTimestamp(
 
 export function supportsBackfillForIntent(intent: AiIntent): boolean {
   return BACKFILL_SUPPORTED_INTENTS.has(intent);
+}
+
+export function extractBackfillDate(note: string): string | null {
+  const match = note.match(BACKFILL_DATE_NOTE_PATTERN);
+
+  return match?.[1] ?? null;
+}
+
+export function appendBackfillDateNote(
+  note: string | undefined,
+  targetDate: string | undefined,
+  loggedAt: Date,
+): string {
+  const normalizedNote = note?.trim() ?? '';
+
+  if (!isDateStamp(targetDate) || targetDate === formatDateStamp(loggedAt)) {
+    return normalizedNote;
+  }
+
+  if (extractBackfillDate(normalizedNote) === targetDate) {
+    return normalizedNote;
+  }
+
+  return normalizedNote
+    ? `${normalizedNote}; backfillDate=${targetDate}`
+    : `backfillDate=${targetDate}`;
+}
+
+export function matchesRecordDate(
+  loggedAt: string,
+  note: string,
+  dateStamp: string,
+): boolean {
+  return (
+    loggedAt.startsWith(dateStamp) || extractBackfillDate(note) === dateStamp
+  );
 }
 
 export function formatDateLabel(targetDate: string): string {

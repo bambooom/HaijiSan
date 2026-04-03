@@ -9,6 +9,7 @@ import {
   formatLoggedAt,
   formatSheetCellAsString,
 } from '../shared/records';
+import { matchesRecordDate } from '../shared/date-reference';
 
 export class FoodLogRepository {
   constructor(
@@ -45,7 +46,9 @@ export class FoodLogRepository {
     return this.spreadsheet
       .getDataRows(this.layout.name)
       .map(({ values }) => this.mapRow(values))
-      .filter((entry) => entry.logged_at.startsWith(datePrefix))
+      .filter((entry) =>
+        matchesRecordDate(entry.logged_at, entry.note, datePrefix),
+      )
       .filter((entry) => entry.food_log_id.trim() !== '');
   }
 

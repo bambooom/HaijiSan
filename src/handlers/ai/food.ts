@@ -18,7 +18,10 @@ import {
 } from '../../services/meal-recording';
 import { createPendingMealRecordAction } from '../../services/meal-action';
 import { savePendingAiAction } from '../../services/pending-action';
-import { resolveTargetDateTimestamp } from '../../shared/date-reference';
+import {
+  appendBackfillDateNote,
+  resolveTargetDateTimestamp,
+} from '../../shared/date-reference';
 import {
   buildEstimatedMealReply,
   buildMissingQuantityReply,
@@ -83,7 +86,6 @@ export function handleFoodAiMessage(
         savePendingAiAction(
           createPendingMealRecordAction({
             timestamp,
-            recordTimestamp,
             traceId,
             sourceText: originalText,
             previewText,
@@ -100,7 +102,11 @@ export function handleFoodAiMessage(
             mealText: resolvedMeal.mealText,
             estimatedCalories: resolvedMeal.estimatedCalories,
             parseStatus: 'parsed',
-            mealNote: buildResolvedMealNote(resolvedMeal),
+            mealNote: appendBackfillDateNote(
+              buildResolvedMealNote(resolvedMeal),
+              plan.targetDate,
+              timestamp,
+            ),
             items: buildFoodItemEntriesFromResolution('', resolvedMeal),
           }),
         );
@@ -137,11 +143,7 @@ export function handleFoodAiMessage(
     // Fall back to staged flow.
   }
 
-  const resolvedEstimate = resolveMealEstimate(
-    plan,
-    originalText,
-    recordTimestamp,
-  );
+  const resolvedEstimate = resolveMealEstimate(plan, originalText, timestamp);
   const estimate = resolvedEstimate?.estimate ?? null;
 
   if (!estimate) {
@@ -236,7 +238,6 @@ export function handleFoodAiMessage(
     savePendingAiAction(
       createPendingMealRecordAction({
         timestamp,
-        recordTimestamp,
         traceId,
         sourceText: originalText,
         previewText,
@@ -250,7 +251,11 @@ export function handleFoodAiMessage(
         mealText: estimate.mealText,
         estimatedCalories: totalEstimatedCalories,
         parseStatus: mealRecordMeta.parseStatus,
-        mealNote: mealRecordMeta.note,
+        mealNote: appendBackfillDateNote(
+          mealRecordMeta.note,
+          plan.targetDate,
+          timestamp,
+        ),
         items: buildFoodItemEntriesFromParsed(
           '',
           estimate.items,

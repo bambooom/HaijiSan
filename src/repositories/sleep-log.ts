@@ -10,6 +10,7 @@ import {
   formatLoggedAt,
   formatSheetCellAsString,
 } from '../shared/records';
+import { extractBackfillDate } from '../shared/date-reference';
 
 export class SleepLogRepository {
   constructor(
@@ -48,7 +49,9 @@ export class SleepLogRepository {
       .filter(
         (entry) =>
           entry.sleep_log_id.trim() !== '' &&
-          entry.logged_at.startsWith(datePrefix),
+          (entry.sleep_end_at.startsWith(datePrefix) ||
+            entry.logged_at.startsWith(datePrefix) ||
+            extractBackfillDate(entry.note) === datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  appendBackfillDateNote,
+  extractBackfillDate,
+  formatDateStamp,
+  matchesRecordDate,
   parseTargetDateReference,
   resolveTargetDateTimestamp,
 } from './date-reference';
@@ -32,5 +36,14 @@ describe('date reference helpers', () => {
     expect(resolved.getDate()).toBe(2);
     expect(resolved.getHours()).toBe(now.getHours());
     expect(resolved.getMinutes()).toBe(now.getMinutes());
+  });
+
+  it('stores and reads backfill dates separately from logged_at', () => {
+    const note = appendBackfillDateNote('manual entry', '2026-04-02', now);
+
+    expect(extractBackfillDate(note)).toBe('2026-04-02');
+    expect(matchesRecordDate(formatDateStamp(now), note, '2026-04-02')).toBe(
+      true,
+    );
   });
 });

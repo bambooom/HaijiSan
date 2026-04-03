@@ -9,7 +9,6 @@ import { persistMealRecord } from './meal-recording';
 
 type CreatePendingMealRecordActionInput = {
   timestamp: Date;
-  recordTimestamp?: Date;
   traceId?: string;
   sourceText: string;
   previewText: string;
@@ -34,7 +33,7 @@ export function createPendingMealRecordAction(
     note: input.note,
     ...input.logFields,
     mealRecord: {
-      createdAt: (input.recordTimestamp ?? input.timestamp).toISOString(),
+      createdAt: input.timestamp.toISOString(),
       mealType: input.mealType,
       mealText: input.mealText,
       estimatedCalories: input.estimatedCalories,

@@ -10,6 +10,7 @@ import {
   formatLoggedAt,
   formatSheetCellAsString,
 } from '../shared/records';
+import { matchesRecordDate } from '../shared/date-reference';
 
 export class BodyLogRepository {
   constructor(
@@ -48,7 +49,7 @@ export class BodyLogRepository {
       .filter(
         (entry) =>
           entry.body_log_id.trim() !== '' &&
-          entry.logged_at.startsWith(datePrefix),
+          matchesRecordDate(entry.logged_at, entry.note, datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }

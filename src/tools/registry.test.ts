@@ -2,10 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { AI_INTENTS } from '../constants/ai';
 
+const mocks = vi.hoisted(() => ({
+  logSleep: vi.fn(),
+  getTodayNutritionSummary: vi.fn(),
+}));
+
 vi.mock('../repositories', () => ({
   bodyLogRepository: {},
   refCaloriesRepository: {},
-  sleepLogRepository: {},
+  sleepLogRepository: {
+    logSleep: mocks.logSleep,
+  },
   statusLogRepository: {},
   stockRepository: {},
   workoutLogRepository: {},
@@ -16,11 +23,15 @@ vi.mock('../services/meal-recording', () => ({
 }));
 
 vi.mock('../services/nutrition-summary', () => ({
-  getTodayNutritionSummary: vi.fn(),
+  getTodayNutritionSummary: mocks.getTodayNutritionSummary,
 }));
 
 import { buildToolInputFromAiPlan, getToolContract } from './registry';
-import type { LogMealInput, ToolExecutionContext } from './schemas';
+import type {
+  LogMealInput,
+  LogSleepInput,
+  ToolExecutionContext,
+} from './schemas';
 import { TOOL_NAMES } from './schemas';
 
 function getMealContract(): {
@@ -113,5 +124,39 @@ describe('tool registry meal validation', () => {
       sleepQuality: 'normal',
       note: undefined,
     });
+  });
+
+  it('writes sleep logged_at with the actual record time while backfilling sleep_start_at and sleep_end_at', () => {
+    const execute = getToolContract(TOOL_NAMES.LOG_SLEEP).execute as
+      | ((input: LogSleepInput, context: ToolExecutionContext) => unknown)
+      | undefined;
+
+    if (!execute) {
+      throw new Error('log sleep execute is missing');
+    }
+
+    execute(
+      {
+        targetDate: '2026-04-02',
+        sleepStart: '02:42',
+        sleepEnd: '08:20',
+        sleepQuality: 'normal',
+      },
+      {
+        timestamp: new Date('2026-04-03T10:00:00.000Z'),
+        source: 'ai-plan',
+      },
+    );
+
+    expect(mocks.logSleep).toHaveBeenCalledTimes(1);
+    expect(mocks.logSleep.mock.calls[0]?.[0]).toEqual(
+      new Date('2026-04-03T10:00:00.000Z'),
+    );
+    expect(mocks.logSleep.mock.calls[0]?.[1]).toEqual(
+      new Date(2026, 3, 2, 2, 42, 0, 0),
+    );
+    expect(mocks.logSleep.mock.calls[0]?.[2]).toEqual(
+      new Date(2026, 3, 2, 8, 20, 0, 0),
+    );
   });
 });

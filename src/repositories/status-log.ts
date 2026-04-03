@@ -10,6 +10,7 @@ import {
   formatLoggedAt,
   formatSheetCellAsString,
 } from '../shared/records';
+import { matchesRecordDate } from '../shared/date-reference';
 
 export class StatusLogRepository {
   constructor(
@@ -47,7 +48,7 @@ export class StatusLogRepository {
       .filter(
         (entry) =>
           entry.entry_id.trim() !== '' &&
-          entry.logged_at.startsWith(datePrefix),
+          matchesRecordDate(entry.logged_at, entry.note, datePrefix),
       )
       .sort((left, right) => left.logged_at.localeCompare(right.logged_at));
   }
