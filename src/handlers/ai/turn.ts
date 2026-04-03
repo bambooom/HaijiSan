@@ -35,6 +35,28 @@ export type ResolvedAiTurn = {
 };
 
 const LOW_CONFIDENCE_THRESHOLD = 0.45;
+const SLEEP_RECORD_PATTERN = /睡眠|睡了|入睡|醒来|睡觉/;
+const QUESTION_PATTERN = /[?？]|为什么|怎么|多少|几点|吗$/;
+const SLEEP_TIME_RANGE_PATTERN =
+  /([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|~|到|至|—|–)\s*([01]?\d|2[0-3]):([0-5]\d)/;
+const SLEEP_QUALITY_ALIASES: Record<string, AiPlan['sleepQuality']> = {
+  good: 'good',
+  great: 'good',
+  well: 'good',
+  hao: 'good',
+  好: 'good',
+  不错: 'good',
+  normal: 'normal',
+  ok: 'normal',
+  medium: 'normal',
+  ordinary: 'normal',
+  一般: 'normal',
+  还行: 'normal',
+  poor: 'poor',
+  bad: 'poor',
+  差: 'poor',
+  很差: 'poor',
+};
 
 function createTraceId(): string {
   try {
@@ -69,6 +91,58 @@ function mergeInferredTargetDate(
         targetDate: inferredDate,
       }
     : plan;
+}
+
+function normalizeClock(hour: string, minute: string): string {
+  return `${hour.padStart(2, '0')}:${minute}`;
+}
+
+function inferSleepQuality(text: string): AiPlan['sleepQuality'] | undefined {
+  for (const [token, quality] of Object.entries(SLEEP_QUALITY_ALIASES)) {
+    if (text.includes(token)) {
+      return quality;
+    }
+  }
+
+  return undefined;
+}
+
+function mergeInferredSleepFields(plan: AiPlan, sourceText: string): AiPlan {
+  const looksLikeSleepRecord =
+    plan.intent === 'sleep' || SLEEP_RECORD_PATTERN.test(sourceText);
+
+  if (!looksLikeSleepRecord) {
+    return plan;
+  }
+
+  const timeRangeMatch = sourceText.match(SLEEP_TIME_RANGE_PATTERN);
+
+  if (!timeRangeMatch) {
+    return plan;
+  }
+
+  const nextPlan: AiPlan = {
+    ...plan,
+    intent: 'sleep',
+    sleepStart:
+      plan.sleepStart ?? normalizeClock(timeRangeMatch[1], timeRangeMatch[2]),
+    sleepEnd:
+      plan.sleepEnd ?? normalizeClock(timeRangeMatch[3], timeRangeMatch[4]),
+    sleepQuality: plan.sleepQuality ?? inferSleepQuality(sourceText),
+  };
+
+  if (
+    nextPlan.mode === 'clarify' &&
+    nextPlan.sleepStart &&
+    nextPlan.sleepEnd &&
+    !QUESTION_PATTERN.test(sourceText)
+  ) {
+    nextPlan.mode = 'command';
+    nextPlan.reply = '我知道你的意思了。';
+    nextPlan.confidence = Math.max(nextPlan.confidence ?? 0, 0.92);
+  }
+
+  return nextPlan;
 }
 
 export type AiTurnResolution =
@@ -106,6 +180,7 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
       ? pendingActionResult.plan
       : geminiService.planMessage(text, timestamp, planningContext);
   plan = mergeInferredTargetDate(plan, inferenceText, timestamp);
+  plan = mergeInferredSleepFields(plan, inferenceText);
   const { toolName, input, validation } = validateAiPlanAgainstTool(
     plan,
     sourceText,

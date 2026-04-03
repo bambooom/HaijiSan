@@ -83,4 +83,31 @@ describe('resolveAiTurn target date inference', () => {
 
     expect(resolution.turn.plan.targetDate).toBe('2026-04-02');
   });
+
+  it('upgrades a sleep clarify plan when the source text already contains a full time range', () => {
+    mocks.planMessage.mockReturnValueOnce({
+      mode: 'clarify',
+      intent: 'sleep',
+      reply: '我知道你想记录内容，但关键信息还不够。再补一句具体数值或时间就可以。',
+      confidence: 0.4,
+    });
+
+    const resolution = resolveAiTurn(
+      '更新4月2号的睡眠 2:42-8:20，一般',
+      new Date('2026-04-03T10:00:00.000Z'),
+    );
+
+    expect(resolution.kind).toBe('turn');
+
+    if (resolution.kind !== 'turn') {
+      return;
+    }
+
+    expect(resolution.turn.plan.mode).toBe('command');
+    expect(resolution.turn.plan.intent).toBe('sleep');
+    expect(resolution.turn.plan.targetDate).toBe('2026-04-02');
+    expect(resolution.turn.plan.sleepStart).toBe('02:42');
+    expect(resolution.turn.plan.sleepEnd).toBe('08:20');
+    expect(resolution.turn.plan.sleepQuality).toBe('normal');
+  });
 });
