@@ -49,6 +49,11 @@ const MEAL_TIME_HINTS: Array<{ pattern: RegExp; mealType: MealType }> = [
   { pattern: /(下午|加餐|夜宵|宵夜|零食)/, mealType: 'snack' },
 ];
 
+const WEIGHTED_UNIT_PATTERN =
+  'g|kg|ml|l|克|千克|毫升|升|个|颗|枚|份|碗|袋|盒|杯|片|根|条|只|瓶|罐';
+const QUANTITY_TOKEN_PATTERN =
+  '(?:\\d+(?:\\.\\d+)?)|半|[零一二两三四五六七八九十]+';
+
 export function inferMealTypeByPrefix(content: string): {
   mealType: MealType;
   mealText: string;
@@ -115,37 +120,58 @@ export function parseWeightedIngredient(
     return null;
   }
 
-  const match = trimmedSegment.match(
-    /^((?:\d+(?:\.\d+)?)|半|[零一二两三四五六七八九十]+)(g|kg|ml|l|克|千克|毫升|升|个|颗|枚|份|碗|袋|盒|杯|片|根|条|只|瓶|罐)(.+)$/i,
+  const prefixedMatch = trimmedSegment.match(
+    new RegExp(
+      `^(${QUANTITY_TOKEN_PATTERN})(${WEIGHTED_UNIT_PATTERN})(.+)$`,
+      'i',
+    ),
   );
 
-  if (!match) {
-    return null;
+  if (prefixedMatch) {
+    return buildParsedIngredient(
+      trimmedSegment,
+      prefixedMatch[3],
+      prefixedMatch[1],
+      prefixedMatch[2],
+      estimateCaloriesForReference,
+    );
   }
 
-  const quantity = parseChineseNumberToken(match[1]);
-  const unit = match[2];
-  const itemName = match[3].trim();
-
-  if (!itemName || quantity === null || Number.isNaN(quantity)) {
-    return null;
-  }
-
-  const matchedReference = findBestReference(itemName);
-
-  return {
-    sourceSegment: trimmedSegment,
-    itemName,
-    quantity,
-    unit,
-    estimatedCalories: estimateCaloriesForReference(
-      quantity,
-      unit,
-      matchedReference,
+  const suffixedMatch = trimmedSegment.match(
+    new RegExp(
+      `^(.+?)(?:\\s*[x×*]\\s*|\\s+)(${QUANTITY_TOKEN_PATTERN})(${WEIGHTED_UNIT_PATTERN})$`,
+      'i',
     ),
-    linkedFoodRefId: matchedReference?.id ?? '',
-    matchedReference,
-  };
+  );
+
+  if (suffixedMatch) {
+    return buildParsedIngredient(
+      trimmedSegment,
+      suffixedMatch[1],
+      suffixedMatch[2],
+      suffixedMatch[3],
+      estimateCaloriesForReference,
+    );
+  }
+
+  const parenthesizedMatch = trimmedSegment.match(
+    new RegExp(
+      `^(.+?)[（(]\\s*(${QUANTITY_TOKEN_PATTERN})(${WEIGHTED_UNIT_PATTERN})\\s*[)）]$`,
+      'i',
+    ),
+  );
+
+  if (parenthesizedMatch) {
+    return buildParsedIngredient(
+      trimmedSegment,
+      parenthesizedMatch[1],
+      parenthesizedMatch[2],
+      parenthesizedMatch[3],
+      estimateCaloriesForReference,
+    );
+  }
+
+  return null;
 }
 
 export function countMeaningfulSegments(text: string): number {
@@ -229,12 +255,73 @@ function parseChineseNumberToken(token: string): number | null {
   return tens * 10 + ones;
 }
 
+function normalizeIngredientName(rawName: string): string {
+  return rawName
+    .trim()
+    .replace(/^(?:的\s*)+/, '')
+    .replace(/[（(][^)）]*[)）]$/g, '')
+    .replace(/[x×*]$/i, '')
+    .replace(
+      /(?:零|一|二|两|三|四|五|六|七|八|九|十|半|\d+)(?:个|颗|枚|份|碗|袋|盒|杯|片|根|条|只|瓶|罐)$/,
+      '',
+    )
+    .trim();
+}
+
+function buildParsedIngredient(
+  sourceSegment: string,
+  rawItemName: string,
+  quantityToken: string,
+  unit: string,
+  estimateCaloriesForReference: (
+    quantity: number,
+    unit: string,
+    reference: FoodReference | null,
+  ) => number | null,
+): ParsedIngredient | null {
+  const quantity = parseChineseNumberToken(quantityToken);
+  const itemName = normalizeIngredientName(rawItemName);
+
+  if (!itemName || quantity === null || Number.isNaN(quantity)) {
+    return null;
+  }
+
+  const matchedReference = findBestReference(itemName);
+
+  return {
+    sourceSegment,
+    itemName,
+    quantity,
+    unit,
+    estimatedCalories: estimateCaloriesForReference(
+      quantity,
+      unit,
+      matchedReference,
+    ),
+    linkedFoodRefId: matchedReference?.id ?? '',
+    matchedReference,
+  };
+}
+
 function findBestReference(keyword: string): FoodReference | null {
-  const matches = refCaloriesRepository.searchByKeyword(keyword);
   const normalizedKeyword = keyword.trim().toLowerCase();
+  const matches = refCaloriesRepository.searchByKeyword(keyword);
 
   if (matches.length === 0) {
-    return null;
+    const fallbackMatch = refCaloriesRepository.listAll().find((match) => {
+      const normalizedName = match.name.trim().toLowerCase();
+      const normalizedBrand = match.brand.trim().toLowerCase();
+      const combined = `${normalizedBrand} ${normalizedName}`.trim();
+
+      return (
+        normalizedKeyword.includes(normalizedName) ||
+        normalizedName.includes(normalizedKeyword) ||
+        (combined !== '' && normalizedKeyword.includes(combined)) ||
+        (combined !== '' && combined.includes(normalizedKeyword))
+      );
+    });
+
+    return fallbackMatch ?? null;
   }
 
   const exactMatch = matches.find((match) => {
