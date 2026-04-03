@@ -100,7 +100,7 @@ export function parseTargetDateReference(
   }
 
   const fullDateMatch = normalized.match(
-    /(?<!\d)(20\d{2})[年\/.\-](\d{1,2})[月\/.\-](\d{1,2})(?:日|号)?(?!\d)/,
+    /(?<!\d)(20\d{2})[年/.-](\d{1,2})[月/.-](\d{1,2})(?:日|号)?(?!\d)/,
   );
 
   if (fullDateMatch) {
@@ -112,7 +112,7 @@ export function parseTargetDateReference(
   }
 
   const monthDayMatch = normalized.match(
-    /(?<!\d)(\d{1,2})[月\/.\-](\d{1,2})(?:日|号)?(?!\d)/,
+    /(?<!\d)(\d{1,2})[月/.-](\d{1,2})(?:日|号)?(?!\d)/,
   );
 
   if (!monthDayMatch) {

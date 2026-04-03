@@ -88,7 +88,8 @@ describe('resolveAiTurn target date inference', () => {
     mocks.planMessage.mockReturnValueOnce({
       mode: 'clarify',
       intent: 'sleep',
-      reply: '我知道你想记录内容，但关键信息还不够。再补一句具体数值或时间就可以。',
+      reply:
+        '我知道你想记录内容，但关键信息还不够。再补一句具体数值或时间就可以。',
       confidence: 0.4,
     });
 
