@@ -30,6 +30,7 @@ export type MealEstimateResult = {
 };
 
 export interface MealReferenceFact {
+  referenceId: string;
   itemName: string;
   servingSize: number;
   unit: string;

@@ -37,6 +37,55 @@ function buildIngredientKey(
   return `${itemName}|${quantity}|${unit}`;
 }
 
+function normalizeReferenceName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function findMatchedReferenceFact(
+  itemName: string,
+  matchedReferences: MealReferenceFact[],
+): MealReferenceFact | null {
+  const normalizedItemName = normalizeReferenceName(itemName);
+
+  if (!normalizedItemName) {
+    return null;
+  }
+
+  const exactMatch = matchedReferences.find((reference) => {
+    const normalizedReferenceItem = normalizeReferenceName(reference.itemName);
+    const normalizedReferenceName = normalizeReferenceName(
+      reference.referenceName,
+    );
+
+    return (
+      normalizedReferenceItem === normalizedItemName ||
+      normalizedReferenceName === normalizedItemName
+    );
+  });
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  return (
+    matchedReferences.find((reference) => {
+      const normalizedReferenceItem = normalizeReferenceName(
+        reference.itemName,
+      );
+      const normalizedReferenceName = normalizeReferenceName(
+        reference.referenceName,
+      );
+
+      return (
+        normalizedItemName.includes(normalizedReferenceItem) ||
+        normalizedReferenceItem.includes(normalizedItemName) ||
+        normalizedItemName.includes(normalizedReferenceName) ||
+        normalizedReferenceName.includes(normalizedItemName)
+      );
+    }) ?? null
+  );
+}
+
 function formatReferenceEstimatedItem(item: ParsedIngredient): string {
   const quantityLabel = `${item.quantity}${item.unit}`;
 
@@ -147,6 +196,7 @@ export function buildMatchedReferenceFacts(
         item.matchedReference?.servingSize !== undefined,
     )
     .map((item) => ({
+      referenceId: item.matchedReference?.id ?? '',
       itemName: item.itemName,
       servingSize: item.matchedReference?.servingSize ?? 0,
       unit: item.matchedReference?.unit ?? '',
@@ -170,6 +220,57 @@ export function buildResolvedMealDetailLines(
   resolvedMeal: MealResolutionResult,
 ): string {
   return resolvedMeal.items.map(formatResolvedItem).join('\n');
+}
+
+export function reconcileResolvedMealWithReferences(
+  resolvedMeal: MealResolutionResult,
+  matchedReferences: MealReferenceFact[],
+): MealResolutionResult {
+  if (matchedReferences.length === 0 || resolvedMeal.items.length === 0) {
+    return resolvedMeal;
+  }
+
+  const nextItems = resolvedMeal.items.map((item) => {
+    const matchedReference = findMatchedReferenceFact(
+      item.itemName,
+      matchedReferences,
+    );
+
+    if (!matchedReference) {
+      return item;
+    }
+
+    const referenceCalories = Number(
+      (
+        (item.quantity * matchedReference.calories) /
+        matchedReference.servingSize
+      ).toFixed(1),
+    );
+
+    return {
+      ...item,
+      estimatedCalories: referenceCalories,
+      source: 'reference' as const,
+      linkedFoodRefId: matchedReference.referenceId,
+      note: matchedReference.referenceName
+        ? `按表内参考 ${matchedReference.referenceName} 换算`
+        : item.note,
+    };
+  });
+
+  const resolvedCalories = nextItems.reduce<number | null>((sum, item) => {
+    if (item.estimatedCalories === null) {
+      return sum;
+    }
+
+    return (sum ?? 0) + item.estimatedCalories;
+  }, null);
+
+  return {
+    ...resolvedMeal,
+    items: nextItems,
+    estimatedCalories: resolvedCalories,
+  };
 }
 
 export function buildResolvedMealNote(

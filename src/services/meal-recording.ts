@@ -93,7 +93,7 @@ export function buildFoodItemEntriesFromResolution(
     quantity: item.quantity,
     unit: item.unit,
     estimated_calories: item.estimatedCalories,
-    linked_food_ref_id: '',
+    linked_food_ref_id: item.linkedFoodRefId ?? '',
     linked_stock_item_id: '',
     ai_confidence: item.source === 'reference' ? null : 0.7,
     note:

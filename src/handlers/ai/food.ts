@@ -8,6 +8,7 @@ import {
   buildMealPreviewReply,
   buildResolvedMealDetailLines,
   buildResolvedMealNote,
+  reconcileResolvedMealWithReferences,
   resolveMealEstimate,
   shouldPersistMeal,
   summarizeEstimatedMeal,
@@ -71,13 +72,20 @@ export function handleFoodAiMessage(
     );
 
     if (resolvedMeal) {
-      const detailLines = buildResolvedMealDetailLines(resolvedMeal);
+      const reconciledMeal = reconcileResolvedMealWithReferences(
+        resolvedMeal,
+        matchedReferenceFacts,
+      );
+      const detailLines = buildResolvedMealDetailLines(reconciledMeal);
       const resolvedMealReply = buildResolvedMealReply({
         detailLines,
-        estimatedCalories: resolvedMeal.estimatedCalories,
+        estimatedCalories: reconciledMeal.estimatedCalories,
       });
 
-      if (resolvedMeal.shouldPersist || shouldPersistMeal(plan, originalText)) {
+      if (
+        reconciledMeal.shouldPersist ||
+        shouldPersistMeal(plan, originalText)
+      ) {
         const previewText = prefixTargetDate(
           plan.targetDate,
           buildMealPreviewReply(resolvedMealReply),
@@ -91,23 +99,23 @@ export function handleFoodAiMessage(
             previewText,
             note: appendMealExecutionNote(
               baseNote,
-              `resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
+              `resolution=single-pass; meal=${reconciledMeal.mealText}; kcal=${reconciledMeal.estimatedCalories}; items=${reconciledMeal.items.length}`,
             ),
             logFields: buildCommandLogFields(baseLogFields, {
               intent: plan.intent,
               confirmationState: 'pending',
               resultCode: 'pending-write',
             }),
-            mealType: resolvedMeal.mealType,
-            mealText: resolvedMeal.mealText,
-            estimatedCalories: resolvedMeal.estimatedCalories,
+            mealType: reconciledMeal.mealType,
+            mealText: reconciledMeal.mealText,
+            estimatedCalories: reconciledMeal.estimatedCalories,
             parseStatus: 'parsed',
             mealNote: appendBackfillDateNote(
-              buildResolvedMealNote(resolvedMeal),
+              buildResolvedMealNote(reconciledMeal),
               plan.targetDate,
               timestamp,
             ),
-            items: buildFoodItemEntriesFromResolution('', resolvedMeal),
+            items: buildFoodItemEntriesFromResolution('', reconciledMeal),
           }),
         );
 
@@ -116,7 +124,7 @@ export function handleFoodAiMessage(
           'success',
           appendMealExecutionNote(
             baseNote,
-            `pending-confirmation=true; resolution=single-pass; meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}`,
+            `pending-confirmation=true; resolution=single-pass; meal=${reconciledMeal.mealText}; kcal=${reconciledMeal.estimatedCalories}; items=${reconciledMeal.items.length}`,
           ),
           buildCommandLogFields(baseLogFields, {
             intent: plan.intent,
@@ -131,7 +139,7 @@ export function handleFoodAiMessage(
         'success',
         appendMealExecutionNote(
           baseNote,
-          `meal=${resolvedMeal.mealText}; kcal=${resolvedMeal.estimatedCalories}; items=${resolvedMeal.items.length}; persisted=false`,
+          `meal=${reconciledMeal.mealText}; kcal=${reconciledMeal.estimatedCalories}; items=${reconciledMeal.items.length}; persisted=false`,
         ),
         buildCommandLogFields(baseLogFields, {
           intent: plan.intent,

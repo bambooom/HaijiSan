@@ -27,6 +27,7 @@ export type MealResolvedItemSource = 'reference' | 'ai';
 export interface MealResolvedItem extends IngredientEstimateInput {
   estimatedCalories: number | null;
   source: MealResolvedItemSource;
+  linkedFoodRefId?: string;
   note: string;
 }
 
