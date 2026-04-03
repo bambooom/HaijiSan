@@ -28,6 +28,48 @@ function getTelegramFileUrl(filePath: string): string {
   return `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
 }
 
+function inferMimeTypeFromFilePath(filePath: string): string | null {
+  const normalizedPath = filePath.trim().toLowerCase();
+
+  if (normalizedPath.endsWith('.jpg') || normalizedPath.endsWith('.jpeg')) {
+    return 'image/jpeg';
+  }
+
+  if (normalizedPath.endsWith('.png')) {
+    return 'image/png';
+  }
+
+  if (normalizedPath.endsWith('.webp')) {
+    return 'image/webp';
+  }
+
+  if (normalizedPath.endsWith('.heic')) {
+    return 'image/heic';
+  }
+
+  if (normalizedPath.endsWith('.heif')) {
+    return 'image/heif';
+  }
+
+  return null;
+}
+
+function resolveTelegramMimeType(
+  blobMimeType: string,
+  filePath: string,
+): string {
+  const normalizedBlobMimeType = blobMimeType.trim().toLowerCase();
+
+  if (
+    normalizedBlobMimeType &&
+    normalizedBlobMimeType !== 'application/octet-stream'
+  ) {
+    return normalizedBlobMimeType;
+  }
+
+  return inferMimeTypeFromFilePath(filePath) ?? 'image/jpeg';
+}
+
 export function downloadTelegramFile(fileId: string): {
   base64Data: string;
   mimeType: string;
@@ -71,7 +113,7 @@ export function downloadTelegramFile(fileId: string): {
 
   return {
     base64Data: Utilities.base64Encode(blob.getBytes()),
-    mimeType: blob.getContentType() || 'image/jpeg',
+    mimeType: resolveTelegramMimeType(blob.getContentType() || '', filePath),
   };
 }
 
