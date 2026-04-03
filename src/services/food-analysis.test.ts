@@ -103,4 +103,23 @@ describe('food analysis reference matching', () => {
     expect(result?.items[1]?.estimatedCalories).toBe(116);
     expect(result?.items[2]?.estimatedCalories).toBe(97.6);
   });
+
+  it('matches references when item name and weight are written without separators', () => {
+    const result = estimateMealCalories(
+      '中饭吃的 西葫芦一根（314g）+鸡小胸105g+凉拌鲜脆鱼皮200g',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.items.map((item) => item.itemName)).toEqual([
+      '西葫芦',
+      '鸡小胸',
+      '凉拌鲜脆鱼皮',
+    ]);
+    expect(result?.items.map((item) => item.linkedFoodRefId)).toEqual([
+      'ref_zucchini',
+      'ref_chicken',
+      'ref_fish_skin',
+    ]);
+    expect(result?.items[2]?.estimatedCalories).toBe(97.6);
+  });
 });

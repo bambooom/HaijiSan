@@ -139,7 +139,7 @@ export function parseWeightedIngredient(
 
   const suffixedMatch = trimmedSegment.match(
     new RegExp(
-      `^(.+?)(?:\\s*[x×*]\\s*|\\s+)(${QUANTITY_TOKEN_PATTERN})(${WEIGHTED_UNIT_PATTERN})$`,
+      `^(.+?)(?:\\s*[x×*]\\s*|\\s*)(${QUANTITY_TOKEN_PATTERN})(${WEIGHTED_UNIT_PATTERN})$`,
       'i',
     ),
   );
