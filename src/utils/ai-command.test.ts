@@ -36,6 +36,20 @@ describe('buildCommandFromAiPlan', () => {
     ).toBe('/sleep 23:30 07:30 good');
   });
 
+  it('keeps mapped sleep commands unchanged when targetDate is present', () => {
+    expect(
+      buildCommandFromAiPlan({
+        mode: 'command',
+        intent: AI_INTENTS.SLEEP,
+        reply: '',
+        targetDate: '2026-04-02',
+        sleepStart: '02:42',
+        sleepEnd: '08:20',
+        sleepQuality: 'normal',
+      }),
+    ).toBe('/sleep 02:42 08:20 normal');
+  });
+
   it('builds positive stock adjustment commands with a plus sign', () => {
     expect(
       buildCommandFromAiPlan({

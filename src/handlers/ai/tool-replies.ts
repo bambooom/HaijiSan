@@ -12,6 +12,11 @@ import {
   type ToolInputMap,
   type ToolName,
 } from '../../tools/schemas';
+import { formatDateLabel } from '../../shared/date-reference';
+
+function buildDatePrefix(targetDate?: string): string {
+  return targetDate ? `${formatDateLabel(targetDate)}：` : '';
+}
 
 export function buildReadOnlyToolReply(
   toolName: ToolName,
@@ -25,7 +30,10 @@ export function buildReadOnlyToolReply(
         (toolInput as LookupStockInput).query,
       );
     case TOOL_NAMES.SUMMARIZE_NUTRITION:
-      return buildNutritionSummaryReply(output as SummarizeNutritionOutput);
+      return buildNutritionSummaryReply(
+        output as SummarizeNutritionOutput,
+        (toolInput as LookupStockInput & { targetDate?: string }).targetDate,
+      );
     case TOOL_NAMES.LOOKUP_REFERENCE:
       return buildLookupReferenceReply(
         output as LookupReferenceOutput,
@@ -50,11 +58,18 @@ export function buildImmediateWriteToolReply(
           bodyFatPct: number | null;
           leanBodyMassKg: number | null;
         },
+        (toolInput as { targetDate?: string }).targetDate,
       );
     case TOOL_NAMES.LOG_SLEEP:
-      return buildSleepRecordSuccessReply(output as LogSleepOutput);
+      return buildSleepRecordSuccessReply(
+        output as LogSleepOutput,
+        (toolInput as { targetDate?: string }).targetDate,
+      );
     case TOOL_NAMES.LOG_WORKOUT:
-      return buildWorkoutRecordSuccessReply(output as LogWorkoutOutput);
+      return buildWorkoutRecordSuccessReply(
+        output as LogWorkoutOutput,
+        (toolInput as { targetDate?: string }).targetDate,
+      );
     case TOOL_NAMES.LOG_STATUS:
       return buildStatusRecordSuccessReply(toolInput as LogStatusInput);
     case TOOL_NAMES.LOG_REFERENCE:
@@ -81,15 +96,18 @@ export function buildLookupStockReply(
 
 export function buildNutritionSummaryReply(
   result: SummarizeNutritionOutput,
+  targetDate?: string,
 ): string {
+  const dateLabel = targetDate ? formatDateLabel(targetDate) : '今天';
+
   if (result.mealsCount === 0) {
-    return '今天还没有饮食记录，所以现在没法汇总热量、蛋白质和蔬菜。';
+    return `${dateLabel}还没有饮食记录，所以现在没法汇总热量、蛋白质和蔬菜。`;
   }
 
   const lines = [
     result.totalCalories === null
-      ? `今天共记录 ${result.mealsCount} 餐，但还没有足够的热量汇总数据。`
-      : `今天共记录 ${result.mealsCount} 餐，热量约 ${result.totalCalories} kcal。`,
+      ? `${dateLabel}共记录 ${result.mealsCount} 餐，但还没有足够的热量汇总数据。`
+      : `${dateLabel}共记录 ${result.mealsCount} 餐，热量约 ${result.totalCalories} kcal。`,
     result.totalProtein === null
       ? '蛋白：今天还没有足够的参考数据，暂时没法可靠判断。'
       : result.proteinTarget === null
@@ -128,13 +146,16 @@ export function buildLookupReferenceReply(
     .join('\n')}`;
 }
 
-export function buildBodyRecordSuccessReply(result: {
-  weightKg: number | null;
-  bmi: number | null;
-  bodyFatPct: number | null;
-  leanBodyMassKg: number | null;
-}): string {
-  const parts = ['身体数据已记录。'];
+export function buildBodyRecordSuccessReply(
+  result: {
+    weightKg: number | null;
+    bmi: number | null;
+    bodyFatPct: number | null;
+    leanBodyMassKg: number | null;
+  },
+  targetDate?: string,
+): string {
+  const parts = [`${buildDatePrefix(targetDate)}身体数据已记录。`];
 
   if (result.weightKg !== null) {
     parts.push(`体重 ${result.weightKg} kg`);
@@ -155,34 +176,40 @@ export function buildBodyRecordSuccessReply(result: {
   return parts.join(' ');
 }
 
-export function buildSleepRecordSuccessReply(result: LogSleepOutput): string {
+export function buildSleepRecordSuccessReply(
+  result: LogSleepOutput,
+  targetDate?: string,
+): string {
   const qualityLabels: Record<string, string> = {
     good: '好',
     normal: '一般',
     poor: '差',
   };
 
-  return `睡眠已记录，共 ${result.sleepHours ?? '未知'} 小时，质量${qualityLabels[result.sleepQuality ?? 'normal'] ?? result.sleepQuality ?? '一般'}。`;
+  return `${buildDatePrefix(targetDate)}睡眠已记录，共 ${result.sleepHours ?? '未知'} 小时，质量${qualityLabels[result.sleepQuality ?? 'normal'] ?? result.sleepQuality ?? '一般'}。`;
 }
 
 export function buildWorkoutRecordSuccessReply(
   result: LogWorkoutOutput,
+  targetDate?: string,
 ): string {
-  return `运动 ${result.workoutName} 已记录，时长 ${result.durationMin ?? '未知'} 分钟。`;
+  return `${buildDatePrefix(targetDate)}运动 ${result.workoutName} 已记录，时长 ${result.durationMin ?? '未知'} 分钟。`;
 }
 
 export function buildStatusRecordSuccessReply(input: LogStatusInput): string {
+  const prefix = buildDatePrefix(input.targetDate);
+
   switch (input.entryType) {
     case 'bowel':
-      return '排便状态已记录。';
+      return `${prefix}排便状态已记录。`;
     case 'menstruation':
       return input.cycleDay === null || input.cycleDay === undefined
-        ? '经期状态已记录。'
-        : `经期状态已记录，周期第 ${input.cycleDay} 天。`;
+        ? `${prefix}经期状态已记录。`
+        : `${prefix}经期状态已记录，周期第 ${input.cycleDay} 天。`;
     case 'symptom':
-      return `症状 ${String(input.value ?? input.note ?? '').trim()} 已记录。`;
+      return `${prefix}症状 ${String(input.value ?? input.note ?? '').trim()} 已记录。`;
     case 'medication':
-      return `用药记录 ${String(input.value ?? input.note ?? '').trim()} 已记录。`;
+      return `${prefix}用药记录 ${String(input.value ?? input.note ?? '').trim()} 已记录。`;
   }
 }
 

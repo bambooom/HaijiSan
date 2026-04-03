@@ -1,5 +1,6 @@
 import { AI_INTENTS, AI_MESSAGES } from '../../constants/ai';
 import { savePendingAiAction } from '../../services/pending-action';
+import { resolveTargetDateTimestamp } from '../../shared/date-reference';
 import {
   buildToolInputFromAiPlan,
   getToolContract,
@@ -48,6 +49,10 @@ export function handleExecuteStage(
   turn: ResolvedAiTurn,
   timestamp: Date,
 ): CommandHandlingResult {
+  const executionTimestamp = resolveTargetDateTimestamp(
+    timestamp,
+    turn.plan.targetDate,
+  );
   const specialExecutor = SPECIAL_EXECUTORS[turn.plan.intent];
 
   if (specialExecutor) {
@@ -66,7 +71,7 @@ export function handleExecuteStage(
     };
   }
 
-  const registryResult = executeToolFromRegistry(turn, timestamp);
+  const registryResult = executeToolFromRegistry(turn, executionTimestamp);
 
   if (registryResult) {
     const enrichedNote = turn.toolArgsNote

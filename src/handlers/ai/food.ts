@@ -18,6 +18,7 @@ import {
 } from '../../services/meal-recording';
 import { createPendingMealRecordAction } from '../../services/meal-action';
 import { savePendingAiAction } from '../../services/pending-action';
+import { resolveTargetDateTimestamp } from '../../shared/date-reference';
 import {
   buildEstimatedMealReply,
   buildMissingQuantityReply,
@@ -34,6 +35,13 @@ import type {
 import { buildCommandLogFields } from '../../utils/log-meta';
 import { buildAiResult } from './result';
 
+function prefixTargetDate(
+  targetDate: string | undefined,
+  text: string,
+): string {
+  return targetDate ? `记录日期：${targetDate}\n${text}` : text;
+}
+
 export function handleFoodAiMessage(
   plan: AiPlan,
   originalText: string,
@@ -42,6 +50,10 @@ export function handleFoodAiMessage(
   baseNote?: string,
   baseLogFields?: CommandLogFields,
 ): CommandHandlingResult {
+  const recordTimestamp = resolveTargetDateTimestamp(
+    timestamp,
+    plan.targetDate,
+  );
   const mealInput = buildMealInput(plan, originalText);
   const preMatchedEstimate = estimateMealCalories(mealInput);
   const matchedReferenceFacts = buildMatchedReferenceFacts(
@@ -51,7 +63,7 @@ export function handleFoodAiMessage(
   try {
     const resolvedMeal = geminiService.resolveMealRecord(
       originalText,
-      timestamp,
+      recordTimestamp,
       matchedReferenceFacts,
     );
 
@@ -63,11 +75,15 @@ export function handleFoodAiMessage(
       });
 
       if (resolvedMeal.shouldPersist || shouldPersistMeal(plan, originalText)) {
-        const previewText = buildMealPreviewReply(resolvedMealReply);
+        const previewText = prefixTargetDate(
+          plan.targetDate,
+          buildMealPreviewReply(resolvedMealReply),
+        );
 
         savePendingAiAction(
           createPendingMealRecordAction({
             timestamp,
+            recordTimestamp,
             traceId,
             sourceText: originalText,
             previewText,
@@ -105,7 +121,7 @@ export function handleFoodAiMessage(
       }
 
       return buildAiResult(
-        resolvedMealReply,
+        prefixTargetDate(plan.targetDate, resolvedMealReply),
         'success',
         appendMealExecutionNote(
           baseNote,
@@ -121,7 +137,11 @@ export function handleFoodAiMessage(
     // Fall back to staged flow.
   }
 
-  const resolvedEstimate = resolveMealEstimate(plan, originalText, timestamp);
+  const resolvedEstimate = resolveMealEstimate(
+    plan,
+    originalText,
+    recordTimestamp,
+  );
   const estimate = resolvedEstimate?.estimate ?? null;
 
   if (!estimate) {
@@ -208,11 +228,15 @@ export function handleFoodAiMessage(
       resolvedEstimate?.parseNote ?? '',
     );
     // Keep preview payload creation in one place so confirmation writes exactly what was shown.
-    const previewText = buildMealPreviewReply(estimatedMealReply);
+    const previewText = prefixTargetDate(
+      plan.targetDate,
+      buildMealPreviewReply(estimatedMealReply),
+    );
 
     savePendingAiAction(
       createPendingMealRecordAction({
         timestamp,
+        recordTimestamp,
         traceId,
         sourceText: originalText,
         previewText,
@@ -251,7 +275,7 @@ export function handleFoodAiMessage(
   }
 
   return buildAiResult(
-    estimatedMealReply,
+    prefixTargetDate(plan.targetDate, estimatedMealReply),
     'success',
     appendMealExecutionNote(
       baseNote,

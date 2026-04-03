@@ -764,6 +764,7 @@ export function buildToolInputFromAiPlan(
     case TOOL_NAMES.LOG_MEAL:
       return {
         sourceText,
+        targetDate: plan.targetDate,
         mealText: plan.mealText ?? sourceText,
         mealType: plan.mealType,
         estimatedCalories: null,
@@ -772,6 +773,7 @@ export function buildToolInputFromAiPlan(
       } as ToolInputMap[ToolName];
     case TOOL_NAMES.LOG_BODY:
       return {
+        targetDate: plan.targetDate,
         weightKg: plan.weightKg,
         bmi: plan.bmi,
         bodyFatPct: plan.bodyFatPct,
@@ -796,9 +798,13 @@ export function buildToolInputFromAiPlan(
         query: plan.stockQuery ?? normalizeLookupStockQuery(sourceText),
       } as ToolInputMap[ToolName];
     case TOOL_NAMES.SUMMARIZE_NUTRITION:
-      return { scope: 'today' } as ToolInputMap[ToolName];
+      return {
+        scope: 'today',
+        targetDate: plan.targetDate,
+      } as ToolInputMap[ToolName];
     case TOOL_NAMES.LOG_SLEEP:
       return {
+        targetDate: plan.targetDate,
         sleepStart: plan.sleepStart ?? '',
         sleepEnd: plan.sleepEnd ?? '',
         sleepQuality: plan.sleepQuality,
@@ -806,6 +812,7 @@ export function buildToolInputFromAiPlan(
       } as ToolInputMap[ToolName];
     case TOOL_NAMES.LOG_WORKOUT:
       return {
+        targetDate: plan.targetDate,
         workoutName: plan.workoutName ?? '',
         durationMin: plan.durationMin,
         workoutLevel: plan.workoutLevel,
@@ -813,6 +820,7 @@ export function buildToolInputFromAiPlan(
       } as ToolInputMap[ToolName];
     case TOOL_NAMES.LOG_STATUS:
       return {
+        targetDate: plan.targetDate,
         entryType:
           plan.intent === AI_INTENTS.POO
             ? 'bowel'

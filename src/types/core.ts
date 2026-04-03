@@ -68,6 +68,7 @@ export interface AiPlan {
   intent: AiIntent;
   reply: string;
   confidence?: number | null;
+  targetDate?: string;
   weightKg?: number | null;
   bmi?: number | null;
   bodyFatPct?: number | null;

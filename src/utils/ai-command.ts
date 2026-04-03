@@ -257,6 +257,10 @@ export function summarizeAiPlan(plan: AiPlan, commandText?: string): string {
     parts.push(`confidence=${plan.confidence.toFixed(2)}`);
   }
 
+  if (plan.targetDate) {
+    parts.push(`targetDate=${plan.targetDate}`);
+  }
+
   if (commandText) {
     parts.push(`command=${commandText}`);
   }

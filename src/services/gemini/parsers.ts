@@ -1,4 +1,5 @@
 import { AI_INTENT_VALUES } from '../../constants/ai';
+import { isDateStamp } from '../../shared/date-reference';
 import type {
   AiIntent,
   AiPlan,
@@ -53,6 +54,10 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== ''
     ? value.trim()
     : undefined;
+}
+
+function asTargetDate(value: unknown): string | undefined {
+  return typeof value === 'string' && isDateStamp(value) ? value : undefined;
 }
 
 function asNullableNumber(value: unknown): number | null | undefined {
@@ -182,6 +187,7 @@ export function normalizePlan(raw: Record<string, unknown>): AiPlan {
     mode,
     intent,
     reply,
+    targetDate: asTargetDate(raw.targetDate),
     weightKg: asNullableNumber(raw.weightKg),
     bmi: asNullableNumber(raw.bmi),
     bodyFatPct: asNullableNumber(raw.bodyFatPct),

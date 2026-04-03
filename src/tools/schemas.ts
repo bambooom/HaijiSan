@@ -107,6 +107,7 @@ export interface ToolMealItemInput {
 
 export interface LogMealInput {
   sourceText: string;
+  targetDate?: string;
   mealText: string;
   mealType?: MealType;
   estimatedCalories?: number | null;
@@ -157,6 +158,7 @@ export interface LookupStockOutput {
 }
 
 export interface LogBodyInput {
+  targetDate?: string;
   weightKg?: number | null;
   bmi?: number | null;
   bodyFatPct?: number | null;
@@ -176,6 +178,7 @@ export interface LogBodyOutput {
 export interface SummarizeNutritionInput {
   scope?: 'today';
   date?: string;
+  targetDate?: string;
 }
 
 export interface SummarizeNutritionOutput {
@@ -188,6 +191,7 @@ export interface SummarizeNutritionOutput {
 }
 
 export interface LogSleepInput {
+  targetDate?: string;
   sleepStart: string;
   sleepEnd: string;
   sleepQuality?: SleepQuality;
@@ -201,6 +205,7 @@ export interface LogSleepOutput {
 }
 
 export interface LogWorkoutInput {
+  targetDate?: string;
   workoutName: string;
   durationMin?: number | null;
   workoutLevel?: WorkoutLevel;
@@ -215,6 +220,7 @@ export interface LogWorkoutOutput {
 }
 
 export interface LogStatusInput {
+  targetDate?: string;
   entryType: StatusEntryType;
   value?: string | number | null;
   unit?: string;

@@ -3,6 +3,10 @@ import {
   formatPlanningContext,
   retrievePlanningContext,
 } from '../../services/context-retrieval';
+import {
+  parseTargetDateReference,
+  supportsBackfillForIntent,
+} from '../../shared/date-reference';
 import { validateAiPlanAgainstTool } from '../../tools/registry';
 import type {
   AiPlan,
@@ -48,6 +52,25 @@ function downgradeToClarify(plan: AiPlan, reply?: string): AiPlan {
   };
 }
 
+function mergeInferredTargetDate(
+  plan: AiPlan,
+  sourceText: string,
+  timestamp: Date,
+): AiPlan {
+  if (plan.targetDate || !supportsBackfillForIntent(plan.intent)) {
+    return plan;
+  }
+
+  const inferredDate = parseTargetDateReference(sourceText, timestamp);
+
+  return inferredDate
+    ? {
+        ...plan,
+        targetDate: inferredDate,
+      }
+    : plan;
+}
+
 export type AiTurnResolution =
   | {
       kind: 'result';
@@ -69,6 +92,10 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
   }
 
   const sourceText = pendingActionResult?.sourceText ?? text;
+  const inferenceText =
+    pendingActionResult?.kind === 'continue'
+      ? `${sourceText}\n补充说明：${text}`
+      : text;
   const traceId = createTraceId();
   const planningContext =
     pendingActionResult?.kind === 'continue'
@@ -78,6 +105,7 @@ export function resolveAiTurn(text: string, timestamp: Date): AiTurnResolution {
     pendingActionResult?.kind === 'continue'
       ? pendingActionResult.plan
       : geminiService.planMessage(text, timestamp, planningContext);
+  plan = mergeInferredTargetDate(plan, inferenceText, timestamp);
   const { toolName, input, validation } = validateAiPlanAgainstTool(
     plan,
     sourceText,

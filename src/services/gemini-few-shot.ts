@@ -49,6 +49,16 @@ function buildLogBodyFewShotExamples(): string {
       },
     },
     {
+      input: '昨天体重 55.1kg',
+      output: {
+        mode: 'command',
+        intent: 'weight',
+        reply: '我知道你的意思了。',
+        targetDate: '2026-04-02',
+        weightKg: 55.1,
+      },
+    },
+    {
       input: '今天身体数据更新一下',
       output: {
         mode: 'clarify',
@@ -83,6 +93,17 @@ function buildLogMealFewShotExamples(): string {
       },
     },
     {
+      input: '昨天晚饭吃了牛肉粉',
+      output: {
+        mode: 'command',
+        intent: 'food',
+        reply: '我知道你的意思了。',
+        targetDate: '2026-04-02',
+        mealType: 'dinner',
+        mealText: '牛肉粉',
+      },
+    },
+    {
       input: '我刚吃了个苹果，大概多少热量',
       output: {
         mode: 'command',
@@ -97,6 +118,34 @@ function buildLogMealFewShotExamples(): string {
         mode: 'clarify',
         intent: 'food',
         reply: '你这餐具体吃了什么？补一句食物内容我就能继续。',
+      },
+    },
+  ]);
+}
+
+function buildLogSleepFewShotExamples(): string {
+  return buildExampleBlock('logSleep', [
+    {
+      input: '更新4月2号的睡眠 2:42-8:20，一般',
+      output: {
+        mode: 'command',
+        intent: 'sleep',
+        reply: '我知道你的意思了。',
+        targetDate: '2026-04-02',
+        sleepStart: '02:42',
+        sleepEnd: '08:20',
+        sleepQuality: 'normal',
+      },
+    },
+    {
+      input: '前天睡了 23:30 到 07:10',
+      output: {
+        mode: 'command',
+        intent: 'sleep',
+        reply: '我知道你的意思了。',
+        targetDate: '2026-04-01',
+        sleepStart: '23:30',
+        sleepEnd: '07:10',
       },
     },
   ]);
@@ -118,6 +167,15 @@ function buildSummarizeNutritionFewShotExamples(): string {
         mode: 'command',
         intent: 'nutrition_summary',
         reply: '我知道你的意思了。',
+      },
+    },
+    {
+      input: '昨天饮食总共热量多少',
+      output: {
+        mode: 'command',
+        intent: 'nutrition_summary',
+        reply: '我知道你的意思了。',
+        targetDate: '2026-04-02',
       },
     },
   ]);
@@ -214,6 +272,7 @@ export function buildPlanningFewShotExamples(): string {
   return [
     '下面是按工具和能力分组的输入输出示例，请模仿它们的判断方式和 JSON 结构：',
     buildLogBodyFewShotExamples(),
+    buildLogSleepFewShotExamples(),
     buildLogMealFewShotExamples(),
     buildSummarizeNutritionFewShotExamples(),
     buildAdjustStockFewShotExamples(),

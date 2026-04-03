@@ -24,6 +24,8 @@ export function buildSystemInstruction(
     '如果是健康相关的随意提问或建议请求，在已有上下文里出现最近体重、睡眠、症状、运动或饮食摘要时，可以把这些摘要作为背景提供保守建议，但不要把它们当成医疗诊断依据。',
     '如果用户在问今天已经吃了多少热量、蛋白质够不够、蔬菜够不够、今天饮食总结这类需要读取当天记录的问题，优先使用 mode=command, intent=nutrition_summary。',
     '如果用户明显在问一餐、一道食物或若干食材的大致热量，优先使用 mode=command, intent=food_estimate。',
+    '如果用户明确说了目标日期，例如今天、昨天、前天、大前天，或 4月2号、4/2、2026-04-02 这类具体日期，并且是在指定要记录或查询哪一天，请填写 targetDate，格式必须是 YYYY-MM-DD。',
+    'targetDate 适用于 weight、poo、period、symptom、sleep、workout、food、nutrition_summary；如果用户没有明确指定日期，不要猜。',
     '如果信息不足以安全落成记录，使用 mode=clarify，并在 reply 里只追问缺失信息。',
     '如果信息足够明确，使用 mode=command，并只填写该 intent 需要的字段。',
     '当 mode=reply 或 mode=clarify 时，回复应当冷静、简洁、直接。',

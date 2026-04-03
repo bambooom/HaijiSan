@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { AI_INTENTS } from '../constants/ai';
+
 vi.mock('../repositories', () => ({
   bodyLogRepository: {},
   refCaloriesRepository: {},
@@ -17,7 +19,7 @@ vi.mock('../services/nutrition-summary', () => ({
   getTodayNutritionSummary: vi.fn(),
 }));
 
-import { getToolContract } from './registry';
+import { buildToolInputFromAiPlan, getToolContract } from './registry';
 import type { LogMealInput, ToolExecutionContext } from './schemas';
 import { TOOL_NAMES } from './schemas';
 
@@ -87,5 +89,29 @@ describe('tool registry meal validation', () => {
     expect(validation.issues[0]?.message).toBe(
       '我知道你想记录内容，但关键信息还不够。再补一句具体数值或时间就可以。',
     );
+  });
+
+  it('passes targetDate through to sleep tool input', () => {
+    expect(
+      buildToolInputFromAiPlan(
+        TOOL_NAMES.LOG_SLEEP,
+        {
+          mode: 'command',
+          intent: AI_INTENTS.SLEEP,
+          reply: '',
+          targetDate: '2026-04-02',
+          sleepStart: '02:42',
+          sleepEnd: '08:20',
+          sleepQuality: 'normal',
+        },
+        '更新4月2号的睡眠 2:42-8:20，一般',
+      ),
+    ).toEqual({
+      targetDate: '2026-04-02',
+      sleepStart: '02:42',
+      sleepEnd: '08:20',
+      sleepQuality: 'normal',
+      note: undefined,
+    });
   });
 });
