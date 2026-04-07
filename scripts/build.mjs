@@ -52,7 +52,7 @@ async function buildGasEntry(
   { bundle = true, format = 'iife', define = {}, footer = {} } = {},
 ) {
   await build({
-    entryPoints: [path.join(projectRoot, 'src', ...entryFile)],
+    entryPoints: [path.join(projectRoot, ...entryFile)],
     bundle,
     format,
     platform: 'browser',
@@ -68,7 +68,7 @@ async function buildGasEntry(
 rmSync(distDir, { recursive: true, force: true });
 mkdirSync(distDir, { recursive: true });
 
-await buildGasEntry(['index.ts'], 'Code.js', {
+await buildGasEntry(['src', 'index.ts'], 'Code.js', {
   define: {
     __APP_CONFIG__: JSON.stringify(appConfig),
   },
@@ -89,7 +89,7 @@ function disableDailyDigestTrigger() {
   },
 });
 
-await buildGasEntry(['gas', 'sheet-styler.ts'], 'Styler.js', {
+await buildGasEntry(['gas', 'sheet-styler.ts'], 'SheetStyler.js', {
   bundle: false,
   format: 'esm',
 });
