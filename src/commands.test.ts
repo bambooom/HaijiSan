@@ -11,17 +11,10 @@ Object.assign(globalThis, {
 });
 
 const mocks = vi.hoisted(() => ({
-  handleAiMessage: vi.fn(),
-  handleCancelPendingAction: vi.fn(),
   executeCommandRoute: vi.fn(),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   getDailyDigestTriggerStatus: vi.fn(),
-}));
-
-vi.mock('./handlers/ai', () => ({
-  handleAiMessage: mocks.handleAiMessage,
-  handleCancelPendingAction: mocks.handleCancelPendingAction,
 }));
 
 vi.mock('./handlers/command-router', () => ({
@@ -94,5 +87,16 @@ describe('handleCommand digest trigger commands', () => {
     expect(result.status).toBe('failed');
     expect(result.resultCode).toBe('digest-trigger-auth-required');
     expect(result.reply).toContain('需要额外授权');
+  });
+
+  it('ignores non-slash text in slash-command-only mode', () => {
+    const result = handleCommand(
+      '今天睡得不错',
+      new Date('2026-04-02T12:00:00'),
+    );
+
+    expect(result.status).toBe('ignored');
+    expect(result.resultCode).toBe('slash-command-only');
+    expect(result.reply).toContain('只支持 slash command');
   });
 });

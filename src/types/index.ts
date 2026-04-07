@@ -2,7 +2,6 @@ export * from './core';
 export * from './commands';
 export * from './food';
 export * from './records';
-export * from './pending';
 export * from './repositories';
 export * from './food-analysis';
 export * from './spreadsheet';

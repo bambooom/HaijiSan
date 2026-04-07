@@ -1,7 +1,6 @@
 export const SLASH_COMMANDS = {
   START: '/start',
   HELP: '/help',
-  CANCEL: '/cancel',
   DIGEST_ON: '/digeston',
   DIGEST_OFF: '/digestoff',
   DIGEST_STATUS: '/digeststatus',

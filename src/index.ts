@@ -6,12 +6,7 @@ import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
 } from './services/digest-trigger';
-import { importHealthDataPhoto } from './services/reference-ocr';
-import {
-  downloadTelegramFile,
-  sendChatAction,
-  sendText,
-} from './services/telegram';
+import { sendChatAction, sendText } from './services/telegram';
 
 interface TelegramUpdate {
   message?: {
@@ -19,58 +14,7 @@ interface TelegramUpdate {
       id: number | string;
     };
     text?: string;
-    caption?: string;
-    photo?: Array<{
-      file_id: string;
-      width: number;
-      height: number;
-      file_size?: number;
-    }>;
   };
-}
-
-function pickLargestPhoto(
-  photos: Array<{
-    file_id: string;
-    width: number;
-    height: number;
-    file_size?: number;
-  }>,
-): { file_id: string } | null {
-  if (photos.length === 0) {
-    return null;
-  }
-
-  return photos.reduce((largest, current) => {
-    const largestScore =
-      (largest.file_size ?? largest.width * largest.height) || 0;
-    const currentScore =
-      (current.file_size ?? current.width * current.height) || 0;
-
-    return currentScore >= largestScore ? current : largest;
-  });
-}
-
-function handlePhotoUpdate(
-  message: NonNullable<TelegramUpdate['message']>,
-  timestamp: Date,
-) {
-  const photo = pickLargestPhoto(message.photo ?? []);
-
-  if (!photo) {
-    throw new Error('Photo update did not include a downloadable image');
-  }
-
-  const downloaded = downloadTelegramFile(photo.file_id);
-
-  return importHealthDataPhoto(
-    {
-      base64Data: downloaded.base64Data,
-      mimeType: downloaded.mimeType,
-      caption: message.caption,
-    },
-    timestamp,
-  );
 }
 
 function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
@@ -101,15 +45,12 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
 
     sendChatAction(chatId, 'typing');
 
-    const result =
-      update.message.photo && update.message.photo.length > 0
-        ? handlePhotoUpdate(update.message, timestamp)
-        : handleCommand(update.message.text ?? '', timestamp);
+    const result = handleCommand(update.message.text ?? '', timestamp);
 
     sendText(chatId, result.reply);
     botLogRepository.appendMessageLog(
       timestamp,
-      update.message.text ?? update.message.caption ?? '[photo]',
+      update.message.text ?? '',
       result,
     );
   } catch (error) {

@@ -20,7 +20,6 @@ const mocks = vi.hoisted(() => ({
   listWorkoutByDate: vi.fn(),
   listRecentWorkouts: vi.fn(),
   listStatusByDate: vi.fn(),
-  generateDailyInsight: vi.fn(),
 }));
 
 vi.mock('./nutrition-summary', () => ({
@@ -46,12 +45,6 @@ vi.mock('../repositories', () => ({
   },
 }));
 
-vi.mock('./gemini', () => ({
-  geminiService: {
-    generateDailyInsight: mocks.generateDailyInsight,
-  },
-}));
-
 import { buildDailySummaryMessage } from './daily-summary';
 
 describe('daily summary', () => {
@@ -64,10 +57,9 @@ describe('daily summary', () => {
     mocks.listWorkoutByDate.mockReturnValue([]);
     mocks.listRecentWorkouts.mockReturnValue([]);
     mocks.listStatusByDate.mockReturnValue([]);
-    mocks.generateDailyInsight.mockReturnValue(null);
   });
 
-  it('builds a deterministic digest and appends AI insight when available', () => {
+  it('builds a deterministic digest from recorded data', () => {
     mocks.getTodayNutritionSummary.mockReturnValue({
       meals: [{ food_log_id: '1' }],
       proteinStatus: 'low',
@@ -169,10 +161,6 @@ describe('daily summary', () => {
         cycle_day: null,
       },
     ]);
-    mocks.generateDailyInsight.mockReturnValue(
-      '今天蛋白和运动都还不错，但体重较上次略降。晚餐如果偏轻，可以补一点高蛋白食物。',
-    );
-
     const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
 
     expect(result).toContain('📋 今日总结 2026-04-02');
@@ -185,58 +173,6 @@ describe('daily summary', () => {
     );
     expect(result).toContain('运动：今天共 1 次，合计 35 分钟；项目 跑步。');
     expect(result).toContain('状态：排便已记录。');
-    expect(result).toContain('💡 AI insight');
-    expect(result).toContain('今天蛋白和运动都还不错');
-    const firstCallArg = mocks.generateDailyInsight.mock.calls[0]?.[0] as {
-      context: {
-        ruleSignals: {
-          proteinStatus: string;
-          proteinTarget: number | null;
-          totalProtein: number | null;
-          vegetableStatus: string;
-          totalVegetableGrams: number | null;
-          carbsStatus: string;
-          totalCarbs: number | null;
-          carbCalorieShare: number | null;
-        };
-      };
-    };
-
-    expect(firstCallArg.context.ruleSignals).toEqual({
-      proteinStatus: 'low',
-      proteinTarget: 66,
-      totalProtein: 56.7,
-      vegetableStatus: 'enough',
-      totalVegetableGrams: 380,
-      carbsStatus: 'moderate',
-      totalCarbs: 19.1,
-      carbCalorieShare: 0.1,
-    });
-  });
-
-  it('falls back to deterministic output when AI insight generation fails', () => {
-    mocks.getTodayNutritionSummary.mockReturnValue({
-      meals: [{ food_log_id: '1' }],
-      proteinStatus: 'unknown',
-      proteinTarget: null,
-      totalProtein: null,
-      vegetableStatus: 'unknown',
-      totalVegetableGrams: null,
-      carbsStatus: 'unknown',
-      totalCarbs: null,
-      carbCalorieShare: null,
-    });
-    mocks.buildTodayNutritionReply.mockReturnValue(
-      '今天共记录 1 餐，热量约 420 kcal。',
-    );
-    mocks.generateDailyInsight.mockImplementation(() => {
-      throw new Error('Gemini failed');
-    });
-
-    const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
-
-    expect(result).toContain('今天共记录 1 餐，热量约 420 kcal。');
-    expect(result).not.toContain('💡 AI insight');
   });
 
   it('returns the empty-data fallback when nothing is available', () => {

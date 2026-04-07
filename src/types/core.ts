@@ -1,5 +1,3 @@
-import { AI_INTENTS } from '../constants/ai';
-
 export type StatusEntryType =
   | 'bowel'
   | 'menstruation'
@@ -46,49 +44,8 @@ export type CommandHandlingResult = {
   note: string;
 } & CommandLogFields;
 
-export type AiResponseMode = 'reply' | 'command' | 'clarify';
-
-export type AiIntent = (typeof AI_INTENTS)[keyof typeof AI_INTENTS];
-
 export type ReferenceSource =
   | 'nutrition_label'
   | 'manual_entry'
   | 'internet_reference'
   | 'ai_estimate';
-
-export interface AiStockItem {
-  name: string;
-  quantity: number;
-  unit?: string;
-  purchaseChannel?: string;
-}
-
-export interface AiPlan {
-  mode: AiResponseMode;
-  intent: AiIntent;
-  reply: string;
-  confidence?: number | null;
-  targetDate?: string;
-  weightKg?: number | null;
-  bmi?: number | null;
-  bodyFatPct?: number | null;
-  leanBodyMassKg?: number | null;
-  cycleDay?: number | null;
-  symptom?: string;
-  periodNote?: string;
-  sleepStart?: string;
-  sleepEnd?: string;
-  sleepQuality?: SleepQuality;
-  workoutName?: string;
-  durationMin?: number | null;
-  workoutLevel?: WorkoutLevel;
-  mealType?: MealType;
-  mealText?: string;
-  stockQuery?: string;
-  stockItemName?: string;
-  stockQuantity?: number | null;
-  stockUnit?: string;
-  stockItems?: AiStockItem[];
-  purchaseChannel?: string;
-  note?: string;
-}

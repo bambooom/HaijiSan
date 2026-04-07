@@ -8,7 +8,6 @@ import {
   statusLogRepository,
   workoutLogRepository,
 } from '../repositories';
-import { geminiService } from './gemini';
 
 function formatDateLabel(timestamp: Date): string {
   return [
@@ -168,22 +167,6 @@ function buildStatusSection(timestamp: Date): {
   };
 }
 
-function buildAiInsight(
-  timestamp: Date,
-  deterministicSummary: string,
-  context: Record<string, unknown>,
-): string | null {
-  try {
-    return geminiService.generateDailyInsight({
-      timestamp,
-      deterministicSummary,
-      context,
-    });
-  } catch {
-    return null;
-  }
-}
-
 export function buildDailySummaryMessage(timestamp: Date): string {
   const nutritionSummary = getTodayNutritionSummary(timestamp);
   const bodySection = buildBodySection(timestamp);
@@ -204,42 +187,7 @@ export function buildDailySummaryMessage(timestamp: Date): string {
   }
 
   const deterministicSummary = sections.join('\n\n');
-  const ruleSignals = nutritionSummary
-    ? {
-        proteinStatus: nutritionSummary.proteinStatus,
-        proteinTarget: nutritionSummary.proteinTarget,
-        totalProtein: nutritionSummary.totalProtein,
-        vegetableStatus: nutritionSummary.vegetableStatus,
-        totalVegetableGrams: nutritionSummary.totalVegetableGrams,
-        carbsStatus: nutritionSummary.carbsStatus,
-        totalCarbs: nutritionSummary.totalCarbs,
-        carbCalorieShare: nutritionSummary.carbCalorieShare,
-      }
-    : {
-        proteinStatus: 'unknown',
-        proteinTarget: null,
-        totalProtein: null,
-        vegetableStatus: 'unknown',
-        totalVegetableGrams: null,
-        carbsStatus: 'unknown',
-        totalCarbs: null,
-        carbCalorieShare: null,
-      };
-  const aiInsight = buildAiInsight(timestamp, deterministicSummary, {
-    date: formatDateLabel(timestamp),
-    ruleSignals,
-    nutritionSummary,
-    body: bodySection.context,
-    sleep: sleepSection.context,
-    workout: workoutSection.context,
-    status: statusSection.context,
-  });
-
-  return [
-    `📋 今日总结 ${formatDateLabel(timestamp)}`,
-    deterministicSummary,
-    aiInsight ? `\n💡 AI insight\n${aiInsight}` : null,
-  ]
+  return [`📋 今日总结 ${formatDateLabel(timestamp)}`, deterministicSummary]
     .filter((section): section is string => Boolean(section))
     .join('\n\n');
 }

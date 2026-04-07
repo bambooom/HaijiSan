@@ -1,15 +1,3 @@
-import type { AiIntent } from '../types';
-
-const BACKFILL_SUPPORTED_INTENTS = new Set<AiIntent>([
-  'weight',
-  'poo',
-  'period',
-  'symptom',
-  'sleep',
-  'workout',
-  'food',
-  'nutrition_summary',
-]);
 const BACKFILL_DATE_NOTE_PATTERN =
   /(?:^|[;\s])backfillDate=(\d{4}-\d{2}-\d{2})(?=$|[;\s])/;
 
@@ -163,10 +151,6 @@ export function resolveTargetDateTimestamp(
     baseTimestamp.getSeconds(),
     baseTimestamp.getMilliseconds(),
   );
-}
-
-export function supportsBackfillForIntent(intent: AiIntent): boolean {
-  return BACKFILL_SUPPORTED_INTENTS.has(intent);
 }
 
 export function extractBackfillDate(note: string): string | null {
