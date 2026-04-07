@@ -3,7 +3,6 @@ import {
   SLASH_COMMANDS,
   START_HELP_COMMANDS,
 } from './constants/commands';
-import { executeCommandRoute } from './handlers/command-router';
 import {
   disableDailyDigestTrigger,
   getDailyDigestTriggerStatus,
@@ -24,54 +23,6 @@ ${SLASH_COMMANDS.HELP} - 再看一遍所有指令
 ${SLASH_COMMANDS.DIGEST_ON} - 开启每天接近 23:30 的日报定时
 ${SLASH_COMMANDS.DIGEST_OFF} - 关闭日报定时
 ${SLASH_COMMANDS.DIGEST_STATUS} - 查看日报定时当前是否已开启
-
-<b>🏃 身体与状态</b>
-${SLASH_COMMANDS.WEIGHT} 55 - 记录体重
-例如：${SLASH_COMMANDS.WEIGHT} 55.3
-
-${SLASH_COMMANDS.POO} - 记录排便情况
-例如：${SLASH_COMMANDS.POO}
-
-${SLASH_COMMANDS.PERIOD} - 记录经期开始或当天状态
-例如：${SLASH_COMMANDS.PERIOD}
-例如：${SLASH_COMMANDS.PERIOD} 2 量少
-
-${SLASH_COMMANDS.SYMPTOM} - 记录症状，可附周期天数
-例如：${SLASH_COMMANDS.SYMPTOM} 头痛
-例如：${SLASH_COMMANDS.SYMPTOM} 腹痛 day 2
-
-<b>😴 睡眠</b>
-${SLASH_COMMANDS.SLEEP} - 记录入睡、醒来时间和睡眠质量
-例如：${SLASH_COMMANDS.SLEEP} 23:30 07:30 好
-例如：${SLASH_COMMANDS.SLEEP} 00:45 08:15 一般
-
-<b>💪 运动</b>
-${SLASH_COMMANDS.WORKOUT} - 记录运动名称、时长和强度
-例如：${SLASH_COMMANDS.WORKOUT} 跑步 35 中等
-例如：${SLASH_COMMANDS.WORKOUT} 帕梅拉燃脂 20 高强度
-
-<b>📦 库存</b>
-${SLASH_COMMANDS.STOCK} - 增加或扣减库存
-例如：${SLASH_COMMANDS.STOCK} 鸡蛋 +6个 盒马
-例如：${SLASH_COMMANDS.STOCK} 鸡蛋 -2个
-
-${SLASH_COMMANDS.SET_STOCK} - 直接校正库存
-例如：${SLASH_COMMANDS.SET_STOCK} 鸡蛋 12个 盒马
-
-${SLASH_COMMANDS.CHECK} - 查看当前库存
-例如：${SLASH_COMMANDS.CHECK}
-
-<b>🍜 饮食</b>
-${SLASH_COMMANDS.FOOD} - 记录一餐内容，支持居家称重或外食描述
-例如：${SLASH_COMMANDS.FOOD} 早餐 280g西兰花+81g鸡小胸
-例如：${SLASH_COMMANDS.FOOD} 中饭 一碗牛肉粉
-餐次前缀可写：早餐/早饭/早，午餐/午饭/中饭/午/中，晚餐/晚饭/晚，加餐/夜宵/宵夜/零食
-
-<b>📖 热量参考</b>
-${SLASH_COMMANDS.REFERENCE} - 查看热量参考表
-例如：${SLASH_COMMANDS.REFERENCE}
-${SLASH_COMMANDS.REFERENCE} 关键词 - 按名称或品牌搜索
-例如：${SLASH_COMMANDS.REFERENCE} 鸡蛋
 `;
 
 function buildDigestCommandReply(command: string): string {
@@ -114,7 +65,7 @@ function buildDigestAuthorizationReply(): string {
 
 export function handleCommand(
   text: string,
-  timestamp: Date,
+  _timestamp: Date,
 ): CommandHandlingResult {
   const normalizedText = text.trimStart();
 
@@ -176,20 +127,6 @@ export function handleCommand(
 
       throw error;
     }
-  }
-
-  const routedCommand = executeCommandRoute(normalizedText, timestamp);
-
-  if (routedCommand) {
-    return buildResult(
-      routedCommand.reply,
-      'command',
-      routedCommand.note,
-      'success',
-      {
-        resultCode: routedCommand.note,
-      },
-    );
   }
 
   return buildResult(

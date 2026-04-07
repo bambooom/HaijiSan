@@ -11,14 +11,9 @@ Object.assign(globalThis, {
 });
 
 const mocks = vi.hoisted(() => ({
-  executeCommandRoute: vi.fn(),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   getDailyDigestTriggerStatus: vi.fn(),
-}));
-
-vi.mock('./handlers/command-router', () => ({
-  executeCommandRoute: mocks.executeCommandRoute,
 }));
 
 vi.mock('./services/digest-trigger', () => ({
@@ -32,7 +27,6 @@ import { handleCommand } from './commands';
 describe('handleCommand digest trigger commands', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.executeCommandRoute.mockReturnValue(null);
   });
 
   it('enables the daily digest trigger via slash command', () => {
@@ -98,5 +92,16 @@ describe('handleCommand digest trigger commands', () => {
     expect(result.status).toBe('ignored');
     expect(result.resultCode).toBe('slash-command-only');
     expect(result.reply).toContain('只支持 slash command');
+  });
+
+  it('ignores unknown slash commands after business commands are removed', () => {
+    const result = handleCommand(
+      '/food 早餐 鸡蛋',
+      new Date('2026-04-02T12:00:00'),
+    );
+
+    expect(result.status).toBe('ignored');
+    expect(result.resultCode).toBe('unknown-command');
+    expect(result.reply).toContain('/help');
   });
 });
