@@ -189,6 +189,47 @@ export function matchesRecordDate(
   );
 }
 
+export function normalizeDateStampRange(
+  startDateStamp: string,
+  endDateStamp: string,
+): { startDateStamp: string; endDateStamp: string } {
+  return startDateStamp <= endDateStamp
+    ? { startDateStamp, endDateStamp }
+    : { startDateStamp: endDateStamp, endDateStamp: startDateStamp };
+}
+
+export function isDateStampInRange(
+  dateStamp: string | null | undefined,
+  startDateStamp: string,
+  endDateStamp: string,
+): boolean {
+  if (!isDateStamp(dateStamp)) {
+    return false;
+  }
+
+  const normalizedRange = normalizeDateStampRange(startDateStamp, endDateStamp);
+
+  return (
+    dateStamp >= normalizedRange.startDateStamp &&
+    dateStamp <= normalizedRange.endDateStamp
+  );
+}
+
+export function matchesRecordDateRange(
+  loggedAt: string,
+  note: string,
+  startDateStamp: string,
+  endDateStamp: string,
+): boolean {
+  const loggedAtDateStamp = loggedAt.slice(0, 10);
+  const backfillDate = extractBackfillDate(note);
+
+  return (
+    isDateStampInRange(loggedAtDateStamp, startDateStamp, endDateStamp) ||
+    isDateStampInRange(backfillDate, startDateStamp, endDateStamp)
+  );
+}
+
 export function formatDateLabel(targetDate: string): string {
   return targetDate;
 }

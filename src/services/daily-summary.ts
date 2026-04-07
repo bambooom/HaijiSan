@@ -3,11 +3,11 @@ import {
   getTodayNutritionSummary,
 } from './nutrition-summary';
 import {
-  bodyLogRepository,
-  sleepLogRepository,
-  statusLogRepository,
-  workoutLogRepository,
-} from '../repositories';
+  bodyLogTable,
+  sleepLogTable,
+  statusLogTable,
+  workoutLogTable,
+} from '../tables';
 
 function formatDateLabel(timestamp: Date): string {
   return [
@@ -21,8 +21,8 @@ function buildBodySection(timestamp: Date): {
   text: string | null;
   context: Record<string, unknown>;
 } {
-  const todayEntries = bodyLogRepository.listByDate(timestamp);
-  const recentEntries = bodyLogRepository.listRecent(7);
+  const todayEntries = bodyLogTable.listByDate(timestamp);
+  const recentEntries = bodyLogTable.listRecent(7);
   const latestTodayEntry =
     todayEntries.length > 0 ? todayEntries[todayEntries.length - 1] : null;
 
@@ -63,8 +63,8 @@ function buildSleepSection(timestamp: Date): {
   text: string | null;
   context: Record<string, unknown>;
 } {
-  const todayEntries = sleepLogRepository.listByDate(timestamp);
-  const recentEntries = sleepLogRepository.listRecent(7);
+  const todayEntries = sleepLogTable.listByDate(timestamp);
+  const recentEntries = sleepLogTable.listRecent(7);
   const latestTodayEntry =
     todayEntries.length > 0 ? todayEntries[todayEntries.length - 1] : null;
 
@@ -93,8 +93,8 @@ function buildWorkoutSection(timestamp: Date): {
   text: string | null;
   context: Record<string, unknown>;
 } {
-  const todayEntries = workoutLogRepository.listByDate(timestamp);
-  const recentEntries = workoutLogRepository.listRecent(7);
+  const todayEntries = workoutLogTable.listByDate(timestamp);
+  const recentEntries = workoutLogTable.listRecent(7);
 
   if (todayEntries.length === 0) {
     return {
@@ -129,7 +129,7 @@ function buildStatusSection(timestamp: Date): {
   text: string | null;
   context: Record<string, unknown>;
 } {
-  const todayEntries = statusLogRepository.listByDate(timestamp);
+  const todayEntries = statusLogTable.listByDate(timestamp);
 
   if (todayEntries.length === 0) {
     return {

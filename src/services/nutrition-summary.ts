@@ -1,4 +1,4 @@
-import { bodyLogRepository, foodLogRepository } from '../repositories';
+import { foodLogTable } from '../tables';
 import type { FoodLogEntry, MealType } from '../types';
 
 const DAILY_VEGETABLE_TARGET_G = 300;
@@ -162,7 +162,7 @@ export function buildNutritionSummaryFromRecords(input: {
 export function getTodayNutritionSummary(
   timestamp: Date,
 ): NutritionSummary | null {
-  const meals = foodLogRepository.listByDate(timestamp);
+  const meals = foodLogTable.listByDate(timestamp);
 
   if (meals.length === 0) {
     return null;
@@ -170,7 +170,8 @@ export function getTodayNutritionSummary(
 
   return buildNutritionSummaryFromRecords({
     meals,
-    latestWeightKg: bodyLogRepository.getLatestWeight(),
+    // Weight-based target calculation is temporarily disabled until a generic latest-value query exists.
+    latestWeightKg: null,
   });
 }
 

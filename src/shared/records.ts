@@ -1,8 +1,11 @@
-import type { SpreadsheetService } from '../services/spreadsheet';
 import type { SheetCellValue } from '../types';
 
+type TimestampFormatter = {
+  getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
+};
+
 export function createTimestampedEntryId(
-  spreadsheet: SpreadsheetService,
+  spreadsheet: TimestampFormatter,
   prefix: string,
   timestamp: Date,
 ): string {
@@ -10,14 +13,14 @@ export function createTimestampedEntryId(
 }
 
 export function formatLoggedAt(
-  spreadsheet: SpreadsheetService,
+  spreadsheet: TimestampFormatter,
   timestamp: Date,
 ): string {
   return spreadsheet.getTimestamp(false, timestamp);
 }
 
 export function formatSheetCellAsString(
-  spreadsheet: SpreadsheetService,
+  spreadsheet: TimestampFormatter,
   value: SheetCellValue,
 ): string {
   if (typeof value === 'string') {

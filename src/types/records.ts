@@ -67,6 +67,29 @@ export interface StockEntry {
   note: string;
 }
 
+export type StockListItem = {
+  name: string;
+  amount: string;
+};
+
+export type StockAdjustResult =
+  | {
+      ok: true;
+      entry: StockEntry;
+      quantity: number;
+      operation: 'create' | 'adjust' | 'set';
+    }
+  | {
+      ok: false;
+      reason:
+        | 'invalid-name'
+        | 'invalid-quantity'
+        | 'not-found'
+        | 'negative-stock';
+      quantity?: number;
+      currentQuantity?: number;
+    };
+
 export interface FoodLogEntry {
   food_log_id: string;
   logged_at: string;

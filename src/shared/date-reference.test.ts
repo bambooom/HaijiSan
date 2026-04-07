@@ -4,7 +4,9 @@ import {
   appendBackfillDateNote,
   extractBackfillDate,
   formatDateStamp,
+  isDateStampInRange,
   matchesRecordDate,
+  matchesRecordDateRange,
   parseTargetDateReference,
   resolveTargetDateTimestamp,
 } from './date-reference';
@@ -45,5 +47,27 @@ describe('date reference helpers', () => {
     expect(matchesRecordDate(formatDateStamp(now), note, '2026-04-02')).toBe(
       true,
     );
+  });
+
+  it('matches inclusive date ranges for plain date stamps and backfill dates', () => {
+    expect(isDateStampInRange('2026-04-02', '2026-04-01', '2026-04-03')).toBe(
+      true,
+    );
+    expect(
+      matchesRecordDateRange(
+        '2026-04-03 09:00:00',
+        'backfillDate=2026-04-01',
+        '2026-04-01',
+        '2026-04-02',
+      ),
+    ).toBe(true);
+    expect(
+      matchesRecordDateRange(
+        '2026-04-05 09:00:00',
+        '',
+        '2026-04-01',
+        '2026-04-02',
+      ),
+    ).toBe(false);
   });
 });

@@ -1,19 +1,12 @@
-import { SHEET_LAYOUTS } from '../constants/sheets';
+import { SHEET_SCHEMAS } from '../constants/sheet-schema';
 import type { BotLogEntry, CommandHandlingResult } from '../types';
-import {
-  spreadsheetService,
-  type SpreadsheetService,
-} from '../services/spreadsheet';
+import { SheetTable } from './sheet-table';
 
-export class BotLogRepository {
-  constructor(
-    private readonly spreadsheet: SpreadsheetService = spreadsheetService,
-  ) {}
-
-  private readonly layout = SHEET_LAYOUTS.BOT_LOG;
-
-  append(entry: BotLogEntry): void {
-    this.spreadsheet.appendRecord(this.layout.name, this.layout.fields, entry);
+export class BotLogTable extends SheetTable<BotLogEntry> {
+  constructor() {
+    super({
+      schema: SHEET_SCHEMAS.BOT_LOG,
+    });
   }
 
   appendMessageLog(
@@ -23,8 +16,8 @@ export class BotLogRepository {
   ): void {
     const toolCallCount = result.tool.trim() ? 1 : 0;
 
-    this.append({
-      logged_at: this.spreadsheet.getTimestamp(true, timestamp),
+    this.insert({
+      logged_at: this['spreadsheet'].getTimestamp(true, timestamp),
       raw_text: text,
       final_reply: result.reply,
       handling_mode: result.handlingMode,
@@ -48,4 +41,4 @@ export class BotLogRepository {
   }
 }
 
-export const botLogRepository = new BotLogRepository();
+export const botLogTable = new BotLogTable();

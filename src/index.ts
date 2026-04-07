@@ -1,12 +1,12 @@
 import { MY_CHAT_ID } from './app-config';
 import { handleCommand } from './commands';
-import { botLogRepository } from './repositories';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
 } from './services/digest-trigger';
 import { sendChatAction, sendText } from './services/telegram';
+import { botLogTable } from './tables';
 
 interface TelegramUpdate {
   message?: {
@@ -48,11 +48,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
     const result = handleCommand(update.message.text ?? '', timestamp);
 
     sendText(chatId, result.reply);
-    botLogRepository.appendMessageLog(
-      timestamp,
-      update.message.text ?? '',
-      result,
-    );
+    botLogTable.appendMessageLog(timestamp, update.message.text ?? '', result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);

@@ -27,20 +27,20 @@ vi.mock('./nutrition-summary', () => ({
   buildTodayNutritionReply: mocks.buildTodayNutritionReply,
 }));
 
-vi.mock('../repositories', () => ({
-  bodyLogRepository: {
+vi.mock('../tables', () => ({
+  bodyLogTable: {
     listByDate: mocks.listBodyByDate,
     listRecent: mocks.listRecentBodies,
   },
-  sleepLogRepository: {
+  sleepLogTable: {
     listByDate: mocks.listSleepByDate,
     listRecent: mocks.listRecentSleep,
   },
-  workoutLogRepository: {
+  workoutLogTable: {
     listByDate: mocks.listWorkoutByDate,
     listRecent: mocks.listRecentWorkouts,
   },
-  statusLogRepository: {
+  statusLogTable: {
     listByDate: mocks.listStatusByDate,
   },
 }));

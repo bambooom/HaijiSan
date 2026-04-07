@@ -10,11 +10,8 @@ Object.assign(globalThis, {
   },
 });
 
-vi.mock('../repositories', () => ({
-  bodyLogRepository: {
-    getLatestWeight: vi.fn(),
-  },
-  foodLogRepository: {
+vi.mock('../tables', () => ({
+  foodLogTable: {
     listByDate: vi.fn(),
   },
 }));
