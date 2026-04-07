@@ -1,5 +1,5 @@
 import { SHEET_LAYOUTS } from '../constants/sheets';
-import type { FoodLogEntry, ParseStatus, SheetRow } from '../types';
+import type { FoodLogEntry, SheetRow } from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -26,9 +26,20 @@ export class FoodLogRepository {
       logged_at: formatSheetCellAsString(this.spreadsheet, row[1] ?? null),
       meal_type: row[2] as FoodLogEntry['meal_type'],
       meal_text: formatSheetCellAsString(this.spreadsheet, row[3] ?? null),
-      estimated_calories: row[4] === '' ? null : Number(row[4]),
-      parse_status: row[5] as ParseStatus,
-      note: formatSheetCellAsString(this.spreadsheet, row[6] ?? null),
+      calories_kcal: row[4] === '' ? null : Number(row[4]),
+      protein_g: row[5] === '' ? null : Number(row[5]),
+      fat_g: row[6] === '' ? null : Number(row[6]),
+      carbs_g: row[7] === '' ? null : Number(row[7]),
+      vegetable_g: row[8] === '' ? null : Number(row[8]),
+      linked_food_ref_ids: formatSheetCellAsString(
+        this.spreadsheet,
+        row[9] ?? null,
+      ),
+      linked_stock_item_ids: formatSheetCellAsString(
+        this.spreadsheet,
+        row[10] ?? null,
+      ),
+      note: formatSheetCellAsString(this.spreadsheet, row[11] ?? null),
     };
   }
 
@@ -69,8 +80,13 @@ export class FoodLogRepository {
     timestamp: Date,
     mealType: FoodLogEntry['meal_type'],
     mealText: string,
-    estimatedCalories: number | null = null,
-    parseStatus: ParseStatus = 'pending',
+    caloriesKcal: number | null = null,
+    proteinG: number | null = null,
+    fatG: number | null = null,
+    carbsG: number | null = null,
+    vegetableG: number | null = null,
+    linkedFoodRefIds = '',
+    linkedStockItemIds = '',
     note = '',
   ): FoodLogEntry {
     return {
@@ -78,8 +94,13 @@ export class FoodLogRepository {
       logged_at: formatLoggedAt(this.spreadsheet, timestamp),
       meal_type: mealType,
       meal_text: mealText,
-      estimated_calories: estimatedCalories,
-      parse_status: parseStatus,
+      calories_kcal: caloriesKcal,
+      protein_g: proteinG,
+      fat_g: fatG,
+      carbs_g: carbsG,
+      vegetable_g: vegetableG,
+      linked_food_ref_ids: linkedFoodRefIds,
+      linked_stock_item_ids: linkedStockItemIds,
       note,
     };
   }

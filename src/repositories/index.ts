@@ -1,6 +1,5 @@
 export * from './body-log';
 export * from './bot-log';
-export * from './food-items';
 export * from './food-log';
 export * from './ref-calories';
 export * from './sleep-log';

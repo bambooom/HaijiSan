@@ -1,9 +1,8 @@
 import { SLASH_COMMANDS } from '../constants/commands';
 import {
   persistMealRecord,
-  buildFoodItemEntriesFromParsed,
+  enrichParsedIngredientsWithFallback,
 } from '../services/meal-recording';
-import type { ParseStatus } from '../types';
 import { parseFoodContent } from '../services/food-analysis';
 import type { ParsedFoodInput } from '../types/food-analysis';
 
@@ -26,41 +25,39 @@ export function handleFoodCommand(
   const fullyParsed =
     parsedFoodInput.items.length > 0 &&
     parsedFoodInput.items.length === parsedFoodInput.segmentCount;
-  const parseStatus: ParseStatus = fullyParsed ? 'parsed' : 'pending';
-  const foodItemEntries = buildFoodItemEntriesFromParsed(
-    '',
-    parsedFoodInput.items,
-    new Map(),
-  );
-  const estimatedCalories = foodItemEntries.reduce<number | null>(
-    (sum, item) => {
-      if (item.estimated_calories === null) {
-        return sum;
-      }
-
-      return (sum ?? 0) + item.estimated_calories;
-    },
-    null,
-  );
+  const enrichedItems = enrichParsedIngredientsWithFallback({
+    mealType: parsedFoodInput.mealType,
+    mealText: parsedFoodInput.mealText,
+    shouldPersist: true,
+    estimatedCalories: null,
+    items: parsedFoodInput.items.map((item) => ({
+      itemName: item.itemName,
+      quantity: item.quantity,
+      unit: item.unit,
+      estimatedCalories: item.estimatedCalories,
+      source: item.matchedReference ? 'reference' : 'ai',
+      linkedFoodRefId: item.linkedFoodRefId,
+      note: '',
+    })),
+    note: '',
+  });
 
   persistMealRecord({
     timestamp,
     mealType: parsedFoodInput.mealType,
     mealText: parsedFoodInput.mealText,
-    estimatedCalories,
-    parseStatus,
     note: fullyParsed ? '' : 'Best-effort parsing; raw meal text preserved',
-    items: foodItemEntries,
+    items: enrichedItems,
   });
 
-  return buildFoodSuccessMessage(parsedFoodInput, parseStatus);
+  return buildFoodSuccessMessage(parsedFoodInput, fullyParsed);
 }
 
 function buildFoodSuccessMessage(
   parsedFoodInput: ParsedFoodInput,
-  parseStatus: ParseStatus,
+  fullyParsed: boolean,
 ): string {
-  if (parseStatus === 'parsed') {
+  if (fullyParsed) {
     return `✅ 饮食已记录，共识别 ${parsedFoodInput.items.length} 个食材项目。`;
   }
 

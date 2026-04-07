@@ -1,10 +1,8 @@
 import type {
-  BotLogConfirmationState,
   HealthDataSource,
   HandlingMode,
   HandlingStatus,
   MealType,
-  ParseStatus,
   ReferenceSource,
   SleepQuality,
   StatusEntryType,
@@ -74,32 +72,35 @@ export interface FoodLogEntry {
   logged_at: string;
   meal_type: MealType;
   meal_text: string;
-  estimated_calories: number | null;
-  parse_status: ParseStatus;
-  note: string;
-}
-
-export interface FoodItemEntry {
-  parent_food_log_id: string;
-  item_name: string;
-  quantity: number | null;
-  unit: string;
-  estimated_calories: number | null;
-  linked_food_ref_id: string;
-  linked_stock_item_id: string;
-  ai_confidence: number | null;
+  calories_kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  vegetable_g: number | null;
+  linked_food_ref_ids: string;
+  linked_stock_item_ids: string;
   note: string;
 }
 
 export interface BotLogEntry {
   logged_at: string;
   raw_text: string;
+  final_reply: string;
   handling_mode: HandlingMode;
   status: HandlingStatus;
   trace_id: string;
-  intent: string;
-  tool: string;
-  confirmation_state: BotLogConfirmationState | '';
+  tool_call_count: number | null;
+  read_count: number | null;
+  insert_count: number | null;
+  update_count: number | null;
+  read_sheet_names: string;
+  write_sheet_names: string;
+  primary_action: string;
+  primary_target_sheet: string;
+  primary_selector_type: string;
+  primary_selector_value: string;
+  changed_fields: string;
+  action_summary: string;
   result_code: string;
   note: string;
 }

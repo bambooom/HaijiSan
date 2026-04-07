@@ -14,14 +14,8 @@ vi.mock('../repositories', () => ({
   bodyLogRepository: {
     getLatestWeight: vi.fn(),
   },
-  foodItemsRepository: {
-    listByFoodLogIds: vi.fn(),
-  },
   foodLogRepository: {
     listByDate: vi.fn(),
-  },
-  refCaloriesRepository: {
-    findByIds: vi.fn(),
   },
 }));
 
@@ -36,7 +30,7 @@ beforeAll(async () => {
 });
 
 describe('nutrition summary', () => {
-  it('builds a deterministic today summary from meals, items, and references', () => {
+  it('builds a deterministic today summary from aggregated meal rows', () => {
     const summary = buildNutritionSummaryFromRecords({
       meals: [
         {
@@ -44,8 +38,13 @@ describe('nutrition summary', () => {
           logged_at: '2026-04-01 08:00:00',
           meal_type: 'breakfast',
           meal_text: '鸡蛋和菠菜',
-          estimated_calories: 320,
-          parse_status: 'parsed',
+          calories_kcal: 320,
+          protein_g: 5.2,
+          fat_g: 0.6,
+          carbs_g: 7.2,
+          vegetable_g: 200,
+          linked_food_ref_ids: 'ref_spinach',
+          linked_stock_item_ids: 'stock_egg, stock_spinach',
           note: '',
         },
         {
@@ -53,90 +52,14 @@ describe('nutrition summary', () => {
           logged_at: '2026-04-01 12:00:00',
           meal_type: 'lunch',
           meal_text: '鸡胸肉和西兰花',
-          estimated_calories: 520,
-          parse_status: 'parsed',
+          calories_kcal: 520,
+          protein_g: 51.5,
+          fat_g: 6.1,
+          carbs_g: 11.9,
+          vegetable_g: 180,
+          linked_food_ref_ids: 'ref_chicken, ref_broccoli',
+          linked_stock_item_ids: 'stock_chicken, stock_broccoli',
           note: '',
-        },
-      ],
-      items: [
-        {
-          parent_food_log_id: 'food_1',
-          item_name: '鸡蛋',
-          quantity: 2,
-          unit: '个',
-          estimated_calories: 140,
-          linked_food_ref_id: '',
-          linked_stock_item_id: '',
-          ai_confidence: null,
-          note: '',
-        },
-        {
-          parent_food_log_id: 'food_1',
-          item_name: '菠菜',
-          quantity: 200,
-          unit: 'g',
-          estimated_calories: 50,
-          linked_food_ref_id: 'ref_spinach',
-          linked_stock_item_id: '',
-          ai_confidence: null,
-          note: '',
-        },
-        {
-          parent_food_log_id: 'food_2',
-          item_name: '鸡胸肉',
-          quantity: 150,
-          unit: 'g',
-          estimated_calories: 250,
-          linked_food_ref_id: 'ref_chicken',
-          linked_stock_item_id: '',
-          ai_confidence: null,
-          note: '',
-        },
-        {
-          parent_food_log_id: 'food_2',
-          item_name: '西兰花',
-          quantity: 180,
-          unit: 'g',
-          estimated_calories: 60,
-          linked_food_ref_id: 'ref_broccoli',
-          linked_stock_item_id: '',
-          ai_confidence: null,
-          note: '',
-        },
-      ],
-      references: [
-        {
-          id: 'ref_spinach',
-          name: '菠菜',
-          brand: '',
-          servingSize: 100,
-          unit: 'g',
-          calories: 25,
-          protein: 2.6,
-          fat: 0.3,
-          carbs: 3.6,
-        },
-        {
-          id: 'ref_chicken',
-          name: '鸡胸肉',
-          brand: '',
-          servingSize: 100,
-          unit: 'g',
-          calories: 167,
-          protein: 31,
-          fat: 3.6,
-          carbs: 0,
-        },
-        {
-          id: 'ref_broccoli',
-          name: '西兰花',
-          brand: '',
-          servingSize: 100,
-          unit: 'g',
-          calories: 34,
-          protein: 2.8,
-          fat: 0.4,
-          carbs: 6.6,
         },
       ],
       latestWeightKg: 55,
@@ -152,7 +75,6 @@ describe('nutrition summary', () => {
     expect(summary.carbCalorieShare).toBe(0.1);
     expect(summary.proteinTarget).toBe(66);
     expect(summary.totalVegetableGrams).toBe(380);
-    expect(summary.proteinUnresolvedItems).toEqual(['鸡蛋']);
     expect(summary.mealSummaries).toHaveLength(2);
     expect(summary.mealSummaries[0]).toMatchObject({
       totalCalories: 320,
@@ -182,8 +104,5 @@ describe('nutrition summary', () => {
     expect(reply).toContain(
       '午餐 鸡胸肉和西兰花：520 kcal；蛋白 51.5 g；脂肪 6.1 g；碳水 11.9 g；蔬菜 180 g。',
     );
-    expect(reply).toContain('蛋白未纳入：鸡蛋。');
-    expect(reply).toContain('脂肪未纳入：鸡蛋。');
-    expect(reply).toContain('碳水未纳入：鸡蛋。');
   });
 });

@@ -1,4 +1,4 @@
-import type { MealType, ParseStatus } from './core';
+import type { MealType } from './core';
 import type { IngredientEstimateResult, MealResolutionResult } from './food';
 import type { FoodReference } from './repositories';
 
@@ -49,11 +49,6 @@ export type EstimatedMealSummary = {
   totalEstimatedCalories: number | null;
   aiResolvedCount: number;
   pendingParts: string[];
-};
-
-export type EstimatedMealMeta = {
-  parseStatus: ParseStatus;
-  note: string;
 };
 
 export type MealPersistResult = {
