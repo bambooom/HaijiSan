@@ -46,7 +46,13 @@ describe('Gemini native function calling', () => {
         }),
     });
 
-    const result = startAiResponse('你能做什么？');
+    const result = startAiResponse('你能做什么？', [
+      {
+        loggedAt: '2026-04-08 09:00:00',
+        userText: '昨天早餐吃了酸奶',
+        assistantText: '我记住了。',
+      },
+    ]);
 
     expect(result).toMatchObject({
       mode: 'reply',
@@ -55,6 +61,7 @@ describe('Gemini native function calling', () => {
 
     const request = mocks.fetch.mock.calls[0]?.[1] as { payload: string };
     const payload = JSON.parse(request.payload) as {
+      contents: Array<{ role: string; parts: Array<{ text: string }> }>;
       systemInstruction: { parts: Array<{ text: string }> };
       tools: Array<{ functionDeclarations: Array<{ name: string }> }>;
     };
@@ -68,6 +75,20 @@ describe('Gemini native function calling', () => {
     expect(
       payload.tools[0]?.functionDeclarations.map((tool) => tool.name),
     ).toEqual(['readData', 'insertData', 'updateData']);
+    expect(payload.contents).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: '昨天早餐吃了酸奶' }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: '我记住了。' }],
+      },
+      {
+        role: 'user',
+        parts: [{ text: '你能做什么？' }],
+      },
+    ]);
   });
 
   it('maps Gemini functionCall to a GenericToolRequest', () => {
@@ -141,6 +162,13 @@ describe('Gemini native function calling', () => {
 
     const reply = generateFinalAiReply({
       userText: '最近吃了什么',
+      conversationHistory: [
+        {
+          loggedAt: '2026-04-08 09:00:00',
+          userText: '昨天早餐吃了酸奶',
+          assistantText: '我记住了。',
+        },
+      ],
       firstTurn: {
         mode: 'tool',
         request: {
@@ -216,8 +244,16 @@ describe('Gemini native function calling', () => {
       };
     };
 
-    expect(payload.contents).toHaveLength(3);
-    expect(payload.contents[2]?.parts[0]?.functionResponse).toEqual({
+    expect(payload.contents).toHaveLength(5);
+    expect(payload.contents[0]).toEqual({
+      role: 'user',
+      parts: [{ text: '昨天早餐吃了酸奶' }],
+    });
+    expect(payload.contents[1]).toEqual({
+      role: 'model',
+      parts: [{ text: '我记住了。' }],
+    });
+    expect(payload.contents[4]?.parts[0]?.functionResponse).toEqual({
       id: 'call-1',
       name: 'readData',
       response: {

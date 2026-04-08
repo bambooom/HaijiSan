@@ -1,4 +1,10 @@
+import {
+  CONTEXT_EXPANSION_KEYWORDS,
+  DEFAULT_CONVERSATION_CONTEXT_TURNS,
+  EXPANDED_CONVERSATION_CONTEXT_TURNS,
+} from '../constants/ai';
 import { generateFinalAiReply, startAiResponse } from '../services/gemini';
+import { botLogTable } from '../tables/bot-log-table';
 import { executeGenericToolRequest } from '../tools';
 import type {
   GenericToolRequest,
@@ -6,7 +12,11 @@ import type {
   ToolSelector,
 } from '../tools/types';
 import { validateGenericToolRequest } from '../tools/validation';
-import type { CommandAuditFields, CommandHandlingResult } from '../types';
+import type {
+  CommandAuditFields,
+  CommandHandlingResult,
+  ConversationTurn,
+} from '../types';
 import { buildCommandLogFields } from '../utils/log-meta';
 
 function createTraceId(timestamp: Date): string {
@@ -116,6 +126,18 @@ function buildAuditFromRequest(
   }
 }
 
+function shouldExpandConversationContext(text: string): boolean {
+  return CONTEXT_EXPANSION_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
+function getConversationHistory(text: string): ConversationTurn[] {
+  const limit = shouldExpandConversationContext(text)
+    ? EXPANDED_CONVERSATION_CONTEXT_TURNS
+    : DEFAULT_CONVERSATION_CONTEXT_TURNS;
+
+  return botLogTable.listRecentConversationTurns(limit);
+}
+
 function stringifyRecord(record: Record<string, unknown>): string {
   return JSON.stringify(record, null, 2);
 }
@@ -152,7 +174,8 @@ export function handleAiText(
   timestamp: Date,
 ): CommandHandlingResult {
   try {
-    const response = startAiResponse(text);
+    const conversationHistory = getConversationHistory(text);
+    const response = startAiResponse(text, conversationHistory);
 
     if (response.mode === 'reply') {
       return buildAiResult(response.reply, timestamp, {
@@ -187,6 +210,7 @@ export function handleAiText(
     try {
       const reply = generateFinalAiReply({
         userText: text,
+        conversationHistory,
         firstTurn: response,
         toolResult,
       });

@@ -1,5 +1,9 @@
 import { SHEET_SCHEMAS } from '../constants/sheet-schema';
-import type { BotLogEntry, CommandHandlingResult } from '../types';
+import type {
+  BotLogEntry,
+  CommandHandlingResult,
+  ConversationTurn,
+} from '../types';
 import { SheetTable } from './sheet-table';
 
 export class BotLogTable extends SheetTable<BotLogEntry> {
@@ -50,6 +54,21 @@ export class BotLogTable extends SheetTable<BotLogEntry> {
       result_code: result.resultCode,
       note: result.note,
     });
+  }
+
+  listRecentConversationTurns(limit: number): ConversationTurn[] {
+    if (limit <= 0) {
+      return [];
+    }
+
+    return this.listEntries()
+      .filter((entry) => entry.raw_text.trim() || entry.final_reply.trim())
+      .slice(-limit)
+      .map((entry) => ({
+        loggedAt: entry.logged_at,
+        userText: entry.raw_text,
+        assistantText: entry.final_reply,
+      }));
   }
 }
 

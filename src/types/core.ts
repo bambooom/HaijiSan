@@ -49,6 +49,12 @@ export type CommandAuditFields = {
   changedFields: string[];
 };
 
+export type ConversationTurn = {
+  loggedAt: string;
+  userText: string;
+  assistantText: string;
+};
+
 export type HealthDataSource = 'manual' | 'ios_health' | 'smart_scale';
 
 export type CommandHandlingResult = {

@@ -6,6 +6,7 @@ import type {
   ToolRecord,
   ToolSelector,
 } from '../../tools/types';
+import type { ConversationTurn } from '../../types';
 
 type GeminiFunctionCall = {
   id?: string;
@@ -56,6 +57,33 @@ export type AiStartResponse =
       };
       modelContent: GeminiContent;
     };
+
+function buildConversationContents(history: ConversationTurn[], text: string) {
+  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+  history.forEach((turn) => {
+    if (turn.userText.trim()) {
+      contents.push({
+        role: 'user',
+        parts: [{ text: turn.userText }],
+      });
+    }
+
+    if (turn.assistantText.trim()) {
+      contents.push({
+        role: 'model',
+        parts: [{ text: turn.assistantText }],
+      });
+    }
+  });
+
+  contents.push({
+    role: 'user',
+    parts: [{ text }],
+  });
+
+  return contents;
+}
 
 function getGeminiUrl(): string {
   return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -417,17 +445,15 @@ function mapFunctionCallToRequest(
   }
 }
 
-export function startAiResponse(text: string): AiStartResponse {
+export function startAiResponse(
+  text: string,
+  conversationHistory: ConversationTurn[] = [],
+): AiStartResponse {
   const response = callGemini({
     systemInstruction: {
       parts: [{ text: buildSystemInstruction() }],
     },
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text }],
-      },
-    ],
+    contents: buildConversationContents(conversationHistory, text),
     tools: [
       {
         functionDeclarations: buildFunctionDeclarations(),
@@ -475,6 +501,7 @@ export function startAiResponse(text: string): AiStartResponse {
 
 export function generateFinalAiReply(input: {
   userText: string;
+  conversationHistory?: ConversationTurn[];
   firstTurn: Extract<AiStartResponse, { mode: 'tool' }>;
   toolResult: GenericToolResult;
 }): string {
@@ -487,10 +514,10 @@ export function generateFinalAiReply(input: {
       ],
     },
     contents: [
-      {
-        role: 'user',
-        parts: [{ text: input.userText }],
-      },
+      ...buildConversationContents(
+        input.conversationHistory ?? [],
+        input.userText,
+      ),
       input.firstTurn.modelContent,
       {
         role: 'user',

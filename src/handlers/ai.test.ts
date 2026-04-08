@@ -13,6 +13,13 @@ const mocks = vi.hoisted(() => ({
   startAiResponse: vi.fn(),
   generateFinalAiReply: vi.fn(),
   executeGenericToolRequest: vi.fn(),
+  listRecentConversationTurns: vi.fn(
+    (): Array<{
+      loggedAt: string;
+      userText: string;
+      assistantText: string;
+    }> => [],
+  ),
 }));
 
 vi.mock('../services/gemini', () => ({
@@ -29,11 +36,18 @@ vi.mock('../tools', async () => {
   };
 });
 
+vi.mock('../tables/bot-log-table', () => ({
+  botLogTable: {
+    listRecentConversationTurns: mocks.listRecentConversationTurns,
+  },
+}));
+
 import { handleAiText } from './ai';
 
 describe('handleAiText', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.listRecentConversationTurns.mockReturnValue([]);
   });
 
   it('returns direct Gemini replies as ai results', () => {
@@ -51,6 +65,8 @@ describe('handleAiText', () => {
       new Date('2026-04-08T10:00:00Z'),
     );
 
+    expect(mocks.listRecentConversationTurns).toHaveBeenCalledWith(4);
+    expect(mocks.startAiResponse).toHaveBeenCalledWith('你能做什么？', []);
     expect(result.handlingMode).toBe('ai');
     expect(result.status).toBe('success');
     expect(result.reply).toContain('记录或查询');
@@ -128,11 +144,32 @@ describe('handleAiText', () => {
     mocks.generateFinalAiReply.mockReturnValue('你最近记录里提到了酸奶。');
 
     const timestamp = new Date('2026-04-08T10:00:00Z');
+    mocks.listRecentConversationTurns.mockReturnValue([
+      {
+        loggedAt: '2026-04-08 09:00:00',
+        userText: '昨天早餐吃了酸奶',
+        assistantText: '我记住了。',
+      },
+    ]);
     const result = handleAiText('最近一条消息是什么？', timestamp);
 
     expect(mocks.executeGenericToolRequest).toHaveBeenCalledTimes(1);
+    expect(mocks.startAiResponse).toHaveBeenCalledWith('最近一条消息是什么？', [
+      {
+        loggedAt: '2026-04-08 09:00:00',
+        userText: '昨天早餐吃了酸奶',
+        assistantText: '我记住了。',
+      },
+    ]);
     expect(mocks.generateFinalAiReply).toHaveBeenCalledWith({
       userText: '最近一条消息是什么？',
+      conversationHistory: [
+        {
+          loggedAt: '2026-04-08 09:00:00',
+          userText: '昨天早餐吃了酸奶',
+          assistantText: '我记住了。',
+        },
+      ],
       firstTurn,
       toolResult: {
         tool: 'readData',
@@ -168,6 +205,21 @@ describe('handleAiText', () => {
       primarySelectorValue: 'limit=2',
       changedFields: [],
     });
+  });
+
+  it('uses the expanded context window for follow-up style messages', () => {
+    mocks.startAiResponse.mockReturnValue({
+      mode: 'reply',
+      reply: '好的，我们继续。',
+      modelContent: {
+        role: 'model',
+        parts: [{ text: '好的，我们继续。' }],
+      },
+    });
+
+    handleAiText('按刚才那个继续', new Date('2026-04-08T10:00:00Z'));
+
+    expect(mocks.listRecentConversationTurns).toHaveBeenCalledWith(8);
   });
 
   it('rejects invalid tool requests before execution', () => {

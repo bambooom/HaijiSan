@@ -80,4 +80,61 @@ describe('botLogTable.appendMessageLog', () => {
       note: 'readData FOOD_LOG',
     });
   });
+
+  it('returns the latest conversation turns in chronological order', () => {
+    vi.spyOn(botLogTable, 'listEntries').mockReturnValue([
+      {
+        logged_at: '2026-04-08 08:00:00',
+        raw_text: '早上好',
+        final_reply: '早上好。',
+        handling_mode: 'ai',
+        status: 'success',
+        trace_id: '1',
+        tool_call_count: 0,
+        read_count: 0,
+        insert_count: 0,
+        update_count: 0,
+        read_sheet_names: '',
+        write_sheet_names: '',
+        primary_action: '',
+        primary_target_sheet: '',
+        primary_selector_type: '',
+        primary_selector_value: '',
+        changed_fields: '',
+        action_summary: '',
+        result_code: 'ok',
+        note: '',
+      },
+      {
+        logged_at: '2026-04-08 09:00:00',
+        raw_text: '昨天吃了酸奶',
+        final_reply: '我记住了。',
+        handling_mode: 'ai',
+        status: 'success',
+        trace_id: '2',
+        tool_call_count: 0,
+        read_count: 0,
+        insert_count: 0,
+        update_count: 0,
+        read_sheet_names: '',
+        write_sheet_names: '',
+        primary_action: '',
+        primary_target_sheet: '',
+        primary_selector_type: '',
+        primary_selector_value: '',
+        changed_fields: '',
+        action_summary: '',
+        result_code: 'ok',
+        note: '',
+      },
+    ]);
+
+    expect(botLogTable.listRecentConversationTurns(1)).toEqual([
+      {
+        loggedAt: '2026-04-08 09:00:00',
+        userText: '昨天吃了酸奶',
+        assistantText: '我记住了。',
+      },
+    ]);
+  });
 });
