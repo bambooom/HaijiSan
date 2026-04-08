@@ -334,6 +334,43 @@ describe('generic tool contract', () => {
     });
   });
 
+  it('auto-calculates sleep_hours for sleep log inserts when omitted', () => {
+    const insertSpy = vi
+      .spyOn(TOOL_REGISTRY.SLEEP_LOG.table, 'insert')
+      .mockImplementation(() => {});
+    vi.spyOn(spreadsheetService, 'getTimestamp').mockImplementation(
+      (includeMilliseconds = false) =>
+        includeMilliseconds ? '2026-04-08 08:00:00.123' : '2026-04-08 08:00:00',
+    );
+
+    const result = executeInsertData(
+      {
+        tool: 'insertData',
+        sheet: 'SLEEP_LOG',
+        record: {
+          sleep_start_at: '2026-04-08 02:30:00',
+          sleep_end_at: '2026-04-08 07:06:00',
+          sleep_quality: 'poor',
+          source: 'manual',
+        },
+      },
+      new Date('2026-04-08T08:00:00Z'),
+    );
+
+    expect(insertSpy).toHaveBeenCalledWith({
+      sleep_log_id: 'sleep_20260408080000123',
+      logged_at: '2026-04-08 08:00:00',
+      sleep_start_at: '2026-04-08 02:30:00',
+      sleep_end_at: '2026-04-08 07:06:00',
+      sleep_hours: 4.6,
+      sleep_quality: 'poor',
+      source: 'manual',
+    });
+    expect(result.record).toMatchObject({
+      sleep_hours: 4.6,
+    });
+  });
+
   it('executes updateData and auto-refreshes editable updated_at fields', () => {
     const updateSpy = vi
       .spyOn(TOOL_REGISTRY.STOCK.table, 'updateAtRow')
@@ -364,6 +401,39 @@ describe('generic tool contract', () => {
     expect(result.updates).toEqual({
       quantity: 4,
       updated_at: '2026-04-08 18:30:00',
+    });
+  });
+
+  it('auto-calculates sleep_hours for sleep log updates when both endpoints are provided', () => {
+    const updateSpy = vi
+      .spyOn(TOOL_REGISTRY.SLEEP_LOG.table, 'updateAtRow')
+      .mockImplementation(() => {});
+
+    const result = executeUpdateData(
+      {
+        tool: 'updateData',
+        sheet: 'SLEEP_LOG',
+        selector: {
+          type: 'row-number',
+          rowNumber: 12,
+        },
+        updates: {
+          sleep_start_at: '2026-04-08 01:30:00',
+          sleep_end_at: '2026-04-08 07:00:00',
+        },
+      },
+      new Date('2026-04-08T18:30:00Z'),
+    );
+
+    expect(updateSpy).toHaveBeenCalledWith(12, {
+      sleep_start_at: '2026-04-08 01:30:00',
+      sleep_end_at: '2026-04-08 07:00:00',
+      sleep_hours: 5.5,
+    });
+    expect(result.updates).toEqual({
+      sleep_start_at: '2026-04-08 01:30:00',
+      sleep_end_at: '2026-04-08 07:00:00',
+      sleep_hours: 5.5,
     });
   });
 
