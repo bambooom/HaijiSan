@@ -138,10 +138,6 @@ function getConversationHistory(text: string): ConversationTurn[] {
   return botLogTable.listRecentConversationTurns(limit);
 }
 
-function stringifyRecord(record: Record<string, unknown>): string {
-  return JSON.stringify(record, null, 2);
-}
-
 function formatReadResult(
   result: Extract<GenericToolResult, { tool: 'readData' }>,
 ): string {
@@ -151,11 +147,38 @@ function formatReadResult(
 
   const preview = result.rows
     .slice(0, 5)
-    .map((row) => `第 ${row.rowNumber} 行\n${stringifyRecord(row.record)}`)
+    .map(
+      (row) => `第 ${row.rowNumber} 行\n${JSON.stringify(row.record, null, 2)}`,
+    )
     .join('\n\n');
   const suffix = result.rows.length > 5 ? '\n\n其余结果已省略。' : '';
 
   return `我查到 ${result.rows.length} 条 ${result.sheet} 记录。\n\n${preview}${suffix}`;
+}
+
+function formatWriteFallbackResult(
+  result: Extract<GenericToolResult, { tool: 'insertData' | 'updateData' }>,
+): string {
+  const action = result.tool === 'insertData' ? '记录' : '更新';
+
+  switch (result.sheet) {
+    case 'SLEEP_LOG':
+      return `已${action}睡眠数据。`;
+    case 'WORKOUT_LOG':
+      return `已${action}运动数据。`;
+    case 'FOOD_LOG':
+      return `已${action}饮食记录。`;
+    case 'BODY_LOG':
+      return `已${action}身体指标。`;
+    case 'STATUS_LOG':
+      return `已${action}状态记录。`;
+    case 'REF_CALORIES':
+      return `已${action}热量参考数据。`;
+    case 'STOCK':
+      return `已${action}库存数据。`;
+    case 'BOT_LOG':
+      return `已${action}系统日志。`;
+  }
 }
 
 function formatToolResult(result: GenericToolResult): string {
@@ -163,9 +186,9 @@ function formatToolResult(result: GenericToolResult): string {
     case 'readData':
       return formatReadResult(result);
     case 'insertData':
-      return `已写入 ${result.sheet}：\n${stringifyRecord(result.record)}`;
+      return formatWriteFallbackResult(result);
     case 'updateData':
-      return `已更新 ${result.sheet} 第 ${result.selector.rowNumber} 行：\n${stringifyRecord(result.updates)}`;
+      return formatWriteFallbackResult(result);
   }
 }
 

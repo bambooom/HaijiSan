@@ -208,6 +208,7 @@ function buildSystemInstruction(referenceTimestamp: Date): string {
     'You are HaijiSan, a personal health, nutrition, and logging assistant.',
     'Your primary perspective is health management, nutrition management, recovery, sleep, exercise, and sustainable daily habits.',
     `Current local timestamp for interpreting relative dates: ${currentTimestamp}.`,
+    'Treat the latest user message as the primary source of truth. Use conversation history only when the latest message explicitly refers back to it with phrases such as 刚才, 那个, 继续, 改成, or similar follow-up wording. Do not repeat or reuse an older insert record when the current message clearly starts a new topic.',
     'Use function calls when the user wants to read or write spreadsheet data.',
     "When creating log records, extract the event time from the user's natural-language meaning instead of asking the app to parse it mechanically.",
     'Interpret 今天, 昨天, 前天, 本周, and other relative-date phrases against the current local timestamp above. Never invent a distant year or unrelated calendar date when the user gave a relative date like 今天.',
@@ -216,6 +217,8 @@ function buildSystemInstruction(referenceTimestamp: Date): string {
     'For sheets that use occurred_at, include occurred_at when the user implied a date or time such as 今天, 昨天, 早餐, 晚饭, 8:55, or similar semantic clues.',
     'If the user clearly wants to log data but did not specify an event time, it is acceptable to omit occurred_at and let the app default it to now.',
     'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack unless the user clearly means a normal dinner.',
+    'For SLEEP_LOG, route sleep-related statements into SLEEP_LOG rather than FOOD_LOG. Phrases like 睡眠, 睡得, 入睡, 醒来, 2:30-7:06, or 02:30 到 07:06 usually mean a sleep record with sleep_start_at, sleep_end_at, sleep_quality, and source=manual.',
+    'For WORKOUT_LOG, route exercise-related statements into WORKOUT_LOG. Phrases like 跑步, 骑车, 训练, 心率, 消耗, 卡路里, or 时长 usually mean a workout record rather than food or status data.',
     'For STATUS_LOG menstruation entries, entry_type should be menstruation, cycle_day should be the numeric cycle day such as 3 for 第3天, value should hold the main status such as light, medium, or heavy bleeding, and note should keep any extra detail. Do not copy the whole sentence into value.',
     'If the user asks a health or nutrition question that depends on their own history, current status, or recent logs, prefer calling readData first before answering.',
     'If there is no clear need to read or write spreadsheet data, answer directly and mainly from the perspective of health management and nutrition management.',
@@ -301,7 +304,7 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
           record: {
             type: 'object',
             description:
-              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss. Never pass natural-language timestamp strings like today 08:55. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. For FOOD_LOG, meal_type must be exactly one of breakfast, lunch, dinner, snack; convert Chinese meal words like 早餐/早饭/午饭/晚饭/夜宵 into those exact enum values instead of copying the original Chinese word.",
+              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss. Never pass natural-language timestamp strings like today 08:55. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. For FOOD_LOG, meal_type must be exactly one of breakfast, lunch, dinner, snack; convert Chinese meal words like 早餐/早饭/午饭/晚饭/夜宵 into those exact enum values instead of copying the original Chinese word. For SLEEP_LOG, put the sleep interval into sleep_start_at and sleep_end_at, map sleep quality into good, normal, or poor, and use source=manual for user-entered text. For WORKOUT_LOG, use workout_name, workout_level, duration_min, heart-rate fields, and calories_kcal instead of putting exercise details into other sheets.",
           },
         },
         required: ['sheet', 'record'],

@@ -323,4 +323,61 @@ describe('handleAiText', () => {
     expect(result.reply).toContain('BOT_LOG');
     expect(result.reply).toContain('第 7 行');
   });
+
+  it('uses a human-readable fallback for write operations when the second Gemini call fails', () => {
+    mocks.startAiResponse.mockReturnValue({
+      mode: 'tool',
+      request: {
+        tool: 'insertData',
+        sheet: 'SLEEP_LOG',
+        record: {
+          sleep_start_at: '2026-04-08 02:30:00',
+          sleep_end_at: '2026-04-08 07:06:00',
+          sleep_quality: 'poor',
+          source: 'manual',
+        },
+      },
+      functionCall: {
+        name: 'insertData',
+        args: {
+          sheet: 'SLEEP_LOG',
+          record: {
+            sleep_start_at: '2026-04-08 02:30:00',
+            sleep_end_at: '2026-04-08 07:06:00',
+            sleep_quality: 'poor',
+            source: 'manual',
+          },
+        },
+      },
+      modelContent: {
+        role: 'model',
+        parts: [],
+      },
+    });
+    mocks.executeGenericToolRequest.mockReturnValue({
+      tool: 'insertData',
+      sheet: 'SLEEP_LOG',
+      record: {
+        sleep_start_at: '2026-04-08 02:30:00',
+        sleep_end_at: '2026-04-08 07:06:00',
+        sleep_quality: 'poor',
+        source: 'manual',
+        sleep_log_id: 'sleep_1',
+        logged_at: '2026-04-08 10:00:00',
+      },
+    });
+    mocks.generateFinalAiReply.mockImplementation(() => {
+      throw new Error('Gemini unavailable');
+    });
+
+    const result = handleAiText(
+      '今天的睡眠记录是 2:30-7:06，睡得不太好',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(result.resultCode).toBe('ai-tool-executed-final-reply-failed');
+    expect(result.reply).toBe('已记录睡眠数据。');
+    expect(result.reply).not.toContain('{');
+  });
 });

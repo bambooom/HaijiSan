@@ -84,6 +84,9 @@ describe('Gemini native function calling', () => {
       'Current local timestamp for interpreting relative dates: 2026-04-08 18:00:00.',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Treat the latest user message as the primary source of truth.',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'Never invent a distant year or unrelated calendar date when the user gave a relative date like 今天.',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
@@ -97,6 +100,9 @@ describe('Gemini native function calling', () => {
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'For SLEEP_LOG, route sleep-related statements into SLEEP_LOG rather than FOOD_LOG.',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'For STATUS_LOG menstruation entries, entry_type should be menstruation, cycle_day should be the numeric cycle day such as 3 for 第3天, value should hold the main status such as light, medium, or heavy bleeding',
@@ -127,6 +133,9 @@ describe('Gemini native function calling', () => {
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'STATUS_LOG field meanings: occurred_at = When the status event actually happened.; entry_type = Status category: bowel movement, menstruation, symptom, or medication.; value = Primary recorded value. For menstruation, use a short status such as light, medium, or heavy bleeding rather than copying the full user sentence.; unit = Unit only when value is numeric, such as mg or times.; note = Optional extra detail that does not fit in the main value.; cycle_day = Menstrual cycle day number, such as 3 for 经期第3天.',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'SLEEP_LOG field meanings: sleep_start_at = When the sleep period started.; sleep_end_at = When the sleep period ended.; sleep_hours = Total sleep duration in hours when known.; sleep_quality = Overall sleep quality as good, normal, or poor.; source = Where the sleep data came from.; note = Optional extra detail about the sleep record.',
     );
     expect(payload.systemInstruction.parts[0]?.text).not.toContain(
       'Available sheets and fields:',
@@ -294,6 +303,11 @@ describe('Gemini native function calling', () => {
       insertDeclaration?.parameters.properties.record.description,
     ).toContain(
       'Never pass natural-language timestamp strings like today 08:55.',
+    );
+    expect(
+      insertDeclaration?.parameters.properties.record.description,
+    ).toContain(
+      'For SLEEP_LOG, put the sleep interval into sleep_start_at and sleep_end_at',
     );
   });
 
