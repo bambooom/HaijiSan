@@ -73,6 +73,30 @@ describe('Gemini native function calling', () => {
       "extract the event time from the user's natural-language meaning",
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Schema constraints summary:',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'FOOD_LOG\n- allowed operations: read, insert, update',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      '- required on insert: occurred_at, meal_type, meal_text',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      '- auto-generated: food_log_id',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      '- immutable: logged_at',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      '- enums: meal_type = breakfast | lunch | dinner | snack',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'BOT_LOG\n- allowed operations: read',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'prefer calling readData first before answering',
     );
     expect(
