@@ -66,7 +66,11 @@ describe('handleAiText', () => {
     );
 
     expect(mocks.listRecentConversationTurns).toHaveBeenCalledWith(4);
-    expect(mocks.startAiResponse).toHaveBeenCalledWith('你能做什么？', []);
+    expect(mocks.startAiResponse).toHaveBeenCalledWith(
+      '你能做什么？',
+      [],
+      new Date('2026-04-08T10:00:00Z'),
+    );
     expect(result.handlingMode).toBe('ai');
     expect(result.status).toBe('success');
     expect(result.reply).toContain('记录或查询');
@@ -154,13 +158,17 @@ describe('handleAiText', () => {
     const result = handleAiText('最近一条消息是什么？', timestamp);
 
     expect(mocks.executeGenericToolRequest).toHaveBeenCalledTimes(1);
-    expect(mocks.startAiResponse).toHaveBeenCalledWith('最近一条消息是什么？', [
-      {
-        loggedAt: '2026-04-08 09:00:00',
-        userText: '昨天早餐吃了酸奶',
-        assistantText: '我记住了。',
-      },
-    ]);
+    expect(mocks.startAiResponse).toHaveBeenCalledWith(
+      '最近一条消息是什么？',
+      [
+        {
+          loggedAt: '2026-04-08 09:00:00',
+          userText: '昨天早餐吃了酸奶',
+          assistantText: '我记住了。',
+        },
+      ],
+      timestamp,
+    );
     expect(mocks.generateFinalAiReply).toHaveBeenCalledWith({
       userText: '最近一条消息是什么？',
       conversationHistory: [
@@ -170,6 +178,7 @@ describe('handleAiText', () => {
           assistantText: '我记住了。',
         },
       ],
+      referenceTimestamp: timestamp,
       firstTurn,
       toolResult: {
         tool: 'readData',

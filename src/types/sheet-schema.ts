@@ -24,6 +24,7 @@ export type FieldSchema = {
   type: FieldSchemaType;
   required: boolean;
   enumValues?: readonly string[];
+  description?: string;
   validator?: string;
   tooling?: FieldToolingSchema;
 };

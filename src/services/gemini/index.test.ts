@@ -23,10 +23,14 @@ Object.assign(globalThis, {
 });
 
 import { generateFinalAiReply, startAiResponse } from './index';
+import { spreadsheetService } from '../spreadsheet';
 
 describe('Gemini native function calling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(spreadsheetService, 'getTimestamp').mockReturnValue(
+      '2026-04-08 18:00:00',
+    );
   });
 
   it('starts with a direct reply when Gemini returns plain text', () => {
@@ -49,13 +53,17 @@ describe('Gemini native function calling', () => {
         }),
     });
 
-    const result = startAiResponse('你能做什么？', [
-      {
-        loggedAt: '2026-04-08 09:00:00',
-        userText: '昨天早餐吃了酸奶',
-        assistantText: '我记住了。',
-      },
-    ]);
+    const result = startAiResponse(
+      '你能做什么？',
+      [
+        {
+          loggedAt: '2026-04-08 09:00:00',
+          userText: '昨天早餐吃了酸奶',
+          assistantText: '我记住了。',
+        },
+      ],
+      new Date('2026-04-08T10:00:00Z'),
+    );
 
     expect(result).toMatchObject({
       mode: 'reply',
@@ -73,6 +81,12 @@ describe('Gemini native function calling', () => {
       'personal health, nutrition, and logging assistant',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Current local timestamp for interpreting relative dates: 2026-04-08 18:00:00.',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Never invent a distant year or unrelated calendar date when the user gave a relative date like 今天.',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       "extract the event time from the user's natural-language meaning",
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
@@ -85,7 +99,13 @@ describe('Gemini native function calling', () => {
       'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'For STATUS_LOG menstruation entries, entry_type should be menstruation, cycle_day should be the numeric cycle day such as 3 for 第3天, value should hold the main status such as light, medium, or heavy bleeding',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'Schema constraints summary:',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Field meaning summary:',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'FOOD_LOG | ops=read,insert,update',
@@ -104,6 +124,9 @@ describe('Gemini native function calling', () => {
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'BOT_LOG | ops=read',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'STATUS_LOG field meanings: occurred_at = When the status event actually happened.; entry_type = Status category: bowel movement, menstruation, symptom, or medication.; value = Primary recorded value. For menstruation, use a short status such as light, medium, or heavy bleeding rather than copying the full user sentence.; unit = Unit only when value is numeric, such as mg or times.; note = Optional extra detail that does not fit in the main value.; cycle_day = Menstrual cycle day number, such as 3 for 经期第3天.',
     );
     expect(payload.systemInstruction.parts[0]?.text).not.toContain(
       'Available sheets and fields:',
@@ -159,7 +182,11 @@ describe('Gemini native function calling', () => {
         }),
     });
 
-    const result = startAiResponse('最近吃了什么');
+    const result = startAiResponse(
+      '最近吃了什么',
+      [],
+      new Date('2026-04-08T10:00:00Z'),
+    );
 
     expect(result).toMatchObject({
       mode: 'tool',
@@ -201,7 +228,11 @@ describe('Gemini native function calling', () => {
           }),
       });
 
-    const result = startAiResponse('现在怎么样？');
+    const result = startAiResponse(
+      '现在怎么样？',
+      [],
+      new Date('2026-04-08T10:00:00Z'),
+    );
 
     expect(result).toMatchObject({
       mode: 'reply',
@@ -216,9 +247,9 @@ describe('Gemini native function calling', () => {
       getContentText: () => 'Bad Request',
     });
 
-    expect(() => startAiResponse('坏请求')).toThrow(
-      'Gemini request failed (400): Bad Request',
-    );
+    expect(() =>
+      startAiResponse('坏请求', [], new Date('2026-04-08T10:00:00Z')),
+    ).toThrow('Gemini request failed (400): Bad Request');
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -238,7 +269,7 @@ describe('Gemini native function calling', () => {
         }),
     });
 
-    startAiResponse('帮我记录早餐');
+    startAiResponse('帮我记录早餐', [], new Date('2026-04-08T10:00:00Z'));
 
     const request = mocks.fetch.mock.calls[0]?.[1] as { payload: string };
     const payload = JSON.parse(request.payload) as {
@@ -295,6 +326,7 @@ describe('Gemini native function calling', () => {
           assistantText: '我记住了。',
         },
       ],
+      referenceTimestamp: new Date('2026-04-08T10:00:00Z'),
       firstTurn: {
         mode: 'tool',
         request: {

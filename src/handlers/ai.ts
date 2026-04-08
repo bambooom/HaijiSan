@@ -175,7 +175,7 @@ export function handleAiText(
 ): CommandHandlingResult {
   try {
     const conversationHistory = getConversationHistory(text);
-    const response = startAiResponse(text, conversationHistory);
+    const response = startAiResponse(text, conversationHistory, timestamp);
 
     if (response.mode === 'reply') {
       return buildAiResult(response.reply, timestamp, {
@@ -211,6 +211,7 @@ export function handleAiText(
       const reply = generateFinalAiReply({
         userText: text,
         conversationHistory,
+        referenceTimestamp: timestamp,
         firstTurn: response,
         toolResult,
       });
