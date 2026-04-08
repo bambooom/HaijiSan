@@ -78,6 +78,7 @@ describe('daily summary', () => {
       {
         body_log_id: 'body_2',
         logged_at: '2026-04-02 08:00:00',
+        occurred_at: '2026-04-02 07:58:00',
         weight_kg: 54.8,
         bmi: 20.2,
         body_fat_pct: 22.4,
@@ -90,6 +91,7 @@ describe('daily summary', () => {
       {
         body_log_id: 'body_2',
         logged_at: '2026-04-02 08:00:00',
+        occurred_at: '2026-04-02 07:58:00',
         weight_kg: 54.8,
         bmi: 20.2,
         body_fat_pct: 22.4,
@@ -100,6 +102,7 @@ describe('daily summary', () => {
       {
         body_log_id: 'body_1',
         logged_at: '2026-04-01 08:00:00',
+        occurred_at: '2026-04-01 07:55:00',
         weight_kg: 55.2,
         bmi: 20.4,
         body_fat_pct: 22.8,
@@ -124,6 +127,7 @@ describe('daily summary', () => {
       {
         workout_id: 'workout_1',
         logged_at: '2026-04-02 19:00:00',
+        occurred_at: '2026-04-02 18:30:00',
         workout_name: '跑步',
         workout_video_url: '',
         workout_level: 'medium',
@@ -139,6 +143,7 @@ describe('daily summary', () => {
       {
         workout_id: 'workout_1',
         logged_at: '2026-04-02 19:00:00',
+        occurred_at: '2026-04-02 18:30:00',
         workout_name: '跑步',
         workout_video_url: '',
         workout_level: 'medium',
@@ -154,6 +159,7 @@ describe('daily summary', () => {
       {
         entry_id: 'status_1',
         logged_at: '2026-04-02 11:00:00',
+        occurred_at: '2026-04-02 10:45:00',
         entry_type: 'bowel',
         value: '4',
         unit: '',

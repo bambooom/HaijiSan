@@ -13,6 +13,7 @@ describe('record write helpers', () => {
     insertSheetRecord(spreadsheet as never, SHEET_SCHEMAS.BODY_LOG, {
       body_log_id: 'body_1',
       logged_at: '2026-04-02 08:30:00',
+      occurred_at: '2026-04-02 07:45:00',
       weight_kg: 55.1,
       bmi: null,
       body_fat_pct: null,
@@ -24,6 +25,7 @@ describe('record write helpers', () => {
     expect(spreadsheet.appendRow).toHaveBeenCalledWith('Body_Log', [
       'body_1',
       '2026-04-02 08:30:00',
+      '2026-04-02 07:45:00',
       55.1,
       '',
       '',
@@ -75,6 +77,7 @@ describe('record write helpers', () => {
       insertSheetRecord(spreadsheet as never, SHEET_SCHEMAS.BODY_LOG, {
         body_log_id: '',
         logged_at: '2026-04-02 08:30:00',
+        occurred_at: '2026-04-02 07:45:00',
         source: 'oops',
       }),
     ).toThrow('Cannot insert into Body_Log');

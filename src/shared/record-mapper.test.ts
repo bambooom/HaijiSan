@@ -16,6 +16,7 @@ describe('record mapper', () => {
     const record = mapRowToRecord(spreadsheet, SHEET_SCHEMAS.BODY_LOG, [
       'body_1',
       new Date('2026-04-02T00:30:00.000Z'),
+      '2026-04-01 22:30:00',
       55.3,
       '',
       '',
@@ -27,6 +28,7 @@ describe('record mapper', () => {
     expect(record).toEqual({
       body_log_id: 'body_1',
       logged_at: '2026-04-02 08:30:00',
+      occurred_at: '2026-04-01 22:30:00',
       weight_kg: 55.3,
       bmi: null,
       body_fat_pct: null,
@@ -40,6 +42,7 @@ describe('record mapper', () => {
     const row = serializeRecordToRow(spreadsheet, SHEET_SCHEMAS.FOOD_LOG, {
       food_log_id: 'food_1',
       logged_at: '2026-04-02 08:30:00',
+      occurred_at: '2026-04-02 08:10:00',
       meal_type: 'breakfast',
       meal_text: '鸡蛋燕麦',
       calories_kcal: 360,
@@ -55,6 +58,7 @@ describe('record mapper', () => {
     expect(row).toEqual([
       'food_1',
       '2026-04-02 08:30:00',
+      '2026-04-02 08:10:00',
       'breakfast',
       '鸡蛋燕麦',
       360,
@@ -72,6 +76,7 @@ describe('record mapper', () => {
     const errors = validateRecordAgainstSchema(SHEET_SCHEMAS.BODY_LOG, {
       body_log_id: '',
       logged_at: '2026-04-02 08:30:00',
+      occurred_at: '2026-04-02 07:45:00',
       source: 'robot',
       unexpected: 'x',
     });

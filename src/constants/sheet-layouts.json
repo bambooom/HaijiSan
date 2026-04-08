@@ -4,6 +4,7 @@
     "fields": [
       "entry_id",
       "logged_at",
+      "occurred_at",
       "entry_type",
       "value",
       "unit",
@@ -13,6 +14,7 @@
     "headers": [
       "记录ID(entry_id)",
       "记录时间(logged_at)",
+      "事件时间(occurred_at)",
       "记录类型(entry_type)",
       "数值(value)",
       "单位(unit)",
@@ -25,6 +27,7 @@
     "fields": [
       "body_log_id",
       "logged_at",
+      "occurred_at",
       "weight_kg",
       "bmi",
       "body_fat_pct",
@@ -35,6 +38,7 @@
     "headers": [
       "身体记录ID(body_log_id)",
       "记录时间(logged_at)",
+      "事件时间(occurred_at)",
       "体重公斤(weight_kg)",
       "BMI(bmi)",
       "体脂率(body_fat_pct)",
@@ -71,6 +75,7 @@
     "fields": [
       "workout_id",
       "logged_at",
+      "occurred_at",
       "workout_name",
       "workout_video_url",
       "workout_level",
@@ -84,6 +89,7 @@
     "headers": [
       "运动ID(workout_id)",
       "记录时间(logged_at)",
+      "事件时间(occurred_at)",
       "运动名称(workout_name)",
       "运动视频链接(workout_video_url)",
       "运动等级(workout_level)",
@@ -100,6 +106,7 @@
     "fields": [
       "food_log_id",
       "logged_at",
+      "occurred_at",
       "meal_type",
       "meal_text",
       "calories_kcal",
@@ -114,6 +121,7 @@
     "headers": [
       "饮食记录ID(food_log_id)",
       "记录时间(logged_at)",
+      "事件时间(occurred_at)",
       "餐次类型(meal_type)",
       "饮食内容(meal_text)",
       "热量千卡(calories_kcal)",

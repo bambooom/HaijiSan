@@ -6,6 +6,7 @@ export class BodyLogTable extends LogSheetTable<BodyLogEntry> {
   constructor() {
     super({
       schema: SHEET_SCHEMAS.BODY_LOG,
+      eventTimeKey: 'occurred_at',
       idPrefix: 'body',
     });
   }

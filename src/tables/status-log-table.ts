@@ -6,6 +6,7 @@ export class StatusLogTable extends LogSheetTable<StatusLogEntry> {
   constructor() {
     super({
       schema: SHEET_SCHEMAS.STATUS_LOG,
+      eventTimeKey: 'occurred_at',
       idPrefix: 'status',
     });
   }

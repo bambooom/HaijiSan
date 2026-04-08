@@ -11,15 +11,6 @@ import {
 } from '../shared/record-query';
 import { SheetTable } from './sheet-table';
 
-type DefaultLogDateRecord = {
-  logged_at: string;
-  note: string;
-};
-
-type DefaultLogSortRecord = {
-  logged_at: string;
-};
-
 type DateMatchPredicate<TRecord> = (
   entry: TRecord,
   dateStamp: string,
@@ -37,6 +28,7 @@ type LogSheetTableOptions<TRecord extends object> = {
   matchesDateRange?: DateRangeMatchPredicate<TRecord>;
   sortValue?: (entry: TRecord) => string;
   isIncluded?: (entry: TRecord) => boolean;
+  eventTimeKey?: string;
   idPrefix?: string;
 };
 
@@ -55,13 +47,29 @@ export class LogSheetTable<TRecord extends object> {
     return this.baseTable['spreadsheet'];
   }
 
+  private get eventTimeKey(): string {
+    return this.options.eventTimeKey ?? 'logged_at';
+  }
+
+  private getEventTimestamp(entry: TRecord): string {
+    const value = (entry as Record<string, unknown>)[this.eventTimeKey];
+
+    return typeof value === 'string' ? value : '';
+  }
+
+  private getNote(entry: TRecord): string {
+    const value = (entry as Record<string, unknown>).note;
+
+    return typeof value === 'string' ? value : '';
+  }
+
   private get matchesDate(): DateMatchPredicate<TRecord> {
     return (
       this.options.matchesDate ??
       ((entry, dateStamp) =>
         matchesRecordDate(
-          (entry as DefaultLogDateRecord).logged_at,
-          (entry as DefaultLogDateRecord).note,
+          this.getEventTimestamp(entry),
+          this.getNote(entry),
           dateStamp,
         ))
     );
@@ -72,8 +80,8 @@ export class LogSheetTable<TRecord extends object> {
       this.options.matchesDateRange ??
       ((entry, startDateStamp, endDateStamp) =>
         matchesRecordDateRange(
-          (entry as DefaultLogDateRecord).logged_at,
-          (entry as DefaultLogDateRecord).note,
+          this.getEventTimestamp(entry),
+          this.getNote(entry),
           startDateStamp,
           endDateStamp,
         ))
@@ -81,10 +89,7 @@ export class LogSheetTable<TRecord extends object> {
   }
 
   private get sortValue(): (entry: TRecord) => string {
-    return (
-      this.options.sortValue ??
-      ((entry) => (entry as DefaultLogSortRecord).logged_at)
-    );
+    return this.options.sortValue ?? ((entry) => this.getEventTimestamp(entry));
   }
 
   private get isIncluded(): (entry: TRecord) => boolean {

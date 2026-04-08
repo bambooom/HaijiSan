@@ -6,6 +6,7 @@ export class FoodLogTable extends LogSheetTable<FoodLogEntry> {
   constructor() {
     super({
       schema: SHEET_SCHEMAS.FOOD_LOG,
+      eventTimeKey: 'occurred_at',
       idPrefix: 'food',
     });
   }

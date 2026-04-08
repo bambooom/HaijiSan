@@ -6,6 +6,7 @@ export class WorkoutLogTable extends LogSheetTable<WorkoutLogEntry> {
   constructor() {
     super({
       schema: SHEET_SCHEMAS.WORKOUT_LOG,
+      eventTimeKey: 'occurred_at',
       idPrefix: 'workout',
     });
   }

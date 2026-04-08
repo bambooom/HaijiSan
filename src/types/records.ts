@@ -12,6 +12,7 @@ import type {
 export interface StatusLogEntry {
   entry_id: string;
   logged_at: string;
+  occurred_at: string;
   entry_type: StatusEntryType;
   value: string | number;
   unit: string;
@@ -22,6 +23,7 @@ export interface StatusLogEntry {
 export interface BodyLogEntry {
   body_log_id: string;
   logged_at: string;
+  occurred_at: string;
   weight_kg: number | null;
   bmi: number | null;
   body_fat_pct: number | null;
@@ -44,6 +46,7 @@ export interface SleepLogEntry {
 export interface WorkoutLogEntry {
   workout_id: string;
   logged_at: string;
+  occurred_at: string;
   workout_name: string;
   workout_video_url: string;
   workout_level: WorkoutLevel;
@@ -93,6 +96,7 @@ export type StockAdjustResult =
 export interface FoodLogEntry {
   food_log_id: string;
   logged_at: string;
+  occurred_at: string;
   meal_type: MealType;
   meal_text: string;
   calories_kcal: number | null;

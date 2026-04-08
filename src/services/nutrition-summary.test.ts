@@ -33,6 +33,7 @@ describe('nutrition summary', () => {
         {
           food_log_id: 'food_1',
           logged_at: '2026-04-01 08:00:00',
+          occurred_at: '2026-04-01 07:40:00',
           meal_type: 'breakfast',
           meal_text: '鸡蛋和菠菜',
           calories_kcal: 320,
@@ -47,6 +48,7 @@ describe('nutrition summary', () => {
         {
           food_log_id: 'food_2',
           logged_at: '2026-04-01 12:00:00',
+          occurred_at: '2026-04-01 11:50:00',
           meal_type: 'lunch',
           meal_text: '鸡胸肉和西兰花',
           calories_kcal: 520,
