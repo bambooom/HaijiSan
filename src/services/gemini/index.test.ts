@@ -17,6 +17,9 @@ Object.assign(globalThis, {
   UrlFetchApp: {
     fetch: mocks.fetch,
   },
+  Utilities: {
+    sleep: vi.fn(),
+  },
 });
 
 import { generateFinalAiReply, startAiResponse } from './index';
@@ -79,22 +82,25 @@ describe('Gemini native function calling', () => {
       'Schema constraints summary:',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      'FOOD_LOG\n- allowed operations: read, insert, update',
+      'FOOD_LOG | ops=read,insert,update',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      '- required on insert: occurred_at, meal_type, meal_text',
+      'insert-required=occurred_at,meal_type,meal_text',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      '- auto-generated: food_log_id',
+      'auto=food_log_id',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      '- immutable: logged_at',
+      'immutable=logged_at',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      '- enums: meal_type = breakfast | lunch | dinner | snack',
+      'enums=meal_type = breakfast | lunch | dinner | snack',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
-      'BOT_LOG\n- allowed operations: read',
+      'BOT_LOG | ops=read',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).not.toContain(
+      'Available sheets and fields:',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
       'prefer calling readData first before answering',
@@ -165,6 +171,49 @@ describe('Gemini native function calling', () => {
         name: 'readData',
       },
     });
+  });
+
+  it('retries transient Gemini 503 responses before succeeding', () => {
+    mocks.fetch
+      .mockReturnValueOnce({
+        getResponseCode: () => 503,
+        getContentText: () =>
+          'This model is currently experiencing high demand',
+      })
+      .mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () =>
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: '重试后成功。' }],
+                },
+              },
+            ],
+          }),
+      });
+
+    const result = startAiResponse('现在怎么样？');
+
+    expect(result).toMatchObject({
+      mode: 'reply',
+      reply: '重试后成功。',
+    });
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry non-retryable Gemini errors', () => {
+    mocks.fetch.mockReturnValue({
+      getResponseCode: () => 400,
+      getContentText: () => 'Bad Request',
+    });
+
+    expect(() => startAiResponse('坏请求')).toThrow(
+      'Gemini request failed (400): Bad Request',
+    );
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('sends functionResponse back to Gemini for the final answer', () => {
