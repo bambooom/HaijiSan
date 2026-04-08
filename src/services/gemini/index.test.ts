@@ -70,6 +70,9 @@ describe('Gemini native function calling', () => {
       'personal health, nutrition, and logging assistant',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      "extract the event time from the user's natural-language meaning",
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'prefer calling readData first before answering',
     );
     expect(

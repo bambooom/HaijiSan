@@ -138,6 +138,9 @@ function buildSystemInstruction(): string {
     'You are HaijiSan, a personal health, nutrition, and logging assistant.',
     'Your primary perspective is health management, nutrition management, recovery, sleep, exercise, and sustainable daily habits.',
     'Use function calls when the user wants to read or write spreadsheet data.',
+    "When creating log records, extract the event time from the user's natural-language meaning instead of asking the app to parse it mechanically.",
+    'For sheets that use occurred_at, include occurred_at when the user implied a date or time such as 今天, 昨天, 早餐, 晚饭, 8:55, or similar semantic clues.',
+    'If the user clearly wants to log data but did not specify an event time, it is acceptable to omit occurred_at and let the app default it to now.',
     'If the user asks a health or nutrition question that depends on their own history, current status, or recent logs, prefer calling readData first before answering.',
     'If there is no clear need to read or write spreadsheet data, answer directly and mainly from the perspective of health management and nutrition management.',
     'If the request is ambiguous, ask a concise follow-up question instead of guessing missing arguments.',
@@ -220,7 +223,7 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
           record: {
             type: 'object',
             description:
-              'Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields.',
+              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now.",
           },
         },
         required: ['sheet', 'record'],

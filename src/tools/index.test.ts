@@ -299,6 +299,41 @@ describe('generic tool contract', () => {
     });
   });
 
+  it('defaults missing occurred_at to now for event-log inserts', () => {
+    const insertSpy = vi
+      .spyOn(TOOL_REGISTRY.FOOD_LOG.table, 'insert')
+      .mockImplementation(() => {});
+    vi.spyOn(spreadsheetService, 'getTimestamp').mockImplementation(
+      (includeMilliseconds = false) =>
+        includeMilliseconds ? '2026-04-08 08:55:00.123' : '2026-04-08 08:55:00',
+    );
+
+    const result = executeInsertData(
+      {
+        tool: 'insertData',
+        sheet: 'FOOD_LOG',
+        record: {
+          meal_type: 'breakfast',
+          meal_text: '2个鸡蛋，一杯咖啡（200ml牛奶）',
+        },
+      },
+      new Date('2026-04-08T08:55:00Z'),
+    );
+
+    expect(insertSpy).toHaveBeenCalledWith({
+      food_log_id: 'food_20260408085500123',
+      logged_at: '2026-04-08 08:55:00',
+      occurred_at: '2026-04-08 08:55:00',
+      meal_type: 'breakfast',
+      meal_text: '2个鸡蛋，一杯咖啡（200ml牛奶）',
+    });
+    expect(result.record).toMatchObject({
+      food_log_id: 'food_20260408085500123',
+      logged_at: '2026-04-08 08:55:00',
+      occurred_at: '2026-04-08 08:55:00',
+    });
+  });
+
   it('executes updateData and auto-refreshes editable updated_at fields', () => {
     const updateSpy = vi
       .spyOn(TOOL_REGISTRY.STOCK.table, 'updateAtRow')

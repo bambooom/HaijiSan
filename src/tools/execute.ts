@@ -176,10 +176,11 @@ function projectRecord(record: ToolRecord, fields?: string[]): ToolRecord {
 }
 
 function applyRuntimeInsertDefaults(
-  schema: SheetSchema,
+  entry: ToolRegistryEntry,
   record: ToolRecord,
   timestamp: Date,
 ): ToolRecord {
+  const schema = entry.schema;
   const nextRecord: ToolRecord = { ...record };
 
   schema.fields.forEach((field) => {
@@ -203,6 +204,17 @@ function applyRuntimeInsertDefaults(
       nextRecord[field.key] = formatLoggedAt(spreadsheetService, timestamp);
     }
   });
+
+  if (
+    entry.eventTimeKey &&
+    nextRecord[entry.eventTimeKey] === undefined &&
+    schema.fields.some((field) => field.key === entry.eventTimeKey)
+  ) {
+    nextRecord[entry.eventTimeKey] = formatLoggedAt(
+      spreadsheetService,
+      timestamp,
+    );
+  }
 
   return nextRecord;
 }
@@ -249,11 +261,7 @@ export function executeInsertData(
   assertValidRequest(request);
 
   const entry = TOOL_REGISTRY[request.sheet];
-  const record = applyRuntimeInsertDefaults(
-    entry.schema,
-    request.record,
-    timestamp,
-  );
+  const record = applyRuntimeInsertDefaults(entry, request.record, timestamp);
 
   entry.table.insert(record);
 
