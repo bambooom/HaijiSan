@@ -35,6 +35,20 @@ export type CommandLogFields = {
   resultCode: CommandResultCode;
 };
 
+export type CommandAuditFields = {
+  toolCallCount: number;
+  readCount: number;
+  insertCount: number;
+  updateCount: number;
+  readSheetNames: string[];
+  writeSheetNames: string[];
+  primaryAction: string;
+  primaryTargetSheet: string;
+  primarySelectorType: string;
+  primarySelectorValue: string;
+  changedFields: string[];
+};
+
 export type HealthDataSource = 'manual' | 'ios_health' | 'smart_scale';
 
 export type CommandHandlingResult = {
@@ -42,6 +56,7 @@ export type CommandHandlingResult = {
   handlingMode: HandlingMode;
   status: HandlingStatus;
   note: string;
+  audit?: CommandAuditFields;
 } & CommandLogFields;
 
 export type ReferenceSource =

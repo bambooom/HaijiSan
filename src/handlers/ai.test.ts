@@ -55,6 +55,19 @@ describe('handleAiText', () => {
     expect(result.status).toBe('success');
     expect(result.reply).toContain('记录或查询');
     expect(result.resultCode).toBe('ai-direct-reply');
+    expect(result.audit).toEqual({
+      toolCallCount: 0,
+      readCount: 0,
+      insertCount: 0,
+      updateCount: 0,
+      readSheetNames: [],
+      writeSheetNames: [],
+      primaryAction: '',
+      primaryTargetSheet: '',
+      primarySelectorType: '',
+      primarySelectorValue: '',
+      changedFields: [],
+    });
   });
 
   it('executes valid tool requests and asks Gemini for a final answer', () => {
@@ -142,6 +155,19 @@ describe('handleAiText', () => {
     expect(result.tool).toBe('readData');
     expect(result.reply).toContain('酸奶');
     expect(result.resultCode).toBe('ai-tool-executed');
+    expect(result.audit).toEqual({
+      toolCallCount: 1,
+      readCount: 1,
+      insertCount: 0,
+      updateCount: 0,
+      readSheetNames: ['BOT_LOG'],
+      writeSheetNames: [],
+      primaryAction: 'readData',
+      primaryTargetSheet: 'BOT_LOG',
+      primarySelectorType: 'recent',
+      primarySelectorValue: 'limit=2',
+      changedFields: [],
+    });
   });
 
   it('rejects invalid tool requests before execution', () => {
