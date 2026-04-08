@@ -1,5 +1,5 @@
 import { MY_CHAT_ID } from './app-config';
-import { handleCommand } from './commands';
+import { handleIncomingText } from './handlers';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
@@ -45,7 +45,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): void {
 
     sendChatAction(chatId, 'typing');
 
-    const result = handleCommand(update.message.text ?? '', timestamp);
+    const result = handleIncomingText(update.message.text ?? '', timestamp);
 
     sendText(chatId, result.reply);
     botLogTable.appendMessageLog(timestamp, update.message.text ?? '', result);
