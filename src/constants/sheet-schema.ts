@@ -223,7 +223,13 @@ export const SHEET_SCHEMAS = {
     name: SHEET_LAYOUTS.BOT_LOG.name,
     tooling: READ_ONLY_TOOLING,
     fields: [
-      { key: 'logged_at', type: 'timestamp', required: true, ...IMMUTABLE },
+      {
+        key: 'logged_at',
+        type: 'timestamp',
+        required: true,
+        validator: 'timestamp-with-milliseconds',
+        ...IMMUTABLE,
+      },
       { key: 'raw_text', type: 'string', required: true },
       { key: 'final_reply', type: 'string', required: true },
       {

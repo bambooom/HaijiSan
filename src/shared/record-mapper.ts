@@ -12,6 +12,9 @@ type TimestampFormatter = {
 
 const SHEET_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
+const SHEET_TIMESTAMP_WITH_MILLISECONDS_PATTERN =
+  /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/;
+
 function isEmptyCellValue(value: SheetCellValue | undefined): boolean {
   return value === '' || value === null || value === undefined;
 }
@@ -20,8 +23,20 @@ function isMissingRecordValue(value: unknown): boolean {
   return value === '' || value === null || value === undefined;
 }
 
-function isValidSheetTimestampString(value: string): boolean {
-  return SHEET_TIMESTAMP_PATTERN.test(value);
+function getTimestampValidationPattern(field: FieldSchema): RegExp {
+  if (field.validator === 'timestamp-with-milliseconds') {
+    return SHEET_TIMESTAMP_WITH_MILLISECONDS_PATTERN;
+  }
+
+  return SHEET_TIMESTAMP_PATTERN;
+}
+
+function getTimestampValidationMessage(field: FieldSchema): string {
+  if (field.validator === 'timestamp-with-milliseconds') {
+    return `Field ${field.key} must use timestamp format yyyy-MM-dd HH:mm:ss.SSS`;
+  }
+
+  return `Field ${field.key} must use timestamp format yyyy-MM-dd HH:mm:ss`;
 }
 
 function coerceRowValue(
@@ -172,10 +187,11 @@ export function validateRecordAgainstSchema(
           break;
         }
 
-        if (typeof value === 'string' && !isValidSheetTimestampString(value)) {
-          errors.push(
-            `Field ${field.key} must use timestamp format yyyy-MM-dd HH:mm:ss`,
-          );
+        if (
+          typeof value === 'string' &&
+          !getTimestampValidationPattern(field).test(value)
+        ) {
+          errors.push(getTimestampValidationMessage(field));
         }
 
         break;

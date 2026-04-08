@@ -102,6 +102,18 @@ describe('record mapper', () => {
     ]);
   });
 
+  it('allows millisecond timestamps for Bot_Log logged_at', () => {
+    const errors = validateRecordAgainstSchema(SHEET_SCHEMAS.BOT_LOG, {
+      logged_at: '2026-04-02 08:30:00.123',
+      raw_text: 'hello',
+      final_reply: 'world',
+      handling_mode: 'ai',
+      status: 'success',
+    });
+
+    expect(errors).toEqual([]);
+  });
+
   it('allows partial validation for update-style payloads', () => {
     const errors = validateRecordAgainstSchema(
       SHEET_SCHEMAS.STOCK,
