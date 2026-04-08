@@ -10,12 +10,18 @@ type TimestampFormatter = {
   getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
 };
 
+const SHEET_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
 function isEmptyCellValue(value: SheetCellValue | undefined): boolean {
   return value === '' || value === null || value === undefined;
 }
 
 function isMissingRecordValue(value: unknown): boolean {
   return value === '' || value === null || value === undefined;
+}
+
+function isValidSheetTimestampString(value: string): boolean {
+  return SHEET_TIMESTAMP_PATTERN.test(value);
 }
 
 function coerceRowValue(
@@ -152,12 +158,24 @@ export function validateRecordAgainstSchema(
 
     switch (field.type) {
       case 'string':
+        if (typeof value !== 'string') {
+          errors.push(`Field ${field.key} must be a string`);
+        }
+
+        break;
       case 'timestamp':
         if (
           typeof value !== 'string' &&
           !(field.type === 'timestamp' && value instanceof Date)
         ) {
           errors.push(`Field ${field.key} must be a string`);
+          break;
+        }
+
+        if (typeof value === 'string' && !isValidSheetTimestampString(value)) {
+          errors.push(
+            `Field ${field.key} must use timestamp format yyyy-MM-dd HH:mm:ss`,
+          );
         }
 
         break;

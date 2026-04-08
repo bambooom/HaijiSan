@@ -184,6 +184,8 @@ function buildSystemInstruction(): string {
     'Your primary perspective is health management, nutrition management, recovery, sleep, exercise, and sustainable daily habits.',
     'Use function calls when the user wants to read or write spreadsheet data.',
     "When creating log records, extract the event time from the user's natural-language meaning instead of asking the app to parse it mechanically.",
+    'All timestamp fields must use the exact format yyyy-MM-dd HH:mm:ss.',
+    'Do not output natural-language timestamp strings such as today 08:55, tomorrow morning, or similar phrases inside tool arguments.',
     'For sheets that use occurred_at, include occurred_at when the user implied a date or time such as 今天, 昨天, 早餐, 晚饭, 8:55, or similar semantic clues.',
     'If the user clearly wants to log data but did not specify an event time, it is acceptable to omit occurred_at and let the app default it to now.',
     'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack unless the user clearly means a normal dinner.',
@@ -269,7 +271,7 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
           record: {
             type: 'object',
             description:
-              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. For FOOD_LOG, meal_type must be exactly one of breakfast, lunch, dinner, snack; convert Chinese meal words like 早餐/早饭/午饭/晚饭/夜宵 into those exact enum values instead of copying the original Chinese word.",
+              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss. Never pass natural-language timestamp strings like today 08:55. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. For FOOD_LOG, meal_type must be exactly one of breakfast, lunch, dinner, snack; convert Chinese meal words like 早餐/早饭/午饭/晚饭/夜宵 into those exact enum values instead of copying the original Chinese word.",
           },
         },
         required: ['sheet', 'record'],
@@ -294,7 +296,7 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
           updates: {
             type: 'object',
             description:
-              'Flat JSON object containing only the fields to change. Do not include immutable or auto-generated fields.',
+              'Flat JSON object containing only the fields to change. Do not include immutable or auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss.',
           },
         },
         required: ['sheet', 'rowNumber', 'updates'],

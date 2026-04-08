@@ -88,6 +88,20 @@ describe('record mapper', () => {
     ]);
   });
 
+  it('rejects timestamp strings that do not use sheet timestamp format', () => {
+    const errors = validateRecordAgainstSchema(SHEET_SCHEMAS.FOOD_LOG, {
+      food_log_id: 'food_1',
+      logged_at: '2026-04-02 08:30:00',
+      occurred_at: 'today 08:55',
+      meal_type: 'breakfast',
+      meal_text: '鸡蛋和咖啡',
+    });
+
+    expect(errors).toEqual([
+      'Field occurred_at must use timestamp format yyyy-MM-dd HH:mm:ss',
+    ]);
+  });
+
   it('allows partial validation for update-style payloads', () => {
     const errors = validateRecordAgainstSchema(
       SHEET_SCHEMAS.STOCK,

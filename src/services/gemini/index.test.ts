@@ -76,6 +76,12 @@ describe('Gemini native function calling', () => {
       "extract the event time from the user's natural-language meaning",
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'All timestamp fields must use the exact format yyyy-MM-dd HH:mm:ss.',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'Do not output natural-language timestamp strings such as today 08:55',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
@@ -214,6 +220,50 @@ describe('Gemini native function calling', () => {
       'Gemini request failed (400): Bad Request',
     );
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells insertData to use exact timestamp strings instead of natural-language timestamps', () => {
+    mocks.fetch.mockReturnValue({
+      getResponseCode: () => 200,
+      getContentText: () =>
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: '可以。' }],
+              },
+            },
+          ],
+        }),
+    });
+
+    startAiResponse('帮我记录早餐');
+
+    const request = mocks.fetch.mock.calls[0]?.[1] as { payload: string };
+    const payload = JSON.parse(request.payload) as {
+      tools: Array<{
+        functionDeclarations: Array<{
+          name: string;
+          parameters: { properties: { record: { description: string } } };
+        }>;
+      }>;
+    };
+
+    const insertDeclaration = payload.tools[0]?.functionDeclarations.find(
+      (tool) => tool.name === 'insertData',
+    );
+
+    expect(
+      insertDeclaration?.parameters.properties.record.description,
+    ).toContain(
+      'All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss.',
+    );
+    expect(
+      insertDeclaration?.parameters.properties.record.description,
+    ).toContain(
+      'Never pass natural-language timestamp strings like today 08:55.',
+    );
   });
 
   it('sends functionResponse back to Gemini for the final answer', () => {
