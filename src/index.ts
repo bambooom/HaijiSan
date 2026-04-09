@@ -36,13 +36,13 @@ import {
   type WebhookContext,
 } from './services/webhook-routing';
 
-function createOkResponse(): GoogleAppsScript.Content.TextOutput {
-  return ContentService.createTextOutput('ok');
+function createOkResponse(): GoogleAppsScript.HTML.HtmlOutput {
+  return HtmlService.createHtmlOutput('ok');
 }
 
 function doPost(
   e: GoogleAppsScript.Events.DoPost,
-): GoogleAppsScript.Content.TextOutput {
+): GoogleAppsScript.HTML.HtmlOutput {
   let update: TelegramUpdate | null = null;
   let rawLogText = '[unparsed update]';
   let dedupeKey: string | null = null;

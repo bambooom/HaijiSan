@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   buildDailySummaryMessage: vi.fn(() => 'digest'),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
-  createTextOutput: vi.fn(() => ({ getContent: () => 'ok' })),
+  createHtmlOutput: vi.fn(() => ({ getContent: () => 'ok' })),
 }));
 
 vi.mock('./handlers', () => ({
@@ -65,8 +65,8 @@ vi.mock('./services/digest-trigger', () => ({
 }));
 
 Object.assign(globalThis, {
-  ContentService: {
-    createTextOutput: mocks.createTextOutput,
+  HtmlService: {
+    createHtmlOutput: mocks.createHtmlOutput,
   },
   CacheService: {
     getScriptCache: () => ({
