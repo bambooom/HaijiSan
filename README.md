@@ -293,6 +293,86 @@ The following items are planned next, but are not yet implemented here.
 - Read-only actions like inventory checks can still execute directly.
 - If Gemini cannot safely form a command, the bot falls back to a short clarification or a normal chat reply.
 
+## System Flow
+
+The project now has a global routing shape that is broader than the current FOOD_LOG-only or OCR-only discussions. The diagram below is the intended end-to-end view of the whole bot runtime.
+
+```mermaid
+flowchart TD
+		A[User Input] --> B{Input Medium}
+
+		B -->|Text| C{Text Category}
+		B -->|Image| D{Image Category}
+
+		C -->|Slash Command| E[Command Path]
+		C -->|Food Record| F[Food Workflow]
+		C -->|Non-food Record| G[Health Log Workflow]
+		C -->|Q and A / Query| H[Q and A Workflow]
+
+		D -->|Nutrition Label| I[Nutrition Label OCR Workflow]
+		D -->|Food Photo| J[Food Image Workflow]
+		D -->|Health Screenshot| K[Health Screenshot OCR Workflow]
+
+		E --> Z[Reply to User]
+
+		F --> F1[Gemini routing and draft extraction]
+		F1 --> F2[Food enrichment workflow]
+		F2 --> F3[Local REF_CALORIES lookup]
+		F3 --> F4{All items resolved?}
+		F4 -->|Yes| F5[Local nutrition aggregation]
+		F4 -->|No| F6[Gemini fallback estimation for unresolved items]
+		F5 --> F7[Write FOOD_LOG once]
+		F6 --> F7
+		F7 --> F8[Local STOCK side effects]
+		F8 --> Z
+
+		G --> G1[Gemini routing]
+		G1 --> G2[Map to BODY_LOG / SLEEP_LOG / WORKOUT_LOG / STATUS_LOG]
+		G2 --> G3[Apply defaults and derived fields]
+		G3 --> G4[Write target log sheet]
+		G4 --> Z
+
+		H --> H1[Gemini decides direct reply or readData]
+		H1 --> H2{Need sheet data?}
+		H2 -->|No| Z
+		H2 -->|Yes| H3[Execute readData]
+		H3 --> H4[Gemini final reply]
+		H4 --> Z
+
+		I --> I1[Telegram file download]
+		I1 --> I2[Gemini OCR extraction]
+		I2 --> I3[REF_CALORIES create or update flow]
+		I3 --> Z
+
+		J --> J1[Telegram file download]
+		J1 --> J2[Gemini OCR extraction]
+		J2 --> J3[Convert to food draft]
+		J3 --> F2
+
+		K --> K1[Telegram file download]
+		K1 --> K2[Gemini OCR extraction]
+		K2 --> K3[Map to BODY / SLEEP / WORKOUT workflow]
+		K3 --> Z
+```
+
+### Current Status
+
+- Implemented:
+	- Slash command handling
+	- Text-based AI routing for direct reply, readData, insertData, and updateData
+	- Non-food log writes for body, sleep, workout, and status records
+	- FOOD_LOG base writes
+	- BOT_LOG audit logging
+	- Telegram webhook idempotency protection
+	- Generic OCR extraction service for nutrition labels and health screenshots
+- Partially implemented:
+	- Food workflow exists only as a direct FOOD_LOG write path today; nutrition enrichment and stock side effects are still being added
+	- OCR extraction exists, but image ingress and sheet-mapping workflows are not fully wired into Telegram message handling yet
+- Planned next:
+	- FOOD_LOG enrichment through REF_CALORIES lookup before fallback estimation
+	- FOOD_LOG stock side effects
+	- OCR-to-sheet workflows for nutrition labels and health screenshots
+
 ### 3. Calorie estimation workflow
 
 - Estimate calories for common foods and ingredients.
