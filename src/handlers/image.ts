@@ -118,13 +118,14 @@ function buildFoodPhotoMealText(
   extraction: HealthScreenshotExtractionResult,
   caption: string,
 ): string {
-  return [
-    asTrimmedString(extraction.summary),
-    asTrimmedString(extraction.foodName),
-    asTrimmedString(caption),
-    asTrimmedString(extraction.recognizedText),
-  ]
-    .find(Boolean) || 'OCR food photo';
+  return (
+    [
+      asTrimmedString(extraction.summary),
+      asTrimmedString(extraction.foodName),
+      asTrimmedString(caption),
+      asTrimmedString(extraction.recognizedText),
+    ].find(Boolean) || 'OCR food photo'
+  );
 }
 
 function inferHealthSource(
@@ -321,8 +322,11 @@ function buildWriteRequest(
   switch (extraction.kind) {
     case 'nutrition_label': {
       const foodName =
-        extraction.foodName || asTrimmedString(caption) || 'OCR nutrition label';
-      const existingReference = refCaloriesTable.findEntryRowByFoodName(foodName);
+        extraction.foodName ||
+        asTrimmedString(caption) ||
+        'OCR nutrition label';
+      const existingReference =
+        refCaloriesTable.findEntryRowByFoodName(foodName);
 
       return existingReference
         ? toNutritionLabelUpdateRequest(

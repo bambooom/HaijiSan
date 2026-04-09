@@ -228,7 +228,9 @@ describe('handleIncomingImage', () => {
     );
 
     const foodInsertCall = mocks.executeFoodInsertWorkflow.mock.calls[0];
-    const foodInsertRequest = foodInsertCall?.[0] as InsertDataRequest | undefined;
+    const foodInsertRequest = foodInsertCall?.[0] as
+      | InsertDataRequest
+      | undefined;
 
     expect(foodInsertCall?.[1]).toEqual(new Date('2026-04-08T10:00:00Z'));
     expect(foodInsertRequest).toMatchObject({
