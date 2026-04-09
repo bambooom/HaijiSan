@@ -194,6 +194,15 @@ describe('doPost', () => {
       'test-chat-id',
       '🚨 逻辑故障：\nboom',
     );
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        status: 'failed',
+        resultCode: 'webhook-error',
+        note: 'boom',
+      }),
+    );
   });
 
   it('routes photo messages into the image handler and logs the caption', () => {

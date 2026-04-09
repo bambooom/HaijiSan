@@ -165,11 +165,28 @@ function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   return JSON.parse(contents) as TelegramUpdate;
 }
 
+function buildWebhookFailureResult(
+  message: string,
+): import('./types').CommandHandlingResult {
+  return {
+    reply: '系统异常，未完成处理。',
+    handlingMode: 'ai',
+    status: 'failed',
+    note: message,
+    traceId: '',
+    intent: 'webhook-error',
+    tool: '',
+    confirmationState: 'failed',
+    resultCode: 'webhook-error',
+  };
+}
+
 function doPost(
   e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
   let dedupeKey: string | null = null;
   let businessLogicCompleted = false;
+  let rawLogText = '[unparsed update]';
 
   try {
     const update = parseUpdate(e);
@@ -177,6 +194,12 @@ function doPost(
     if (!update?.message && !update?.callback_query) {
       return createOkResponse();
     }
+
+    rawLogText = update.callback_query?.data
+      ? `[callback] ${update.callback_query.data}`
+      : update.message
+        ? getRawMessageText(update.message)
+        : '[unknown update]';
 
     dedupeKey = getUpdateDedupeKey(update);
 
@@ -284,18 +307,29 @@ function doPost(
       );
     }
 
-    botLogTable.appendMessageLog(
-      timestamp,
-      update.message ? getRawMessageText(update.message) : '[callback]',
-      result,
-    );
+    botLogTable.appendMessageLog(timestamp, rawLogText, result);
   } catch (error) {
     if (dedupeKey && !businessLogicCompleted) {
       clearCachedUpdateState(dedupeKey);
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);
+
+    try {
+      botLogTable.appendMessageLog(
+        new Date(),
+        rawLogText,
+        buildWebhookFailureResult(message),
+      );
+    } catch {
+      // Ignore secondary logging failures so alert delivery still has a chance.
+    }
+
+    try {
+      sendText(MY_CHAT_ID, `🚨 逻辑故障：\n${message}`);
+    } catch {
+      // Ignore secondary alert failures after preserving the original error in BOT_LOG.
+    }
 
     return createOkResponse();
   }
