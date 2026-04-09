@@ -361,17 +361,20 @@ flowchart TD
 	- Slash command handling
 	- Text-based AI routing for direct reply, readData, insertData, and updateData
 	- Non-food log writes for body, sleep, workout, and status records
-	- FOOD_LOG base writes
+	- FOOD_LOG dedicated workflow with local REF_CALORIES enrichment, multi-item draft splitting, and Gemini fallback estimation for unresolved items
+	- FOOD_LOG stock side effects for safe direct stock matches
 	- BOT_LOG audit logging
 	- Telegram webhook idempotency protection
-	- Generic OCR extraction service for nutrition labels and health screenshots
+	- Generic OCR extraction service for nutrition labels, food photos, and health screenshots
+	- Telegram image ingress for nutrition labels, food photos, and health screenshots
+	- Nutrition-label OCR create-or-update flow for REF_CALORIES
 - Partially implemented:
-	- Food workflow exists only as a direct FOOD_LOG write path today; nutrition enrichment and stock side effects are still being added
-	- OCR extraction exists, but image ingress and sheet-mapping workflows are not fully wired into Telegram message handling yet
+	- Food-photo OCR currently converts the extracted summary into a FOOD_LOG draft, but quantity and unit understanding is still rough
+	- Stock side effects currently prefer safe exact matches and do not yet cover broader quantity/unit conversion cases
 - Planned next:
-	- FOOD_LOG enrichment through REF_CALORIES lookup before fallback estimation
-	- FOOD_LOG stock side effects
-	- OCR-to-sheet workflows for nutrition labels and health screenshots
+	- Better quantity and unit extraction for FOOD_LOG and stock deduction
+	- Richer food-photo understanding beyond a summary-first draft
+	- OCR confidence and review paths for lower-certainty writes
 
 ### 3. Calorie estimation workflow
 
