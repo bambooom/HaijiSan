@@ -168,7 +168,14 @@ describe('doPost', () => {
 
     expect(mocks.handleIncomingText).not.toHaveBeenCalled();
     expect(mocks.sendText).not.toHaveBeenCalled();
-    expect(mocks.appendMessageLog).not.toHaveBeenCalled();
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        status: 'ignored',
+        resultCode: 'webhook-duplicate',
+      }),
+    );
   });
 
   it('clears the processing marker when business logic fails before completion', () => {
@@ -235,6 +242,55 @@ describe('doPost', () => {
       expect.any(Date),
       '[image] 早餐营养标签',
       expect.objectContaining({ reply: '请确认这条营养参考：' }),
+    );
+  });
+
+  it('continues processing when typing status fails to send', () => {
+    mocks.sendChatAction.mockImplementation(() => {
+      throw new Error('typing down');
+    });
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 792,
+          message: {
+            message_id: 12,
+            chat: { id: 'test-chat-id' },
+            text: '今天睡得不太好',
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.handleIncomingText).toHaveBeenCalledWith(
+      '今天睡得不太好',
+      expect.any(Date),
+    );
+    expect(mocks.sendText).toHaveBeenLastCalledWith(
+      'test-chat-id',
+      '已记录。',
+      {
+        replyMarkup: undefined,
+      },
+    );
+    expect(mocks.appendMessageLog).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        status: 'ignored',
+        resultCode: 'webhook-typing-failed',
+      }),
+    );
+    expect(mocks.appendMessageLog).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        status: 'success',
+        resultCode: 'ai-tool-executed',
+      }),
     );
   });
 

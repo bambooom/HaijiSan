@@ -12,6 +12,7 @@ import {
 } from './services/digest-trigger';
 import { sendChatAction, sendText } from './services/telegram';
 import { botLogTable } from './tables';
+import { CommandHandlingResult } from './types';
 
 const WEBHOOK_DEDUPE_TTL_SECONDS = 6 * 60 * 60;
 
@@ -165,9 +166,7 @@ function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   return JSON.parse(contents) as TelegramUpdate;
 }
 
-function buildWebhookFailureResult(
-  message: string,
-): import('./types').CommandHandlingResult {
+function buildWebhookFailureResult(message: string): CommandHandlingResult {
   return {
     reply: '系统异常，未完成处理。',
     handlingMode: 'ai',
@@ -178,6 +177,23 @@ function buildWebhookFailureResult(
     tool: '',
     confirmationState: 'failed',
     resultCode: 'webhook-error',
+  };
+}
+
+function buildWebhookIgnoredResult(
+  message: string,
+  resultCode: string,
+): CommandHandlingResult {
+  return {
+    reply: '',
+    handlingMode: 'rule',
+    status: 'ignored',
+    note: message,
+    traceId: '',
+    intent: 'webhook-ignore',
+    tool: '',
+    confirmationState: 'none',
+    resultCode,
   };
 }
 
@@ -192,6 +208,14 @@ function doPost(
     const update = parseUpdate(e);
 
     if (!update?.message && !update?.callback_query) {
+      botLogTable.appendMessageLog(
+        new Date(),
+        '[empty update]',
+        buildWebhookIgnoredResult(
+          'empty update payload',
+          'webhook-empty-update',
+        ),
+      );
       return createOkResponse();
     }
 
@@ -204,6 +228,14 @@ function doPost(
     dedupeKey = getUpdateDedupeKey(update);
 
     if (dedupeKey && getCachedUpdateState(dedupeKey)) {
+      botLogTable.appendMessageLog(
+        new Date(),
+        rawLogText,
+        buildWebhookIgnoredResult(
+          `duplicate update ignored: ${dedupeKey}`,
+          'webhook-duplicate',
+        ),
+      );
       return createOkResponse();
     }
 
@@ -215,11 +247,24 @@ function doPost(
     const timestamp = new Date();
 
     if (!chatId) {
+      botLogTable.appendMessageLog(
+        timestamp,
+        rawLogText,
+        buildWebhookIgnoredResult('missing chat id', 'webhook-missing-chat'),
+      );
       return createOkResponse();
     }
 
     if (chatId !== MY_CHAT_ID) {
       sendText(chatId, '抱歉，由于职责所在，我目前只能专注管理某一位队员。');
+      botLogTable.appendMessageLog(
+        timestamp,
+        rawLogText,
+        buildWebhookIgnoredResult(
+          `ignored unauthorized chat: ${chatId}`,
+          'webhook-unauthorized-chat',
+        ),
+      );
       if (dedupeKey) {
         setCachedUpdateState(dedupeKey, 'done');
       }
@@ -227,7 +272,24 @@ function doPost(
       return createOkResponse();
     }
 
-    sendChatAction(chatId, 'typing');
+    try {
+      sendChatAction(chatId, 'typing');
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `typing failed: ${String(error)}`;
+
+      try {
+        botLogTable.appendMessageLog(
+          timestamp,
+          rawLogText,
+          buildWebhookIgnoredResult(message, 'webhook-typing-failed'),
+        );
+      } catch {
+        // Ignore secondary logging failures for non-critical typing actions.
+      }
+    }
 
     if (update.callback_query?.id && update.callback_query.data) {
       const result = handleOcrConfirmationCallback(
