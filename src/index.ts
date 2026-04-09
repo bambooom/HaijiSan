@@ -1,5 +1,5 @@
 import { MY_CHAT_ID } from './app-config';
-import { handleIncomingText } from './handlers';
+import { handleIncomingImageMessage, handleIncomingText } from './handlers';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
@@ -18,7 +18,56 @@ interface TelegramUpdate {
       id: number | string;
     };
     text?: string;
+    caption?: string;
+    photo?: Array<{
+      file_id?: string;
+    }>;
+    document?: {
+      file_id?: string;
+      mime_type?: string;
+    };
   };
+}
+
+function getImageFileId(
+  message: NonNullable<TelegramUpdate['message']>,
+): string | null {
+  const photoEntries = message.photo;
+  const photoFileId =
+    photoEntries && photoEntries.length > 0
+      ? photoEntries[photoEntries.length - 1]?.file_id?.trim()
+      : undefined;
+
+  if (photoFileId) {
+    return photoFileId;
+  }
+
+  const documentFileId = message.document?.file_id?.trim();
+  const mimeType = message.document?.mime_type?.trim().toLowerCase() ?? '';
+
+  if (documentFileId && mimeType.startsWith('image/')) {
+    return documentFileId;
+  }
+
+  return null;
+}
+
+function getRawMessageText(
+  message: NonNullable<TelegramUpdate['message']>,
+): string {
+  const text = message.text?.trim();
+
+  if (text) {
+    return text;
+  }
+
+  const caption = message.caption?.trim();
+
+  if (caption) {
+    return `[image] ${caption}`;
+  }
+
+  return '[image]';
 }
 
 function createOkResponse(): GoogleAppsScript.Content.TextOutput {
@@ -113,7 +162,14 @@ function doPost(
 
     sendChatAction(chatId, 'typing');
 
-    const result = handleIncomingText(update.message.text ?? '', timestamp);
+    const imageFileId = getImageFileId(update.message);
+    const result = imageFileId
+      ? handleIncomingImageMessage(
+          imageFileId,
+          update.message.caption ?? '',
+          timestamp,
+        )
+      : handleIncomingText(update.message.text ?? '', timestamp);
     businessLogicCompleted = true;
 
     if (dedupeKey) {
@@ -121,7 +177,11 @@ function doPost(
     }
 
     sendText(chatId, result.reply);
-    botLogTable.appendMessageLog(timestamp, update.message.text ?? '', result);
+    botLogTable.appendMessageLog(
+      timestamp,
+      getRawMessageText(update.message),
+      result,
+    );
   } catch (error) {
     if (dedupeKey && !businessLogicCompleted) {
       clearCachedUpdateState(dedupeKey);

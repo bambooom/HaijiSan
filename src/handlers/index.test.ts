@@ -13,6 +13,7 @@ Object.assign(globalThis, {
 const mocks = vi.hoisted(() => ({
   handleCommand: vi.fn(),
   handleAiText: vi.fn(),
+  handleIncomingImage: vi.fn(),
 }));
 
 vi.mock('../commands', () => ({
@@ -23,7 +24,11 @@ vi.mock('./ai', () => ({
   handleAiText: mocks.handleAiText,
 }));
 
-import { handleIncomingText } from './index';
+vi.mock('./image', () => ({
+  handleIncomingImage: mocks.handleIncomingImage,
+}));
+
+import { handleIncomingImageMessage, handleIncomingText } from './index';
 
 describe('handleIncomingText', () => {
   beforeEach(() => {
@@ -49,6 +54,17 @@ describe('handleIncomingText', () => {
       tool: '',
       confirmationState: 'none',
       resultCode: 'ai',
+    });
+    mocks.handleIncomingImage.mockReturnValue({
+      reply: 'image',
+      handlingMode: 'ai',
+      status: 'success',
+      note: '',
+      traceId: '',
+      intent: 'image-ocr',
+      tool: 'insertData',
+      confirmationState: 'none',
+      resultCode: 'image',
     });
   });
 
@@ -79,5 +95,22 @@ describe('handleIncomingText', () => {
 
     expect(mocks.handleCommand).toHaveBeenCalledWith('   ', timestamp);
     expect(mocks.handleAiText).not.toHaveBeenCalled();
+  });
+
+  it('routes image messages to handleIncomingImage', () => {
+    const timestamp = new Date('2026-04-08T10:00:00Z');
+
+    const result = handleIncomingImageMessage(
+      'file_123',
+      '营养标签',
+      timestamp,
+    );
+
+    expect(mocks.handleIncomingImage).toHaveBeenCalledWith(
+      'file_123',
+      '营养标签',
+      timestamp,
+    );
+    expect(result.reply).toBe('image');
   });
 });

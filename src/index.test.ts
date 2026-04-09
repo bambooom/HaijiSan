@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     },
   }),
   handleIncomingText: vi.fn(),
+  handleIncomingImageMessage: vi.fn(),
   sendChatAction: vi.fn(),
   sendText: vi.fn(),
   appendMessageLog: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./handlers', () => ({
   handleIncomingText: mocks.handleIncomingText,
+  handleIncomingImageMessage: mocks.handleIncomingImageMessage,
 }));
 
 vi.mock('./services/telegram', () => ({
@@ -76,6 +78,17 @@ describe('doPost', () => {
       tool: 'insertData',
       confirmationState: 'none',
       resultCode: 'ai-tool-executed',
+    });
+    mocks.handleIncomingImageMessage.mockReturnValue({
+      reply: '已记录图片。',
+      handlingMode: 'ai',
+      status: 'success',
+      note: '',
+      traceId: 'image_1',
+      intent: 'image-ocr',
+      tool: 'insertData',
+      confirmationState: 'none',
+      resultCode: 'image-ocr-inserted',
     });
   });
 
@@ -154,6 +167,34 @@ describe('doPost', () => {
     expect(mocks.sendText).toHaveBeenCalledWith(
       'test-chat-id',
       '🚨 逻辑故障：\nboom',
+    );
+  });
+
+  it('routes photo messages into the image handler and logs the caption', () => {
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 789,
+          message: {
+            message_id: 11,
+            chat: { id: 'test-chat-id' },
+            caption: '早餐营养标签',
+            photo: [{ file_id: 'small' }, { file_id: 'large' }],
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.handleIncomingImageMessage).toHaveBeenCalledWith(
+      'large',
+      '早餐营养标签',
+      expect.any(Date),
+    );
+    expect(mocks.handleIncomingText).not.toHaveBeenCalled();
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '[image] 早餐营养标签',
+      expect.objectContaining({ reply: '已记录图片。' }),
     );
   });
 });

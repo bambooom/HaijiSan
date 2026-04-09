@@ -1,6 +1,7 @@
 import { handleCommand } from '../commands';
 import type { CommandHandlingResult } from '../types';
 import { handleAiText } from './ai';
+import { handleIncomingImage } from './image';
 
 export function handleIncomingText(
   text: string,
@@ -13,6 +14,14 @@ export function handleIncomingText(
   }
 
   return handleAiText(text, timestamp);
+}
+
+export function handleIncomingImageMessage(
+  fileId: string,
+  caption: string,
+  timestamp: Date,
+): CommandHandlingResult {
+  return handleIncomingImage(fileId, caption, timestamp);
 }
 
 export { handleAiText } from './ai';
