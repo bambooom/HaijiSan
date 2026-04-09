@@ -104,12 +104,14 @@ describe('handleIncomingText', () => {
       'file_123',
       '营养标签',
       timestamp,
+      'test-chat-id',
     );
 
     expect(mocks.handleIncomingImage).toHaveBeenCalledWith(
       'file_123',
       '营养标签',
       timestamp,
+      'test-chat-id',
     );
     expect(result.reply).toBe('image');
   });

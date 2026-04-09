@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   }),
   handleIncomingText: vi.fn(),
   handleIncomingImageMessage: vi.fn(),
+  handleOcrConfirmationCallback: vi.fn(),
+  handleOcrConfirmationReply: vi.fn(),
+  attachConfirmationPreviewMessage: vi.fn(),
   sendChatAction: vi.fn(),
   sendText: vi.fn(),
   appendMessageLog: vi.fn(),
@@ -27,6 +30,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./handlers', () => ({
   handleIncomingText: mocks.handleIncomingText,
   handleIncomingImageMessage: mocks.handleIncomingImageMessage,
+}));
+
+vi.mock('./services/ocr-confirmation', () => ({
+  handleOcrConfirmationCallback: mocks.handleOcrConfirmationCallback,
+  handleOcrConfirmationReply: mocks.handleOcrConfirmationReply,
+  attachConfirmationPreviewMessage: mocks.attachConfirmationPreviewMessage,
 }));
 
 vi.mock('./services/telegram', () => ({
@@ -80,16 +89,31 @@ describe('doPost', () => {
       resultCode: 'ai-tool-executed',
     });
     mocks.handleIncomingImageMessage.mockReturnValue({
-      reply: '已记录图片。',
+      reply: '请确认这条营养参考：',
       handlingMode: 'ai',
       status: 'success',
-      note: '',
+      note: 'REF_CALORIES; awaiting confirmation',
       traceId: 'image_1',
       intent: 'image-ocr',
       tool: 'insertData',
-      confirmationState: 'none',
-      resultCode: 'image-ocr-inserted',
+      confirmationState: 'pending',
+      resultCode: 'image-ocr-pending',
+      telegramResponse: {
+        pendingConfirmationId: 'pending_1',
+        replyMarkup: {
+          inlineKeyboard: [
+            [
+              { text: '确认', callbackData: 'ocr:confirm:pending_1' },
+              { text: '取消', callbackData: 'ocr:cancel:pending_1' },
+              { text: '修正', callbackData: 'ocr:edit:pending_1' },
+            ],
+          ],
+        },
+      },
     });
+    mocks.sendText.mockReturnValue(321);
+    mocks.handleOcrConfirmationCallback.mockReturnValue(null);
+    mocks.handleOcrConfirmationReply.mockReturnValue(null);
   });
 
   it('processes a webhook update once and caches completion by update_id', () => {
@@ -114,7 +138,9 @@ describe('doPost', () => {
       21600,
     );
     expect(mocks.handleIncomingText).toHaveBeenCalledTimes(1);
-    expect(mocks.sendText).toHaveBeenCalledWith('test-chat-id', '已记录。');
+    expect(mocks.sendText).toHaveBeenCalledWith('test-chat-id', '已记录。', {
+      replyMarkup: undefined,
+    });
     expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
     expect(mocks.cachePut).toHaveBeenNthCalledWith(
       2,
@@ -189,12 +215,103 @@ describe('doPost', () => {
       'large',
       '早餐营养标签',
       expect.any(Date),
+      'test-chat-id',
     );
     expect(mocks.handleIncomingText).not.toHaveBeenCalled();
+    expect(mocks.attachConfirmationPreviewMessage).toHaveBeenCalledWith(
+      'pending_1',
+      321,
+    );
     expect(mocks.appendMessageLog).toHaveBeenCalledWith(
       expect.any(Date),
       '[image] 早餐营养标签',
-      expect.objectContaining({ reply: '已记录图片。' }),
+      expect.objectContaining({ reply: '请确认这条营养参考：' }),
+    );
+  });
+
+  it('routes callback queries into the OCR confirmation handler', () => {
+    mocks.handleOcrConfirmationCallback.mockReturnValue({
+      reply: '已确认热量参考：Greek Yogurt。',
+      handlingMode: 'ai',
+      status: 'success',
+      note: 'REF_CALORIES; confirmed',
+      traceId: 'image_1',
+      intent: 'image-ocr',
+      tool: 'insertData',
+      confirmationState: 'confirmed',
+      resultCode: 'image-ocr-confirmed',
+    });
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 790,
+          callback_query: {
+            id: 'cb_1',
+            data: 'ocr:confirm:pending_1',
+            message: {
+              message_id: 321,
+              chat: { id: 'test-chat-id' },
+            },
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.handleOcrConfirmationCallback).toHaveBeenCalledWith(
+      'test-chat-id',
+      'cb_1',
+      'ocr:confirm:pending_1',
+      321,
+      expect.any(Date),
+    );
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '[callback] ocr:confirm:pending_1',
+      expect.objectContaining({ resultCode: 'image-ocr-confirmed' }),
+    );
+  });
+
+  it('routes force-reply edits into the OCR confirmation reply handler', () => {
+    mocks.handleOcrConfirmationReply.mockReturnValue({
+      reply: '已更新热量，请确认或继续修正。',
+      handlingMode: 'ai',
+      status: 'success',
+      note: 'REF_CALORIES; calories updated',
+      traceId: 'image_1',
+      intent: 'image-ocr',
+      tool: 'insertData',
+      confirmationState: 'pending',
+      resultCode: 'image-ocr-field-updated',
+    });
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 791,
+          message: {
+            message_id: 77,
+            chat: { id: 'test-chat-id' },
+            text: '220',
+            reply_to_message: {
+              message_id: 654,
+              from: { is_bot: true },
+            },
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.handleOcrConfirmationReply).toHaveBeenCalledWith(
+      'test-chat-id',
+      654,
+      '220',
+      expect.any(Date),
+    );
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '220',
+      expect.objectContaining({ resultCode: 'image-ocr-field-updated' }),
     );
   });
 });

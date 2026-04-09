@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   executeUpdateData: vi.fn(),
   executeFoodInsertWorkflow: vi.fn(),
   findReferenceRowByFoodName: vi.fn(),
+  createNutritionLabelConfirmation: vi.fn(),
 }));
 
 vi.mock('../services/telegram', () => ({
@@ -26,6 +27,10 @@ vi.mock('../services/food-workflow', () => ({
   executeFoodInsertWorkflow: mocks.executeFoodInsertWorkflow,
 }));
 
+vi.mock('../services/ocr-confirmation', () => ({
+  createNutritionLabelConfirmation: mocks.createNutritionLabelConfirmation,
+}));
+
 vi.mock('../tables', () => ({
   refCaloriesTable: {
     findEntryRowByFoodName: mocks.findReferenceRowByFoodName,
@@ -43,9 +48,26 @@ describe('handleIncomingImage', () => {
       mimeType: 'image/jpeg',
     });
     mocks.findReferenceRowByFoodName.mockReturnValue(null);
+    mocks.createNutritionLabelConfirmation.mockImplementation(
+      (
+        _chatId: string,
+        _traceId: string,
+        _request: InsertDataRequest | { updates: Record<string, unknown> },
+      ) => ({
+        reply: '请确认这条营养参考：',
+        handlingMode: 'ai',
+        status: 'success',
+        note: 'REF_CALORIES; awaiting confirmation',
+        traceId: 'image_1',
+        intent: 'image-ocr',
+        tool: 'insertData',
+        confirmationState: 'pending',
+        resultCode: 'image-ocr-pending',
+      }),
+    );
   });
 
-  it('stores nutrition label OCR output into REF_CALORIES', () => {
+  it('creates a pending confirmation for nutrition label OCR output', () => {
     mocks.extractHealthDataFromImage.mockReturnValue({
       kind: 'nutrition_label',
       appSource: 'camera',
@@ -78,27 +100,30 @@ describe('handleIncomingImage', () => {
       minHr: null,
       workoutCaloriesKcal: null,
     });
-    mocks.executeInsertData.mockReturnValue({
-      tool: 'insertData',
-      sheet: 'REF_CALORIES',
-      record: { food_ref_id: 'ref_1' },
-    });
-
     const result = handleIncomingImage(
       'file_123',
       '早餐营养标签',
       new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
     );
 
-    const insertCall = mocks.executeInsertData.mock.calls[0];
-    const insertRequest = insertCall?.[0] as InsertDataRequest | undefined;
+    expect(mocks.createNutritionLabelConfirmation).toHaveBeenCalledWith(
+      'test-chat-id',
+      expect.stringMatching(/^image_/),
+      expect.objectContaining({
+        tool: 'insertData',
+        sheet: 'REF_CALORIES',
+      }),
+      new Date('2026-04-08T10:00:00Z'),
+    );
+    const confirmationRequest = mocks.createNutritionLabelConfirmation.mock
+      .calls[0]?.[2] as InsertDataRequest | undefined;
 
-    expect(insertCall?.[1]).toEqual(new Date('2026-04-08T10:00:00Z'));
-    expect(insertRequest).toMatchObject({
+    expect(confirmationRequest).toMatchObject({
       tool: 'insertData',
       sheet: 'REF_CALORIES',
     });
-    expect(insertRequest?.record).toMatchObject({
+    expect(confirmationRequest?.record).toMatchObject({
       food_name: 'Greek Yogurt',
       brand: 'Example Brand',
       serving_size: 200,
@@ -109,11 +134,12 @@ describe('handleIncomingImage', () => {
       carbs_g: 24,
       source: 'nutrition_label',
     });
-    expect(result.reply).toBe('已记录热量参考：Greek Yogurt。');
-    expect(result.resultCode).toBe('image-ocr-inserted');
+    expect(mocks.executeInsertData).not.toHaveBeenCalled();
+    expect(result.reply).toBe('请确认这条营养参考：');
+    expect(result.resultCode).toBe('image-ocr-pending');
   });
 
-  it('updates an existing nutrition reference when the OCR food name already exists', () => {
+  it('creates a pending confirmation for an existing nutrition reference update', () => {
     mocks.findReferenceRowByFoodName.mockReturnValue({
       rowNumber: 5,
       entry: {
@@ -152,25 +178,18 @@ describe('handleIncomingImage', () => {
       minHr: null,
       workoutCaloriesKcal: null,
     });
-    mocks.executeUpdateData.mockReturnValue({
-      tool: 'updateData',
-      sheet: 'REF_CALORIES',
-      selector: { type: 'row-number', rowNumber: 5 },
-      updates: { food_name: 'Greek Yogurt' },
-    });
-
     const result = handleIncomingImage(
       'file_update',
       '早餐营养标签',
       new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
     );
 
-    const updateCall = mocks.executeUpdateData.mock.calls[0];
-    const updateRequest = updateCall?.[0] as
+    const updateRequest = mocks.createNutritionLabelConfirmation.mock
+      .calls[0]?.[2] as
       | { updates: Record<string, unknown>; selector: { rowNumber: number } }
       | undefined;
 
-    expect(updateCall?.[1]).toEqual(new Date('2026-04-08T10:00:00Z'));
     expect(updateRequest).toMatchObject({
       selector: { rowNumber: 5 },
     });
@@ -178,8 +197,8 @@ describe('handleIncomingImage', () => {
       food_name: 'Greek Yogurt',
       calories_kcal: 210,
     });
-    expect(result.reply).toBe('已更新热量参考：Greek Yogurt。');
-    expect(result.resultCode).toBe('image-ocr-updated');
+    expect(mocks.executeUpdateData).not.toHaveBeenCalled();
+    expect(result.resultCode).toBe('image-ocr-pending');
   });
 
   it('routes food photo OCR into the FOOD_LOG workflow', () => {
@@ -225,6 +244,7 @@ describe('handleIncomingImage', () => {
       'food_photo_1',
       '午餐',
       new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
     );
 
     const foodInsertCall = mocks.executeFoodInsertWorkflow.mock.calls[0];
@@ -287,6 +307,7 @@ describe('handleIncomingImage', () => {
       'file_456',
       '',
       new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
     );
 
     const insertCall = mocks.executeInsertData.mock.calls[0];
@@ -348,6 +369,7 @@ describe('handleIncomingImage', () => {
       'file_789',
       '',
       new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
     );
 
     expect(mocks.executeInsertData).not.toHaveBeenCalled();

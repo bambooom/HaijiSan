@@ -20,8 +20,9 @@ export function handleIncomingImageMessage(
   fileId: string,
   caption: string,
   timestamp: Date,
+  chatId: string,
 ): CommandHandlingResult {
-  return handleIncomingImage(fileId, caption, timestamp);
+  return handleIncomingImage(fileId, caption, timestamp, chatId);
 }
 
 export { handleAiText } from './ai';

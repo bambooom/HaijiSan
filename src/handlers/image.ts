@@ -10,6 +10,7 @@ import type {
 import { buildCommandLogFields } from '../utils/log-meta';
 import { executeFoodInsertWorkflow } from '../services/food-workflow';
 import { extractHealthDataFromImage } from '../services/image-ocr';
+import { createNutritionLabelConfirmation } from '../services/ocr-confirmation';
 import { downloadTelegramFile } from '../services/telegram';
 import { refCaloriesTable } from '../tables';
 
@@ -353,6 +354,7 @@ export function handleIncomingImage(
   fileId: string,
   caption: string,
   timestamp: Date,
+  chatId: string,
 ): CommandHandlingResult {
   try {
     const downloaded = downloadTelegramFile(fileId);
@@ -375,6 +377,15 @@ export function handleIncomingImage(
           resultCode: 'image-ocr-no-write',
           audit: createAudit(),
         },
+      );
+    }
+
+    if (request.sheet === 'REF_CALORIES') {
+      return createNutritionLabelConfirmation(
+        chatId,
+        createTraceId(timestamp),
+        request,
+        timestamp,
       );
     }
 

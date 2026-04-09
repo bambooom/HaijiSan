@@ -1,5 +1,10 @@
 import { MY_CHAT_ID } from './app-config';
 import { handleIncomingImageMessage, handleIncomingText } from './handlers';
+import {
+  attachConfirmationPreviewMessage,
+  handleOcrConfirmationCallback,
+  handleOcrConfirmationReply,
+} from './services/ocr-confirmation';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
@@ -17,6 +22,12 @@ interface TelegramUpdate {
     chat: {
       id: number | string;
     };
+    reply_to_message?: {
+      message_id?: number;
+      from?: {
+        is_bot?: boolean;
+      };
+    };
     text?: string;
     caption?: string;
     photo?: Array<{
@@ -25,6 +36,16 @@ interface TelegramUpdate {
     document?: {
       file_id?: string;
       mime_type?: string;
+    };
+  };
+  callback_query?: {
+    id?: string;
+    data?: string;
+    message?: {
+      message_id?: number;
+      chat: {
+        id: number | string;
+      };
     };
   };
 }
@@ -72,6 +93,25 @@ function getRawMessageText(
 
 function createOkResponse(): GoogleAppsScript.Content.TextOutput {
   return ContentService.createTextOutput('ok');
+}
+
+function getUpdateChatId(update: TelegramUpdate): string | null {
+  const messageChatId = update.message?.chat?.id;
+
+  if (typeof messageChatId === 'string' || typeof messageChatId === 'number') {
+    return String(messageChatId);
+  }
+
+  const callbackChatId = update.callback_query?.message?.chat?.id;
+
+  if (
+    typeof callbackChatId === 'string' ||
+    typeof callbackChatId === 'number'
+  ) {
+    return String(callbackChatId);
+  }
+
+  return null;
 }
 
 function getUpdateDedupeKey(update: TelegramUpdate): string | null {
@@ -134,7 +174,7 @@ function doPost(
   try {
     const update = parseUpdate(e);
 
-    if (!update?.message) {
+    if (!update?.message && !update?.callback_query) {
       return createOkResponse();
     }
 
@@ -148,8 +188,12 @@ function doPost(
       setCachedUpdateState(dedupeKey, 'processing');
     }
 
-    const chatId = String(update.message.chat.id);
+    const chatId = getUpdateChatId(update);
     const timestamp = new Date();
+
+    if (!chatId) {
+      return createOkResponse();
+    }
 
     if (chatId !== MY_CHAT_ID) {
       sendText(chatId, '抱歉，由于职责所在，我目前只能专注管理某一位队员。');
@@ -162,24 +206,87 @@ function doPost(
 
     sendChatAction(chatId, 'typing');
 
-    const imageFileId = getImageFileId(update.message);
+    if (update.callback_query?.id && update.callback_query.data) {
+      const result = handleOcrConfirmationCallback(
+        chatId,
+        update.callback_query.id,
+        update.callback_query.data,
+        update.callback_query.message?.message_id ?? 0,
+        timestamp,
+      );
+      businessLogicCompleted = true;
+
+      if (dedupeKey) {
+        setCachedUpdateState(dedupeKey, 'done');
+      }
+
+      if (result) {
+        botLogTable.appendMessageLog(
+          timestamp,
+          `[callback] ${update.callback_query.data}`,
+          result,
+        );
+      }
+
+      return createOkResponse();
+    }
+
+    if (
+      update.message?.text &&
+      typeof update.message.reply_to_message?.message_id === 'number'
+    ) {
+      const result = handleOcrConfirmationReply(
+        chatId,
+        update.message.reply_to_message.message_id,
+        update.message.text,
+        timestamp,
+      );
+
+      if (result) {
+        businessLogicCompleted = true;
+
+        if (dedupeKey) {
+          setCachedUpdateState(dedupeKey, 'done');
+        }
+
+        botLogTable.appendMessageLog(timestamp, update.message.text, result);
+
+        return createOkResponse();
+      }
+    }
+
+    const imageFileId = update.message ? getImageFileId(update.message) : null;
     const result = imageFileId
       ? handleIncomingImageMessage(
           imageFileId,
-          update.message.caption ?? '',
+          update.message?.caption ?? '',
           timestamp,
+          chatId,
         )
-      : handleIncomingText(update.message.text ?? '', timestamp);
+      : handleIncomingText(update.message?.text ?? '', timestamp);
     businessLogicCompleted = true;
 
     if (dedupeKey) {
       setCachedUpdateState(dedupeKey, 'done');
     }
 
-    sendText(chatId, result.reply);
+    const sentMessageId = sendText(chatId, result.reply, {
+      replyMarkup: result.telegramResponse?.replyMarkup,
+    });
+
+    if (
+      sentMessageId !== null &&
+      typeof result.telegramResponse?.pendingConfirmationId === 'string'
+    ) {
+      attachConfirmationPreviewMessage(
+        result.telegramResponse.pendingConfirmationId,
+        sentMessageId,
+      );
+    }
+
     botLogTable.appendMessageLog(
       timestamp,
-      getRawMessageText(update.message),
+      update.message ? getRawMessageText(update.message) : '[callback]',
       result,
     );
   } catch (error) {
