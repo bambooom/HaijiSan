@@ -15,7 +15,13 @@ import type {
 } from '../types/food';
 
 const MEAL_ITEM_SEPARATOR = /\s*(?:,|，|、|\+|\/|\n|和)\s*/;
-const STOCK_SIDE_EFFECT_UNITS = new Set(['serving', 'piece', '个', '份', '个/份']);
+const STOCK_SIDE_EFFECT_UNITS = new Set([
+  'serving',
+  'piece',
+  '个',
+  '份',
+  '个/份',
+]);
 
 function normalizeMealText(value: unknown): string {
   return typeof value === 'string'
@@ -67,12 +73,19 @@ function normalizeUnit(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function canAutoAdjustStock(item: MealResolvedItem, stockUnit: string): boolean {
+function canAutoAdjustStock(
+  item: MealResolvedItem,
+  stockUnit: string,
+): boolean {
   if (item.source !== 'reference') {
     return false;
   }
 
-  if (!Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
+  if (
+    !Number.isFinite(item.quantity) ||
+    item.quantity <= 0 ||
+    !Number.isInteger(item.quantity)
+  ) {
     return false;
   }
 
@@ -326,7 +339,11 @@ export function executeFoodInsertWorkflow(
     draft,
     resolution,
   );
-  const finalRecord = applyStockSideEffects(enrichedRecord, resolution, timestamp);
+  const finalRecord = applyStockSideEffects(
+    enrichedRecord,
+    resolution,
+    timestamp,
+  );
 
   return executeInsertData(
     {
