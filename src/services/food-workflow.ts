@@ -1,5 +1,5 @@
 import { estimateIngredientCalories } from './food-estimation';
-import { refCaloriesTable } from '../tables';
+import { refCaloriesTable, stockTable } from '../tables';
 import type { MealType } from '../types';
 import type {
   InsertDataRequest,
@@ -15,6 +15,7 @@ import type {
 } from '../types/food';
 
 const MEAL_ITEM_SEPARATOR = /\s*(?:,|，|、|\+|\/|\n|和)\s*/;
+const STOCK_SIDE_EFFECT_UNITS = new Set(['serving', 'piece', '个', '份', '个/份']);
 
 function normalizeMealText(value: unknown): string {
   return typeof value === 'string'
@@ -60,6 +61,108 @@ function sumNullableNumbers(
 
 function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values));
+}
+
+function normalizeUnit(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function canAutoAdjustStock(item: MealResolvedItem, stockUnit: string): boolean {
+  if (item.source !== 'reference') {
+    return false;
+  }
+
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
+    return false;
+  }
+
+  const normalizedItemUnit = normalizeUnit(item.unit);
+  const normalizedStockUnit = normalizeUnit(stockUnit);
+
+  if (normalizedItemUnit === normalizedStockUnit) {
+    return true;
+  }
+
+  return (
+    (normalizedItemUnit === 'serving' || normalizedItemUnit === 'piece') &&
+    STOCK_SIDE_EFFECT_UNITS.has(normalizedStockUnit)
+  );
+}
+
+function applyResolvedFieldsToFoodRecord(
+  baseRecord: ToolRecord,
+  draft: MealStructureResult,
+  resolution: MealResolutionResult,
+): ToolRecord {
+  const nextRecord: ToolRecord = {
+    ...baseRecord,
+    meal_text: draft.mealText,
+  };
+
+  if (
+    (nextRecord.linked_food_ref_ids === undefined ||
+      nextRecord.linked_food_ref_ids === '') &&
+    resolution.linkedFoodRefIds.length > 0
+  ) {
+    nextRecord.linked_food_ref_ids = resolution.linkedFoodRefIds.join(', ');
+  }
+
+  const fieldPairs: Array<
+    ['calories_kcal' | 'protein_g' | 'fat_g' | 'carbs_g', number | null]
+  > = [
+    ['calories_kcal', resolution.estimatedCalories],
+    ['protein_g', resolution.proteinG],
+    ['fat_g', resolution.fatG],
+    ['carbs_g', resolution.carbsG],
+  ];
+
+  fieldPairs.forEach(([field, value]) => {
+    if (toNullableNumber(nextRecord[field]) === undefined && value !== null) {
+      nextRecord[field] = value;
+    }
+  });
+
+  return nextRecord;
+}
+
+function applyStockSideEffects(
+  record: ToolRecord,
+  resolution: MealResolutionResult,
+  timestamp: Date,
+): ToolRecord {
+  const linkedStockItemIds = uniqueValues(
+    resolution.items.flatMap((item) => {
+      const stockEntry = stockTable.findByName(item.itemName);
+
+      if (!stockEntry || !canAutoAdjustStock(item, stockEntry.unit)) {
+        return [];
+      }
+
+      const result = stockTable.adjustStock(
+        timestamp,
+        stockEntry.item_name,
+        -item.quantity,
+        stockEntry.unit,
+        undefined,
+        undefined,
+      );
+
+      return result.ok ? [stockEntry.stock_item_id] : [];
+    }),
+  );
+
+  if (
+    linkedStockItemIds.length === 0 ||
+    (typeof record.linked_stock_item_ids === 'string' &&
+      record.linked_stock_item_ids.trim())
+  ) {
+    return record;
+  }
+
+  return {
+    ...record,
+    linked_stock_item_ids: linkedStockItemIds.join(', '),
+  };
 }
 
 function toItemResolution(
@@ -209,35 +312,7 @@ export function resolveMealWithAiFallback(
 export function enrichFoodInsertRecord(record: ToolRecord): ToolRecord {
   const draft = buildMealStructure(record);
   const resolution = resolveMealFromReferences(draft);
-  const nextRecord: ToolRecord = {
-    ...record,
-    meal_text: draft.mealText,
-  };
-
-  if (
-    (nextRecord.linked_food_ref_ids === undefined ||
-      nextRecord.linked_food_ref_ids === '') &&
-    resolution.linkedFoodRefIds.length > 0
-  ) {
-    nextRecord.linked_food_ref_ids = resolution.linkedFoodRefIds.join(', ');
-  }
-
-  const fieldPairs: Array<
-    ['calories_kcal' | 'protein_g' | 'fat_g' | 'carbs_g', number | null]
-  > = [
-    ['calories_kcal', resolution.estimatedCalories],
-    ['protein_g', resolution.proteinG],
-    ['fat_g', resolution.fatG],
-    ['carbs_g', resolution.carbsG],
-  ];
-
-  fieldPairs.forEach(([field, value]) => {
-    if (toNullableNumber(nextRecord[field]) === undefined && value !== null) {
-      nextRecord[field] = value;
-    }
-  });
-
-  return nextRecord;
+  return applyResolvedFieldsToFoodRecord(record, draft, resolution);
 }
 
 export function executeFoodInsertWorkflow(
@@ -245,45 +320,18 @@ export function executeFoodInsertWorkflow(
   timestamp: Date,
 ): InsertDataResult {
   const draft = buildMealStructure(request.record);
+  const resolution = resolveMealWithAiFallback(draft, timestamp);
+  const enrichedRecord = applyResolvedFieldsToFoodRecord(
+    request.record,
+    draft,
+    resolution,
+  );
+  const finalRecord = applyStockSideEffects(enrichedRecord, resolution, timestamp);
 
   return executeInsertData(
     {
       ...request,
-      record: ((resolution) => {
-        const nextRecord: ToolRecord = {
-          ...request.record,
-          meal_text: draft.mealText,
-        };
-
-        if (
-          (nextRecord.linked_food_ref_ids === undefined ||
-            nextRecord.linked_food_ref_ids === '') &&
-          resolution.linkedFoodRefIds.length > 0
-        ) {
-          nextRecord.linked_food_ref_ids =
-            resolution.linkedFoodRefIds.join(', ');
-        }
-
-        const fieldPairs: Array<
-          ['calories_kcal' | 'protein_g' | 'fat_g' | 'carbs_g', number | null]
-        > = [
-          ['calories_kcal', resolution.estimatedCalories],
-          ['protein_g', resolution.proteinG],
-          ['fat_g', resolution.fatG],
-          ['carbs_g', resolution.carbsG],
-        ];
-
-        fieldPairs.forEach(([field, value]) => {
-          if (
-            toNullableNumber(nextRecord[field]) === undefined &&
-            value !== null
-          ) {
-            nextRecord[field] = value;
-          }
-        });
-
-        return nextRecord;
-      })(resolveMealWithAiFallback(draft, timestamp)),
+      record: finalRecord,
     },
     timestamp,
   );

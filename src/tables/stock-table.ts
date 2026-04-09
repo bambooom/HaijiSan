@@ -95,7 +95,7 @@ export class StockTable extends SheetTable<StockEntry> {
     quantity: number,
     unit?: string,
     purchaseChannel?: string,
-    note = '',
+    note?: string,
   ): StockAdjustResult {
     const normalizedName = name.trim();
 
@@ -120,7 +120,7 @@ export class StockTable extends SheetTable<StockEntry> {
         updated_at: formattedTimestamp,
         purchase_channel: purchaseChannel?.trim() ?? '',
         linked_food_ref_id: '',
-        note,
+        note: note ?? '',
       };
 
       this.insert(entry);
@@ -152,7 +152,7 @@ export class StockTable extends SheetTable<StockEntry> {
         updated_at: formatLoggedAt(this['spreadsheet'], timestamp),
         purchase_channel:
           purchaseChannel?.trim() || existingEntry.purchase_channel,
-        note,
+        note: note ?? existingEntry.note,
       },
       quantity,
       operation: 'set',
@@ -165,7 +165,7 @@ export class StockTable extends SheetTable<StockEntry> {
     delta: number,
     unit?: string,
     purchaseChannel?: string,
-    note = '',
+    note?: string,
   ): StockAdjustResult {
     const normalizedName = name.trim();
 
@@ -225,7 +225,7 @@ export class StockTable extends SheetTable<StockEntry> {
         updated_at: formatLoggedAt(this['spreadsheet'], timestamp),
         purchase_channel:
           purchaseChannel?.trim() || existingEntry.purchase_channel,
-        note,
+        note: note ?? existingEntry.note,
       },
       quantity: nextQuantity,
       operation: 'adjust',
