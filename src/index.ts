@@ -14,8 +14,6 @@ import { sendChatAction, sendText } from './services/telegram';
 import { botLogTable } from './tables';
 import { CommandHandlingResult } from './types';
 
-const WEBHOOK_DEDUPE_TTL_SECONDS = 6 * 60 * 60;
-
 interface TelegramUpdate {
   update_id?: number;
   message?: {
@@ -115,47 +113,6 @@ function getUpdateChatId(update: TelegramUpdate): string | null {
   return null;
 }
 
-function getUpdateDedupeKey(update: TelegramUpdate): string | null {
-  if (typeof update.update_id === 'number') {
-    return `telegram_update:${update.update_id}`;
-  }
-
-  const chatId = update.message?.chat?.id;
-  const messageId = update.message?.message_id;
-
-  if (
-    (typeof chatId === 'string' || typeof chatId === 'number') &&
-    typeof messageId === 'number'
-  ) {
-    return `telegram_message:${String(chatId)}:${messageId}`;
-  }
-
-  return null;
-}
-
-function getWebhookCache(): GoogleAppsScript.Cache.Cache | null {
-  if (
-    typeof CacheService === 'undefined' ||
-    typeof CacheService.getScriptCache !== 'function'
-  ) {
-    return null;
-  }
-
-  return CacheService.getScriptCache();
-}
-
-function getCachedUpdateState(key: string): string | null {
-  return getWebhookCache()?.get(key) ?? null;
-}
-
-function setCachedUpdateState(key: string, state: 'processing' | 'done'): void {
-  getWebhookCache()?.put(key, state, WEBHOOK_DEDUPE_TTL_SECONDS);
-}
-
-function clearCachedUpdateState(key: string): void {
-  getWebhookCache()?.remove(key);
-}
-
 function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   const contents = e.postData?.contents;
 
@@ -200,8 +157,6 @@ function buildWebhookIgnoredResult(
 function doPost(
   e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
-  let dedupeKey: string | null = null;
-  let businessLogicCompleted = false;
   let rawLogText = '[unparsed update]';
 
   try {
@@ -225,24 +180,6 @@ function doPost(
         ? getRawMessageText(update.message)
         : '[unknown update]';
 
-    dedupeKey = getUpdateDedupeKey(update);
-
-    if (dedupeKey && getCachedUpdateState(dedupeKey)) {
-      botLogTable.appendMessageLog(
-        new Date(),
-        rawLogText,
-        buildWebhookIgnoredResult(
-          `duplicate update ignored: ${dedupeKey}`,
-          'webhook-duplicate',
-        ),
-      );
-      return createOkResponse();
-    }
-
-    if (dedupeKey) {
-      setCachedUpdateState(dedupeKey, 'processing');
-    }
-
     const chatId = getUpdateChatId(update);
     const timestamp = new Date();
 
@@ -265,9 +202,6 @@ function doPost(
           'webhook-unauthorized-chat',
         ),
       );
-      if (dedupeKey) {
-        setCachedUpdateState(dedupeKey, 'done');
-      }
 
       return createOkResponse();
     }
@@ -299,11 +233,6 @@ function doPost(
         update.callback_query.message?.message_id ?? 0,
         timestamp,
       );
-      businessLogicCompleted = true;
-
-      if (dedupeKey) {
-        setCachedUpdateState(dedupeKey, 'done');
-      }
 
       if (result) {
         botLogTable.appendMessageLog(
@@ -328,12 +257,6 @@ function doPost(
       );
 
       if (result) {
-        businessLogicCompleted = true;
-
-        if (dedupeKey) {
-          setCachedUpdateState(dedupeKey, 'done');
-        }
-
         botLogTable.appendMessageLog(timestamp, update.message.text, result);
 
         return createOkResponse();
@@ -349,11 +272,6 @@ function doPost(
           chatId,
         )
       : handleIncomingText(update.message?.text ?? '', timestamp);
-    businessLogicCompleted = true;
-
-    if (dedupeKey) {
-      setCachedUpdateState(dedupeKey, 'done');
-    }
 
     const sentMessageId = sendText(chatId, result.reply, {
       replyMarkup: result.telegramResponse?.replyMarkup,
@@ -371,10 +289,6 @@ function doPost(
 
     botLogTable.appendMessageLog(timestamp, rawLogText, result);
   } catch (error) {
-    if (dedupeKey && !businessLogicCompleted) {
-      clearCachedUpdateState(dedupeKey);
-    }
-
     const message = error instanceof Error ? error.message : String(error);
 
     try {
