@@ -20,6 +20,7 @@ import { CommandHandlingResult } from './types';
 
 const WEBHOOK_PROCESSING_TTL_SECONDS = 90;
 const WEBHOOK_DONE_TTL_SECONDS = 6 * 60 * 60;
+const WEBHOOK_DUPLICATE_LOGGED_TTL_SECONDS = 6 * 60 * 60;
 
 type WebhookUpdateState = 'processing' | 'done';
 
@@ -166,6 +167,45 @@ function clearCachedUpdateState(key: string): void {
   getWebhookCache()?.remove(key);
 }
 
+function getDuplicateLoggedKey(dedupeKey: string): string {
+  return `${dedupeKey}:duplicate_logged`;
+}
+
+function logDuplicateUpdateOnce(
+  dedupeKey: string,
+  cachedState: WebhookUpdateState,
+  rawLogText: string,
+): void {
+  const cache = getWebhookCache();
+  const duplicateLoggedKey = getDuplicateLoggedKey(dedupeKey);
+
+  if (cache?.get(duplicateLoggedKey)) {
+    return;
+  }
+
+  botLogTable.appendMessageLog(
+    new Date(),
+    rawLogText,
+    buildWebhookIgnoredResult(
+      `duplicate update ignored: ${dedupeKey}; state=${cachedState}`,
+      'webhook-duplicate-update',
+    ),
+  );
+
+  cache?.put(duplicateLoggedKey, '1', WEBHOOK_DUPLICATE_LOGGED_TTL_SECONDS);
+}
+
+function logWebhookTrace(
+  event: string,
+  details: Record<string, unknown>,
+): void {
+  if (typeof console === 'undefined' || typeof console.info !== 'function') {
+    return;
+  }
+
+  console.info(`[haijisan webhook] ${event}`, JSON.stringify(details));
+}
+
 function buildWebhookFailureResult(message: string): CommandHandlingResult {
   return {
     reply: '系统异常，未完成处理。',
@@ -231,6 +271,14 @@ function doPost(
       const cachedState = getCachedUpdateState(dedupeKey);
 
       if (cachedState === 'done' || cachedState === 'processing') {
+        logDuplicateUpdateOnce(dedupeKey, cachedState, rawLogText);
+
+        logWebhookTrace('duplicate_ignored', {
+          dedupeKey,
+          cachedState,
+          rawLogText,
+        });
+
         return createOkResponse();
       }
 
@@ -302,6 +350,14 @@ function doPost(
         placeholderMessageId,
         timestamp,
       );
+
+      logWebhookTrace('image_queued', {
+        dedupeKey,
+        chatId,
+        imageFileId,
+        placeholderMessageId,
+        rawLogText,
+      });
 
       botLogTable.appendMessageLog(timestamp, rawLogText, queuedResult);
 
@@ -391,6 +447,12 @@ function doPost(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    logWebhookTrace('webhook_error', {
+      dedupeKey,
+      rawLogText,
+      message,
+    });
 
     if (dedupeKey && processingMarked) {
       clearCachedUpdateState(dedupeKey);

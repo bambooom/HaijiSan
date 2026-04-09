@@ -180,7 +180,13 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    mocks.cacheGet.mockReturnValue('done');
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'telegram_update:123') {
+        return 'done';
+      }
+
+      return null;
+    });
 
     doPost({
       postData: {
@@ -197,7 +203,20 @@ describe('doPost', () => {
 
     expect(mocks.handleIncomingText).toHaveBeenCalledTimes(1);
     expect(mocks.sendText).toHaveBeenCalledTimes(1);
-    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
+    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(2);
+    expect(mocks.appendMessageLog).toHaveBeenLastCalledWith(
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        status: 'ignored',
+        resultCode: 'webhook-duplicate-update',
+      }),
+    );
+    expect(mocks.cachePut).toHaveBeenLastCalledWith(
+      'telegram_update:123:duplicate_logged',
+      '1',
+      21600,
+    );
   });
 
   it('clears the processing marker when business logic fails before completion', () => {
@@ -300,7 +319,13 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    mocks.cacheGet.mockReturnValue('done');
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'telegram_update:793') {
+        return 'done';
+      }
+
+      return null;
+    });
 
     doPost({
       postData: {
@@ -318,7 +343,47 @@ describe('doPost', () => {
 
     expect(mocks.sendText).toHaveBeenCalledTimes(1);
     expect(mocks.enqueueImageOcrJob).toHaveBeenCalledTimes(1);
-    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
+    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(2);
+    expect(mocks.appendMessageLog).toHaveBeenLastCalledWith(
+      expect.any(Date),
+      '[image] 早餐营养标签',
+      expect.objectContaining({
+        status: 'ignored',
+        resultCode: 'webhook-duplicate-update',
+      }),
+    );
+  });
+
+  it('logs only the first duplicate retry for the same update id', () => {
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'telegram_update:794') {
+        return 'done';
+      }
+
+      if (key === 'telegram_update:794:duplicate_logged') {
+        return '1';
+      }
+
+      return null;
+    });
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 794,
+          message: {
+            message_id: 14,
+            chat: { id: 'test-chat-id' },
+            caption: '第二张营养标签',
+            photo: [{ file_id: 'small' }, { file_id: 'large' }],
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.sendText).not.toHaveBeenCalled();
+    expect(mocks.enqueueImageOcrJob).not.toHaveBeenCalled();
+    expect(mocks.appendMessageLog).not.toHaveBeenCalled();
   });
 
   it('continues processing when typing status fails to send', () => {
