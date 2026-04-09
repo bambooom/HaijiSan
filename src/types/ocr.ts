@@ -27,6 +27,9 @@ export type NutritionLabelReferenceResult = {
 export type HealthScreenshotExtractionResult = NutritionLabelReferenceResult & {
   kind: HealthScreenshotKind;
   appSource: string;
+  occurredAt: string | null;
+  recognizedText: string;
+  summary: string;
   weightKg: number | null;
   bmi: number | null;
   bodyFatPct: number | null;
@@ -38,5 +41,15 @@ export type HealthScreenshotExtractionResult = NutritionLabelReferenceResult & {
   workoutName: string | null;
   durationMin: number | null;
   workoutLevel: WorkoutLevel | null;
+  avgHr: number | null;
+  maxHr: number | null;
+  minHr: number | null;
   workoutCaloriesKcal: number | null;
+};
+
+export type HealthScreenshotOcrInput = {
+  base64Data: string;
+  mimeType: string;
+  referenceTimestamp?: Date;
+  userPrompt?: string;
 };

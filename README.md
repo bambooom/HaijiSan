@@ -311,6 +311,14 @@ The following items are planned next, but are not yet implemented here.
 - Extract calories and macro information automatically.
 - Insert parsed values into `Ref_Calories` for future reuse.
 
+### 5.5. General health screenshot OCR
+
+- Allow users to send screenshots from health apps, fitness apps, or smart-scale apps.
+- Extract body metrics such as weight, BMI, body fat, and lean body mass.
+- Extract workout metrics such as duration, average heart rate, max heart rate, min heart rate, and calories burned.
+- Extract sleep summaries such as sleep start, sleep end, sleep duration, and sleep quality.
+- Keep normalized structured output plus visible OCR text for auditability.
+
 ### 6. Restaurant meal photo estimation
 
 - Allow users to send food photos when eating outside.
