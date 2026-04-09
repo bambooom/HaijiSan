@@ -26,6 +26,9 @@ export type MealResolvedItemSource = 'reference' | 'ai';
 
 export interface MealResolvedItem extends IngredientEstimateInput {
   estimatedCalories: number | null;
+  proteinG?: number | null;
+  fatG?: number | null;
+  carbsG?: number | null;
   source: MealResolvedItemSource;
   linkedFoodRefId?: string;
   note: string;
@@ -36,6 +39,10 @@ export interface MealResolutionResult {
   mealText: string;
   shouldPersist: boolean;
   estimatedCalories: number | null;
+  proteinG: number | null;
+  fatG: number | null;
+  carbsG: number | null;
+  linkedFoodRefIds: string[];
   items: MealResolvedItem[];
   note: string;
 }

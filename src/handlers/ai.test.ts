@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   startAiResponse: vi.fn(),
   generateFinalAiReply: vi.fn(),
   executeGenericToolRequest: vi.fn(),
+  executeFoodInsertWorkflow: vi.fn(),
   listRecentConversationTurns: vi.fn(
     (): Array<{
       loggedAt: string;
@@ -35,6 +36,10 @@ vi.mock('../tools', async () => {
     executeGenericToolRequest: mocks.executeGenericToolRequest,
   };
 });
+
+vi.mock('../services/food-workflow', () => ({
+  executeFoodInsertWorkflow: mocks.executeFoodInsertWorkflow,
+}));
 
 vi.mock('../tables/bot-log-table', () => ({
   botLogTable: {
@@ -379,5 +384,59 @@ describe('handleAiText', () => {
     expect(result.resultCode).toBe('ai-tool-executed-final-reply-failed');
     expect(result.reply).toBe('已记录睡眠数据。');
     expect(result.reply).not.toContain('{');
+  });
+
+  it('routes FOOD_LOG inserts through the dedicated food workflow', () => {
+    mocks.startAiResponse.mockReturnValue({
+      mode: 'tool',
+      request: {
+        tool: 'insertData',
+        sheet: 'FOOD_LOG',
+        record: {
+          occurred_at: '2026-04-08 12:30:00',
+          meal_type: 'lunch',
+          meal_text: '原味酸奶',
+        },
+      },
+      functionCall: {
+        name: 'insertData',
+        args: {
+          sheet: 'FOOD_LOG',
+          record: {
+            occurred_at: '2026-04-08 12:30:00',
+            meal_type: 'lunch',
+            meal_text: '原味酸奶',
+          },
+        },
+      },
+      modelContent: {
+        role: 'model',
+        parts: [],
+      },
+    });
+    mocks.executeFoodInsertWorkflow.mockReturnValue({
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
+      record: {
+        food_log_id: 'food_1',
+        logged_at: '2026-04-08 10:00:00',
+        occurred_at: '2026-04-08 12:30:00',
+        meal_type: 'lunch',
+        meal_text: '原味酸奶',
+        calories_kcal: 96,
+        linked_food_ref_ids: 'ref_yogurt',
+      },
+    });
+    mocks.generateFinalAiReply.mockReturnValue('已记录午餐。');
+
+    const result = handleAiText(
+      '午餐吃了原味酸奶',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.executeFoodInsertWorkflow).toHaveBeenCalledTimes(1);
+    expect(mocks.executeGenericToolRequest).not.toHaveBeenCalled();
+    expect(result.status).toBe('success');
+    expect(result.reply).toBe('已记录午餐。');
   });
 });

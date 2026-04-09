@@ -3,6 +3,7 @@ import {
   DEFAULT_CONVERSATION_CONTEXT_TURNS,
   EXPANDED_CONVERSATION_CONTEXT_TURNS,
 } from '../constants/ai';
+import { executeFoodInsertWorkflow } from '../services/food-workflow';
 import { generateFinalAiReply, startAiResponse } from '../services/gemini';
 import { botLogTable } from '../tables/bot-log-table';
 import { executeGenericToolRequest } from '../tools';
@@ -192,6 +193,17 @@ function formatToolResult(result: GenericToolResult): string {
   }
 }
 
+function executeAiToolRequest(
+  request: GenericToolRequest,
+  timestamp: Date,
+): GenericToolResult {
+  if (request.tool === 'insertData' && request.sheet === 'FOOD_LOG') {
+    return executeFoodInsertWorkflow(request, timestamp);
+  }
+
+  return executeGenericToolRequest(request, timestamp);
+}
+
 export function handleAiText(
   text: string,
   timestamp: Date,
@@ -228,7 +240,7 @@ export function handleAiText(
       );
     }
 
-    const toolResult = executeGenericToolRequest(response.request, timestamp);
+    const toolResult = executeAiToolRequest(response.request, timestamp);
 
     try {
       const reply = generateFinalAiReply({
