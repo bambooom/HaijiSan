@@ -1,281 +1,43 @@
 import { MY_CHAT_ID } from './app-config';
-import { handleIncomingImageMessage, handleIncomingText } from './handlers';
-import {
-  enqueueImageOcrJob,
-  processPendingImageOcrJobs,
-} from './services/image-ocr-queue';
-import {
-  attachConfirmationPreviewMessage,
-  handleOcrConfirmationCallback,
-  handleOcrConfirmationReply,
-} from './services/ocr-confirmation';
+import { processPendingImageOcrJobs } from './services/image-ocr-queue';
 import { buildDailySummaryMessage } from './services/daily-summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
 } from './services/digest-trigger';
-import { sendChatAction, sendText } from './services/telegram';
-import { botLogTable } from './tables';
-import { CommandHandlingResult } from './types';
-
-const WEBHOOK_PROCESSING_TTL_SECONDS = 90;
-const WEBHOOK_DONE_TTL_SECONDS = 6 * 60 * 60;
-const WEBHOOK_DUPLICATE_LOGGED_TTL_SECONDS = 6 * 60 * 60;
-
-type WebhookUpdateState = 'processing' | 'done';
-
-interface TelegramUpdate {
-  update_id?: number;
-  message?: {
-    message_id?: number;
-    chat: {
-      id: number | string;
-    };
-    reply_to_message?: {
-      message_id?: number;
-      from?: {
-        is_bot?: boolean;
-      };
-    };
-    text?: string;
-    caption?: string;
-    photo?: Array<{
-      file_id?: string;
-    }>;
-    document?: {
-      file_id?: string;
-      mime_type?: string;
-    };
-  };
-  callback_query?: {
-    id?: string;
-    data?: string;
-    message?: {
-      message_id?: number;
-      chat: {
-        id: number | string;
-      };
-    };
-  };
-}
-
-function getImageFileId(
-  message: NonNullable<TelegramUpdate['message']>,
-): string | null {
-  const photoEntries = message.photo;
-  const photoFileId =
-    photoEntries && photoEntries.length > 0
-      ? photoEntries[photoEntries.length - 1]?.file_id?.trim()
-      : undefined;
-
-  if (photoFileId) {
-    return photoFileId;
-  }
-
-  const documentFileId = message.document?.file_id?.trim();
-  const mimeType = message.document?.mime_type?.trim().toLowerCase() ?? '';
-
-  if (documentFileId && mimeType.startsWith('image/')) {
-    return documentFileId;
-  }
-
-  return null;
-}
-
-function getRawMessageText(
-  message: NonNullable<TelegramUpdate['message']>,
-): string {
-  const text = message.text?.trim();
-
-  if (text) {
-    return text;
-  }
-
-  const caption = message.caption?.trim();
-
-  if (caption) {
-    return `[image] ${caption}`;
-  }
-
-  return '[image]';
-}
+import { sendText } from './services/telegram';
+import {
+  getRawMessageText,
+  getUpdateChatId,
+  parseUpdate,
+  type TelegramUpdate,
+} from './services/telegram-update';
+import {
+  clearCachedUpdateState,
+  getCachedUpdateState,
+  getUpdateDedupeKey,
+  logDuplicateUpdateOnce,
+  setCachedUpdateState,
+} from './services/webhook-dedupe';
+import {
+  buildWebhookFailureResult,
+  logWebhookTrace,
+} from './services/webhook-log';
+import {
+  appendIgnoredWebhookLog,
+  appendWebhookLog,
+  handleCallbackRoute,
+  handleDefaultRoute,
+  handleImageRoute,
+  handleReplyRoute,
+  markUpdateDone,
+  reportTypingFailure,
+  sendTyping,
+  type WebhookContext,
+} from './services/webhook-routing';
 
 function createOkResponse(): GoogleAppsScript.Content.TextOutput {
   return ContentService.createTextOutput('ok');
-}
-
-function getUpdateChatId(update: TelegramUpdate): string | null {
-  const messageChatId = update.message?.chat?.id;
-
-  if (typeof messageChatId === 'string' || typeof messageChatId === 'number') {
-    return String(messageChatId);
-  }
-
-  const callbackChatId = update.callback_query?.message?.chat?.id;
-
-  if (
-    typeof callbackChatId === 'string' ||
-    typeof callbackChatId === 'number'
-  ) {
-    return String(callbackChatId);
-  }
-
-  return null;
-}
-
-function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
-  const contents = e.postData?.contents;
-
-  if (!contents) {
-    return null;
-  }
-
-  return JSON.parse(contents) as TelegramUpdate;
-}
-
-function getWebhookCache(): GoogleAppsScript.Cache.Cache | null {
-  if (
-    typeof CacheService === 'undefined' ||
-    typeof CacheService.getScriptCache !== 'function'
-  ) {
-    return null;
-  }
-
-  return CacheService.getScriptCache();
-}
-
-function getUpdateDedupeKey(updateId: number | undefined): string | null {
-  return typeof updateId === 'number' ? `telegram_update:${updateId}` : null;
-}
-
-function getCachedUpdateState(key: string): WebhookUpdateState | null {
-  const value = getWebhookCache()?.get(key);
-
-  return value === 'processing' || value === 'done' ? value : null;
-}
-
-function setCachedUpdateState(key: string, state: WebhookUpdateState): void {
-  const ttlSeconds =
-    state === 'done'
-      ? WEBHOOK_DONE_TTL_SECONDS
-      : WEBHOOK_PROCESSING_TTL_SECONDS;
-
-  getWebhookCache()?.put(key, state, ttlSeconds);
-}
-
-function clearCachedUpdateState(key: string): void {
-  getWebhookCache()?.remove(key);
-}
-
-function getDuplicateLoggedKey(dedupeKey: string): string {
-  return `${dedupeKey}:duplicate_logged`;
-}
-
-function logDuplicateUpdateOnce(
-  dedupeKey: string,
-  cachedState: WebhookUpdateState,
-  rawLogText: string,
-  update: TelegramUpdate | null,
-): void {
-  const cache = getWebhookCache();
-  const duplicateLoggedKey = getDuplicateLoggedKey(dedupeKey);
-
-  if (cache?.get(duplicateLoggedKey)) {
-    return;
-  }
-
-  botLogTable.appendMessageLog(
-    new Date(),
-    rawLogText,
-    withWebhookMeta(
-      buildWebhookIgnoredResult(
-        `duplicate update ignored: ${dedupeKey}; state=${cachedState}`,
-        'webhook-duplicate-update',
-      ),
-      update,
-    ),
-  );
-
-  cache?.put(duplicateLoggedKey, '1', WEBHOOK_DUPLICATE_LOGGED_TTL_SECONDS);
-}
-
-function logWebhookTrace(
-  event: string,
-  details: Record<string, unknown>,
-): void {
-  if (typeof console === 'undefined' || typeof console.info !== 'function') {
-    return;
-  }
-
-  console.info(`[haijisan webhook] ${event}`, JSON.stringify(details));
-}
-
-function buildWebhookFailureResult(message: string): CommandHandlingResult {
-  return {
-    reply: '系统异常，未完成处理。',
-    handlingMode: 'ai',
-    status: 'failed',
-    note: message,
-    traceId: '',
-    intent: 'webhook-error',
-    tool: '',
-    confirmationState: 'failed',
-    resultCode: 'webhook-error',
-  };
-}
-
-function buildWebhookIgnoredResult(
-  message: string,
-  resultCode: string,
-): CommandHandlingResult {
-  return {
-    reply: '请求已忽略。',
-    handlingMode: 'rule',
-    status: 'ignored',
-    note: message,
-    traceId: '',
-    intent: 'webhook-ignore',
-    tool: '',
-    confirmationState: 'none',
-    resultCode,
-  };
-}
-
-function buildWebhookMetaNote(update: TelegramUpdate | null): string {
-  if (!update) {
-    return '';
-  }
-
-  return [
-    typeof update.update_id === 'number' ? `update_id=${update.update_id}` : '',
-    typeof update.message?.message_id === 'number'
-      ? `message_id=${update.message.message_id}`
-      : '',
-    typeof update.callback_query?.message?.message_id === 'number'
-      ? `callback_message_id=${update.callback_query.message.message_id}`
-      : '',
-    typeof update.callback_query?.id === 'string'
-      ? `callback_query_id=${update.callback_query.id}`
-      : '',
-  ]
-    .filter(Boolean)
-    .join('; ');
-}
-
-function withWebhookMeta(
-  result: CommandHandlingResult,
-  update: TelegramUpdate | null,
-): CommandHandlingResult {
-  const metaNote = buildWebhookMetaNote(update);
-
-  if (!metaNote) {
-    return result;
-  }
-
-  return {
-    ...result,
-    note: result.note ? `${result.note}; ${metaNote}` : metaNote,
-  };
 }
 
 function doPost(
@@ -290,16 +52,12 @@ function doPost(
     update = parseUpdate(e);
 
     if (!update?.message && !update?.callback_query) {
-      botLogTable.appendMessageLog(
+      appendIgnoredWebhookLog(
         new Date(),
         '[empty update]',
-        withWebhookMeta(
-          buildWebhookIgnoredResult(
-            'empty update payload',
-            'webhook-empty-update',
-          ),
-          update,
-        ),
+        'empty update payload',
+        'webhook-empty-update',
+        update,
       );
       return createOkResponse();
     }
@@ -333,184 +91,80 @@ function doPost(
 
     const chatId = getUpdateChatId(update);
     const timestamp = new Date();
+    const context = {
+      update,
+      rawLogText,
+      timestamp,
+      chatId: chatId ?? '',
+      dedupeKey,
+    } satisfies WebhookContext;
 
     if (!chatId) {
-      botLogTable.appendMessageLog(
+      appendIgnoredWebhookLog(
         timestamp,
         rawLogText,
-        withWebhookMeta(
-          buildWebhookIgnoredResult('missing chat id', 'webhook-missing-chat'),
-          update,
-        ),
+        'missing chat id',
+        'webhook-missing-chat',
+        update,
       );
       return createOkResponse();
     }
 
     if (chatId !== MY_CHAT_ID) {
       sendText(chatId, '抱歉，由于职责所在，我目前只能专注管理某一位队员。');
-      botLogTable.appendMessageLog(
+      appendIgnoredWebhookLog(
         timestamp,
         rawLogText,
-        withWebhookMeta(
-          buildWebhookIgnoredResult(
-            `ignored unauthorized chat: ${chatId}`,
-            'webhook-unauthorized-chat',
-          ),
-          update,
-        ),
+        `ignored unauthorized chat: ${chatId}`,
+        'webhook-unauthorized-chat',
+        update,
       );
 
       return createOkResponse();
     }
 
     try {
-      sendChatAction(chatId, 'typing');
+      sendTyping(chatId);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : `typing failed: ${String(error)}`;
-
-      try {
-        botLogTable.appendMessageLog(
-          timestamp,
-          rawLogText,
-          withWebhookMeta(
-            buildWebhookIgnoredResult(message, 'webhook-typing-failed'),
-            update,
-          ),
-        );
-      } catch {
-        // Ignore secondary logging failures for non-critical typing actions.
-      }
+      reportTypingFailure(context, error);
     }
 
-    const imageFileId = update.message ? getImageFileId(update.message) : null;
+    const imageOutcome = handleImageRoute(context);
 
-    if (imageFileId) {
-      const placeholderMessageId = sendText(chatId, '正在识别，请稍后。', {
-        replyMarkup: undefined,
-      });
-
-      if (placeholderMessageId === null) {
-        throw new Error('Telegram did not return a placeholder message id');
-      }
-
-      const queuedResult = enqueueImageOcrJob(
-        chatId,
-        imageFileId,
-        update.message?.caption ?? '',
-        rawLogText,
-        placeholderMessageId,
-        timestamp,
-      );
-
-      logWebhookTrace('image_queued', {
-        dedupeKey,
-        chatId,
-        imageFileId,
-        placeholderMessageId,
-        rawLogText,
-      });
-
-      botLogTable.appendMessageLog(
-        timestamp,
-        rawLogText,
-        withWebhookMeta(queuedResult, update),
-      );
-
-      if (dedupeKey) {
-        setCachedUpdateState(dedupeKey, 'done');
+    if (imageOutcome !== 'unhandled') {
+      if (imageOutcome === 'handled-and-completed') {
+        markUpdateDone(dedupeKey);
         processingMarked = false;
       }
 
       return createOkResponse();
     }
 
-    if (update.callback_query?.id && update.callback_query.data) {
-      const result = handleOcrConfirmationCallback(
-        chatId,
-        update.callback_query.id,
-        update.callback_query.data,
-        update.callback_query.message?.message_id ?? 0,
-        timestamp,
-      );
+    const callbackOutcome = handleCallbackRoute(context);
 
-      if (result) {
-        botLogTable.appendMessageLog(
-          timestamp,
-          `[callback] ${update.callback_query.data}`,
-          withWebhookMeta(result, update),
-        );
-
-        if (dedupeKey) {
-          setCachedUpdateState(dedupeKey, 'done');
-          processingMarked = false;
-        }
+    if (callbackOutcome !== 'unhandled') {
+      if (callbackOutcome === 'handled-and-completed') {
+        markUpdateDone(dedupeKey);
+        processingMarked = false;
       }
 
       return createOkResponse();
     }
 
-    if (
-      update.message?.text &&
-      typeof update.message.reply_to_message?.message_id === 'number'
-    ) {
-      const result = handleOcrConfirmationReply(
-        chatId,
-        update.message.reply_to_message.message_id,
-        update.message.text,
-        timestamp,
-      );
+    const replyOutcome = handleReplyRoute(context);
 
-      if (result) {
-        botLogTable.appendMessageLog(
-          timestamp,
-          update.message.text,
-          withWebhookMeta(result, update),
-        );
-
-        if (dedupeKey) {
-          setCachedUpdateState(dedupeKey, 'done');
-          processingMarked = false;
-        }
-
-        return createOkResponse();
+    if (replyOutcome !== 'unhandled') {
+      if (replyOutcome === 'handled-and-completed') {
+        markUpdateDone(dedupeKey);
+        processingMarked = false;
       }
-    }
-    const result = imageFileId
-      ? handleIncomingImageMessage(
-          imageFileId,
-          update.message?.caption ?? '',
-          timestamp,
-          chatId,
-        )
-      : handleIncomingText(update.message?.text ?? '', timestamp);
 
-    const sentMessageId = sendText(chatId, result.reply, {
-      replyMarkup: result.telegramResponse?.replyMarkup,
-    });
-
-    if (
-      sentMessageId !== null &&
-      typeof result.telegramResponse?.pendingConfirmationId === 'string'
-    ) {
-      attachConfirmationPreviewMessage(
-        result.telegramResponse.pendingConfirmationId,
-        sentMessageId,
-      );
+      return createOkResponse();
     }
 
-    botLogTable.appendMessageLog(
-      timestamp,
-      rawLogText,
-      withWebhookMeta(result, update),
-    );
-
-    if (dedupeKey) {
-      setCachedUpdateState(dedupeKey, 'done');
-      processingMarked = false;
-    }
+    handleDefaultRoute(context);
+    markUpdateDone(dedupeKey);
+    processingMarked = false;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -525,10 +179,11 @@ function doPost(
     }
 
     try {
-      botLogTable.appendMessageLog(
+      appendWebhookLog(
         new Date(),
         rawLogText,
-        withWebhookMeta(buildWebhookFailureResult(message), update),
+        buildWebhookFailureResult(message),
+        update,
       );
     } catch {
       // Ignore secondary logging failures so alert delivery still has a chance.
