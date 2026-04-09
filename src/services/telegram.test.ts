@@ -25,9 +25,13 @@ Object.assign(globalThis, {
 });
 
 let downloadTelegramFile: typeof import('./telegram').downloadTelegramFile;
+let sendText: typeof import('./telegram').sendText;
+let editText: typeof import('./telegram').editText;
+let answerCallbackQuery: typeof import('./telegram').answerCallbackQuery;
 
 beforeAll(async () => {
-  ({ downloadTelegramFile } = await import('./telegram'));
+  ({ downloadTelegramFile, sendText, editText, answerCallbackQuery } =
+    await import('./telegram'));
 });
 
 describe('downloadTelegramFile', () => {
@@ -93,5 +97,82 @@ describe('downloadTelegramFile', () => {
     const result = downloadTelegramFile('file_456');
 
     expect(result.mimeType).toBe('image/png');
+  });
+
+  it('sends inline keyboard markup and returns the sent message id', () => {
+    mocks.fetch.mockReturnValue({
+      getContentText: () =>
+        JSON.stringify({ ok: true, result: { message_id: 321 } }),
+    });
+
+    const result = sendText('test-chat-id', '请确认', {
+      replyMarkup: {
+        inlineKeyboard: [
+          [
+            { text: '确认', callbackData: 'ocr:confirm:1' },
+            { text: '取消', callbackData: 'ocr:cancel:1' },
+          ],
+        ],
+      },
+    });
+
+    expect(result).toBe(321);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/sendMessage'),
+      expect.objectContaining({
+        payload: JSON.stringify({
+          chat_id: 'test-chat-id',
+          text: '请确认',
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '确认', callback_data: 'ocr:confirm:1' },
+                { text: '取消', callback_data: 'ocr:cancel:1' },
+              ],
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('supports editing messages and answering callback queries', () => {
+    mocks.fetch.mockReturnValue({
+      getContentText: () => JSON.stringify({ ok: true }),
+    });
+
+    editText('test-chat-id', 321, '已更新', {
+      replyMarkup: {
+        inlineKeyboard: [[{ text: '返回', callbackData: 'ocr:back:1' }]],
+      },
+    });
+    answerCallbackQuery('cb_1', '已确认');
+
+    expect(mocks.fetch).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/editMessageText'),
+      expect.objectContaining({
+        payload: JSON.stringify({
+          chat_id: 'test-chat-id',
+          message_id: 321,
+          text: '已更新',
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '返回', callback_data: 'ocr:back:1' }]],
+          },
+        }),
+      }),
+    );
+    expect(mocks.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/answerCallbackQuery'),
+      expect.objectContaining({
+        payload: JSON.stringify({
+          callback_query_id: 'cb_1',
+          text: '已确认',
+        }),
+      }),
+    );
   });
 });

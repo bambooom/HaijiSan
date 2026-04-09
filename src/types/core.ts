@@ -35,6 +35,25 @@ export type CommandLogFields = {
   resultCode: CommandResultCode;
 };
 
+export type TelegramInlineKeyboardButton = {
+  text: string;
+  callbackData: string;
+};
+
+export type TelegramReplyMarkup =
+  | {
+      inlineKeyboard: TelegramInlineKeyboardButton[][];
+    }
+  | {
+      forceReply: true;
+      inputFieldPlaceholder?: string;
+    };
+
+export type TelegramResponseMeta = {
+  replyMarkup?: TelegramReplyMarkup;
+  pendingConfirmationId?: string;
+};
+
 export type CommandAuditFields = {
   toolCallCount: number;
   readCount: number;
@@ -63,6 +82,7 @@ export type CommandHandlingResult = {
   status: HandlingStatus;
   note: string;
   audit?: CommandAuditFields;
+  telegramResponse?: TelegramResponseMeta;
 } & CommandLogFields;
 
 export type ReferenceSource =

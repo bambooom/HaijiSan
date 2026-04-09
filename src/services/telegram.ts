@@ -2,22 +2,83 @@ import { BOT_TOKEN } from '../app-config';
 
 type TelegramChatAction = 'typing';
 
+type TelegramInlineKeyboardButton = {
+  text: string;
+  callback_data: string;
+};
+
+type TelegramReplyMarkup =
+  | {
+      inline_keyboard: TelegramInlineKeyboardButton[][];
+    }
+  | {
+      force_reply: true;
+      input_field_placeholder?: string;
+    };
+
 type TelegramFileResponse = {
   ok?: boolean;
   result?: {
     file_path?: string;
+    message_id?: number;
   };
   description?: string;
 };
 
-function postTelegramRequest(endpoint: string, payload: object): void {
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/${endpoint}`;
+type TelegramRequestResponse = {
+  ok?: boolean;
+  result?: {
+    message_id?: number;
+  };
+  description?: string;
+};
 
-  UrlFetchApp.fetch(url, {
+type SendTextOptions = {
+  replyMarkup?: import('../types').TelegramReplyMarkup;
+};
+
+function toReplyMarkup(
+  replyMarkup: import('../types').TelegramReplyMarkup | undefined,
+): TelegramReplyMarkup | undefined {
+  if (!replyMarkup) {
+    return undefined;
+  }
+
+  if ('inlineKeyboard' in replyMarkup) {
+    return {
+      inline_keyboard: replyMarkup.inlineKeyboard.map((row) =>
+        row.map((button) => ({
+          text: button.text,
+          callback_data: button.callbackData,
+        })),
+      ),
+    };
+  }
+
+  return {
+    force_reply: true,
+    input_field_placeholder: replyMarkup.inputFieldPlaceholder,
+  };
+}
+
+function postTelegramRequest(
+  endpoint: string,
+  payload: object,
+): TelegramRequestResponse {
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/${endpoint}`;
+  const response = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
   });
+  const body = response.getContentText();
+
+  return body ? (JSON.parse(body) as TelegramRequestResponse) : {};
+}
+
+function postTelegramVoidRequest(endpoint: string, payload: object): void {
+  postTelegramRequest(endpoint, payload);
 }
 
 function getTelegramApiUrl(endpoint: string): string {
@@ -121,16 +182,48 @@ export function sendChatAction(
   chatId: string,
   action: TelegramChatAction,
 ): void {
-  postTelegramRequest('sendChatAction', {
+  postTelegramVoidRequest('sendChatAction', {
     chat_id: chatId,
     action,
   });
 }
 
-export function sendText(chatId: string, text: string): void {
-  postTelegramRequest('sendMessage', {
+export function sendText(
+  chatId: string,
+  text: string,
+  options?: SendTextOptions,
+): number | null {
+  const response = postTelegramRequest('sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
+    reply_markup: toReplyMarkup(options?.replyMarkup),
+  });
+
+  return response.result?.message_id ?? null;
+}
+
+export function editText(
+  chatId: string,
+  messageId: number,
+  text: string,
+  options?: SendTextOptions,
+): void {
+  postTelegramVoidRequest('editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: 'HTML',
+    reply_markup: toReplyMarkup(options?.replyMarkup),
+  });
+}
+
+export function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string,
+): void {
+  postTelegramVoidRequest('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    text,
   });
 }
