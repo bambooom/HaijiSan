@@ -1,6 +1,10 @@
 import { MY_CHAT_ID } from './app-config';
 import { handleIncomingImageMessage, handleIncomingText } from './handlers';
 import {
+  enqueueImageOcrJob,
+  processPendingImageOcrJobs,
+} from './services/image-ocr-queue';
+import {
   attachConfirmationPreviewMessage,
   handleOcrConfirmationCallback,
   handleOcrConfirmationReply,
@@ -225,6 +229,31 @@ function doPost(
       }
     }
 
+    const imageFileId = update.message ? getImageFileId(update.message) : null;
+
+    if (imageFileId) {
+      const placeholderMessageId = sendText(chatId, '正在识别，请稍后。', {
+        replyMarkup: undefined,
+      });
+
+      if (placeholderMessageId === null) {
+        throw new Error('Telegram did not return a placeholder message id');
+      }
+
+      const queuedResult = enqueueImageOcrJob(
+        chatId,
+        imageFileId,
+        update.message?.caption ?? '',
+        rawLogText,
+        placeholderMessageId,
+        timestamp,
+      );
+
+      botLogTable.appendMessageLog(timestamp, rawLogText, queuedResult);
+
+      return createOkResponse();
+    }
+
     if (update.callback_query?.id && update.callback_query.data) {
       const result = handleOcrConfirmationCallback(
         chatId,
@@ -262,8 +291,6 @@ function doPost(
         return createOkResponse();
       }
     }
-
-    const imageFileId = update.message ? getImageFileId(update.message) : null;
     const result = imageFileId
       ? handleIncomingImageMessage(
           imageFileId,
@@ -327,6 +354,7 @@ function disableDailyDigestTrigger() {
 
 Object.assign(globalThis, {
   doPost,
+  processPendingImageOcrJobs,
   sendDailyDigest,
   installDailyDigestTrigger,
   disableDailyDigestTrigger,
@@ -339,5 +367,6 @@ export {
   disableDailyDigestTrigger,
   doPost,
   installDailyDigestTrigger,
+  processPendingImageOcrJobs,
   sendDailyDigest,
 };

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   }),
   handleIncomingText: vi.fn(),
   handleIncomingImageMessage: vi.fn(),
+  enqueueImageOcrJob: vi.fn(),
   handleOcrConfirmationCallback: vi.fn(),
   handleOcrConfirmationReply: vi.fn(),
   attachConfirmationPreviewMessage: vi.fn(),
@@ -27,6 +28,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./handlers', () => ({
   handleIncomingText: mocks.handleIncomingText,
   handleIncomingImageMessage: mocks.handleIncomingImageMessage,
+}));
+
+vi.mock('./services/image-ocr-queue', () => ({
+  enqueueImageOcrJob: mocks.enqueueImageOcrJob,
+  processPendingImageOcrJobs: vi.fn(),
 }));
 
 vi.mock('./services/ocr-confirmation', () => ({
@@ -99,6 +105,17 @@ describe('doPost', () => {
           ],
         },
       },
+    });
+    mocks.enqueueImageOcrJob.mockReturnValue({
+      reply: '正在识别，请稍后。',
+      handlingMode: 'rule',
+      status: 'success',
+      note: 'image OCR queued; placeholder_message_id=321',
+      traceId: 'image_queue_1',
+      intent: 'image-ocr-queued',
+      tool: '',
+      confirmationState: 'none',
+      resultCode: 'image-ocr-queued',
     });
     mocks.sendText.mockReturnValue(321);
     mocks.handleOcrConfirmationCallback.mockReturnValue(null);
@@ -206,21 +223,27 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    expect(mocks.handleIncomingImageMessage).toHaveBeenCalledWith(
+    expect(mocks.enqueueImageOcrJob).toHaveBeenCalledWith(
+      'test-chat-id',
       'large',
       '早餐营养标签',
-      expect.any(Date),
-      'test-chat-id',
-    );
-    expect(mocks.handleIncomingText).not.toHaveBeenCalled();
-    expect(mocks.attachConfirmationPreviewMessage).toHaveBeenCalledWith(
-      'pending_1',
+      '[image] 早餐营养标签',
       321,
+      expect.any(Date),
+    );
+    expect(mocks.handleIncomingImageMessage).not.toHaveBeenCalled();
+    expect(mocks.handleIncomingText).not.toHaveBeenCalled();
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      'test-chat-id',
+      '正在识别，请稍后。',
+      {
+        replyMarkup: undefined,
+      },
     );
     expect(mocks.appendMessageLog).toHaveBeenCalledWith(
       expect.any(Date),
       '[image] 早餐营养标签',
-      expect.objectContaining({ reply: '请确认这条营养参考：' }),
+      expect.objectContaining({ reply: '正在识别，请稍后。' }),
     );
   });
 
