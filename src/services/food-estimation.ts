@@ -151,7 +151,9 @@ function asTrimmedString(value: unknown): string {
 function normalizeConfidence(value: unknown): IngredientEstimateConfidence {
   const normalized = asTrimmedString(value);
 
-  return normalized === 'high' || normalized === 'medium' || normalized === 'low'
+  return normalized === 'high' ||
+    normalized === 'medium' ||
+    normalized === 'low'
     ? normalized
     : 'low';
 }

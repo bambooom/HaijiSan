@@ -42,7 +42,9 @@ function buildDraftItems(mealText: string): IngredientEstimateInput[] {
     }));
 }
 
-function sumNullableNumbers(values: Array<number | null | undefined>): number | null {
+function sumNullableNumbers(
+  values: Array<number | null | undefined>,
+): number | null {
   const definedValues = values.filter(
     (value): value is number => typeof value === 'number',
   );
@@ -51,7 +53,9 @@ function sumNullableNumbers(values: Array<number | null | undefined>): number | 
     return null;
   }
 
-  return Math.round(definedValues.reduce((sum, value) => sum + value, 0) * 10) / 10;
+  return (
+    Math.round(definedValues.reduce((sum, value) => sum + value, 0) * 10) / 10
+  );
 }
 
 function uniqueValues(values: string[]): string[] {
@@ -66,10 +70,16 @@ function toItemResolution(
   const linkedFoodRefIds = uniqueValues(
     matchedItems
       .map((item) => item.linkedFoodRefId)
-      .filter((value): value is string => typeof value === 'string' && value.length > 0),
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0,
+      ),
   );
 
-  if (matchedItems.length === 0 && items.every((item) => item.estimatedCalories === null)) {
+  if (
+    matchedItems.length === 0 &&
+    items.every((item) => item.estimatedCalories === null)
+  ) {
     return {
       mealType: draft.mealType,
       mealText: draft.mealText,
@@ -88,7 +98,9 @@ function toItemResolution(
     mealType: draft.mealType,
     mealText: draft.mealText,
     shouldPersist: draft.shouldPersist,
-    estimatedCalories: sumNullableNumbers(items.map((item) => item.estimatedCalories)),
+    estimatedCalories: sumNullableNumbers(
+      items.map((item) => item.estimatedCalories),
+    ),
     proteinG: sumNullableNumbers(items.map((item) => item.proteinG)),
     fatG: sumNullableNumbers(items.map((item) => item.fatG)),
     carbsG: sumNullableNumbers(items.map((item) => item.carbsG)),
@@ -168,7 +180,10 @@ export function resolveMealWithAiFallback(
   }
 
   try {
-    const aiEstimates = estimateIngredientCalories(unresolvedItems, referenceTimestamp);
+    const aiEstimates = estimateIngredientCalories(
+      unresolvedItems,
+      referenceTimestamp,
+    );
     let aiIndex = 0;
     const mergedItems = localResolution.items.map((item) => {
       if (item.estimatedCalories !== null) {
@@ -245,7 +260,8 @@ export function executeFoodInsertWorkflow(
             nextRecord.linked_food_ref_ids === '') &&
           resolution.linkedFoodRefIds.length > 0
         ) {
-          nextRecord.linked_food_ref_ids = resolution.linkedFoodRefIds.join(', ');
+          nextRecord.linked_food_ref_ids =
+            resolution.linkedFoodRefIds.join(', ');
         }
 
         const fieldPairs: Array<
@@ -258,7 +274,10 @@ export function executeFoodInsertWorkflow(
         ];
 
         fieldPairs.forEach(([field, value]) => {
-          if (toNullableNumber(nextRecord[field]) === undefined && value !== null) {
+          if (
+            toNullableNumber(nextRecord[field]) === undefined &&
+            value !== null
+          ) {
             nextRecord[field] = value;
           }
         });
