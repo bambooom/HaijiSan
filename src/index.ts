@@ -175,6 +175,7 @@ function logDuplicateUpdateOnce(
   dedupeKey: string,
   cachedState: WebhookUpdateState,
   rawLogText: string,
+  update: TelegramUpdate | null,
 ): void {
   const cache = getWebhookCache();
   const duplicateLoggedKey = getDuplicateLoggedKey(dedupeKey);
@@ -186,9 +187,12 @@ function logDuplicateUpdateOnce(
   botLogTable.appendMessageLog(
     new Date(),
     rawLogText,
-    buildWebhookIgnoredResult(
-      `duplicate update ignored: ${dedupeKey}; state=${cachedState}`,
-      'webhook-duplicate-update',
+    withWebhookMeta(
+      buildWebhookIgnoredResult(
+        `duplicate update ignored: ${dedupeKey}; state=${cachedState}`,
+        'webhook-duplicate-update',
+      ),
+      update,
     ),
   );
 
@@ -237,23 +241,64 @@ function buildWebhookIgnoredResult(
   };
 }
 
+function buildWebhookMetaNote(update: TelegramUpdate | null): string {
+  if (!update) {
+    return '';
+  }
+
+  return [
+    typeof update.update_id === 'number' ? `update_id=${update.update_id}` : '',
+    typeof update.message?.message_id === 'number'
+      ? `message_id=${update.message.message_id}`
+      : '',
+    typeof update.callback_query?.message?.message_id === 'number'
+      ? `callback_message_id=${update.callback_query.message.message_id}`
+      : '',
+    typeof update.callback_query?.id === 'string'
+      ? `callback_query_id=${update.callback_query.id}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
+function withWebhookMeta(
+  result: CommandHandlingResult,
+  update: TelegramUpdate | null,
+): CommandHandlingResult {
+  const metaNote = buildWebhookMetaNote(update);
+
+  if (!metaNote) {
+    return result;
+  }
+
+  return {
+    ...result,
+    note: result.note ? `${result.note}; ${metaNote}` : metaNote,
+  };
+}
+
 function doPost(
   e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
+  let update: TelegramUpdate | null = null;
   let rawLogText = '[unparsed update]';
   let dedupeKey: string | null = null;
   let processingMarked = false;
 
   try {
-    const update = parseUpdate(e);
+    update = parseUpdate(e);
 
     if (!update?.message && !update?.callback_query) {
       botLogTable.appendMessageLog(
         new Date(),
         '[empty update]',
-        buildWebhookIgnoredResult(
-          'empty update payload',
-          'webhook-empty-update',
+        withWebhookMeta(
+          buildWebhookIgnoredResult(
+            'empty update payload',
+            'webhook-empty-update',
+          ),
+          update,
         ),
       );
       return createOkResponse();
@@ -271,7 +316,7 @@ function doPost(
       const cachedState = getCachedUpdateState(dedupeKey);
 
       if (cachedState === 'done' || cachedState === 'processing') {
-        logDuplicateUpdateOnce(dedupeKey, cachedState, rawLogText);
+        logDuplicateUpdateOnce(dedupeKey, cachedState, rawLogText, update);
 
         logWebhookTrace('duplicate_ignored', {
           dedupeKey,
@@ -293,7 +338,10 @@ function doPost(
       botLogTable.appendMessageLog(
         timestamp,
         rawLogText,
-        buildWebhookIgnoredResult('missing chat id', 'webhook-missing-chat'),
+        withWebhookMeta(
+          buildWebhookIgnoredResult('missing chat id', 'webhook-missing-chat'),
+          update,
+        ),
       );
       return createOkResponse();
     }
@@ -303,9 +351,12 @@ function doPost(
       botLogTable.appendMessageLog(
         timestamp,
         rawLogText,
-        buildWebhookIgnoredResult(
-          `ignored unauthorized chat: ${chatId}`,
-          'webhook-unauthorized-chat',
+        withWebhookMeta(
+          buildWebhookIgnoredResult(
+            `ignored unauthorized chat: ${chatId}`,
+            'webhook-unauthorized-chat',
+          ),
+          update,
         ),
       );
 
@@ -324,7 +375,10 @@ function doPost(
         botLogTable.appendMessageLog(
           timestamp,
           rawLogText,
-          buildWebhookIgnoredResult(message, 'webhook-typing-failed'),
+          withWebhookMeta(
+            buildWebhookIgnoredResult(message, 'webhook-typing-failed'),
+            update,
+          ),
         );
       } catch {
         // Ignore secondary logging failures for non-critical typing actions.
@@ -359,7 +413,11 @@ function doPost(
         rawLogText,
       });
 
-      botLogTable.appendMessageLog(timestamp, rawLogText, queuedResult);
+      botLogTable.appendMessageLog(
+        timestamp,
+        rawLogText,
+        withWebhookMeta(queuedResult, update),
+      );
 
       if (dedupeKey) {
         setCachedUpdateState(dedupeKey, 'done');
@@ -382,7 +440,7 @@ function doPost(
         botLogTable.appendMessageLog(
           timestamp,
           `[callback] ${update.callback_query.data}`,
-          result,
+          withWebhookMeta(result, update),
         );
 
         if (dedupeKey) {
@@ -406,7 +464,11 @@ function doPost(
       );
 
       if (result) {
-        botLogTable.appendMessageLog(timestamp, update.message.text, result);
+        botLogTable.appendMessageLog(
+          timestamp,
+          update.message.text,
+          withWebhookMeta(result, update),
+        );
 
         if (dedupeKey) {
           setCachedUpdateState(dedupeKey, 'done');
@@ -439,7 +501,11 @@ function doPost(
       );
     }
 
-    botLogTable.appendMessageLog(timestamp, rawLogText, result);
+    botLogTable.appendMessageLog(
+      timestamp,
+      rawLogText,
+      withWebhookMeta(result, update),
+    );
 
     if (dedupeKey) {
       setCachedUpdateState(dedupeKey, 'done');
@@ -462,7 +528,7 @@ function doPost(
       botLogTable.appendMessageLog(
         new Date(),
         rawLogText,
-        buildWebhookFailureResult(message),
+        withWebhookMeta(buildWebhookFailureResult(message), update),
       );
     } catch {
       // Ignore secondary logging failures so alert delivery still has a chance.

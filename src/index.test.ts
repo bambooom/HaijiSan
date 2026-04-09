@@ -79,6 +79,26 @@ Object.assign(globalThis, {
 
 import { doPost } from './index';
 
+function getAppendMessageLogResult(callIndex: number): {
+  note?: string;
+  resultCode?: string;
+  status?: string;
+  reply?: string;
+} {
+  const call = mocks.appendMessageLog.mock.calls[callIndex] as [
+    Date,
+    string,
+    {
+      note?: string;
+      resultCode?: string;
+      status?: string;
+      reply?: string;
+    },
+  ];
+
+  return call[2];
+}
+
 describe('doPost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -152,6 +172,13 @@ describe('doPost', () => {
       replyMarkup: undefined,
     });
     expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '今天睡得不太好',
+      expect.objectContaining({
+        note: 'update_id=123; message_id=9',
+      }),
+    );
     expect(mocks.cachePut).toHaveBeenNthCalledWith(
       1,
       'telegram_update:123',
@@ -212,6 +239,9 @@ describe('doPost', () => {
         resultCode: 'webhook-duplicate-update',
       }),
     );
+    expect(getAppendMessageLogResult(1).note).toContain(
+      'update_id=123; message_id=9',
+    );
     expect(mocks.cachePut).toHaveBeenLastCalledWith(
       'telegram_update:123:duplicate_logged',
       '1',
@@ -247,7 +277,7 @@ describe('doPost', () => {
       expect.objectContaining({
         status: 'failed',
         resultCode: 'webhook-error',
-        note: 'boom',
+        note: 'boom; update_id=456; message_id=10',
       }),
     );
     expect(mocks.cacheRemove).toHaveBeenCalledWith('telegram_update:456');
@@ -288,7 +318,12 @@ describe('doPost', () => {
     expect(mocks.appendMessageLog).toHaveBeenCalledWith(
       expect.any(Date),
       '[image] 早餐营养标签',
-      expect.objectContaining({ reply: '正在识别，请稍后。' }),
+      expect.objectContaining({
+        reply: '正在识别，请稍后。',
+      }),
+    );
+    expect(getAppendMessageLogResult(0).note).toContain(
+      'update_id=789; message_id=11',
     );
     expect(mocks.cachePut).toHaveBeenNthCalledWith(
       1,
@@ -351,6 +386,9 @@ describe('doPost', () => {
         status: 'ignored',
         resultCode: 'webhook-duplicate-update',
       }),
+    );
+    expect(getAppendMessageLogResult(1).note).toContain(
+      'update_id=793; message_id=13',
     );
   });
 
@@ -424,6 +462,9 @@ describe('doPost', () => {
         resultCode: 'webhook-typing-failed',
       }),
     );
+    expect(getAppendMessageLogResult(0).note).toContain(
+      'update_id=792; message_id=12',
+    );
     expect(mocks.appendMessageLog).toHaveBeenNthCalledWith(
       2,
       expect.any(Date),
@@ -474,7 +515,12 @@ describe('doPost', () => {
     expect(mocks.appendMessageLog).toHaveBeenCalledWith(
       expect.any(Date),
       '[callback] ocr:confirm:pending_1',
-      expect.objectContaining({ resultCode: 'image-ocr-confirmed' }),
+      expect.objectContaining({
+        resultCode: 'image-ocr-confirmed',
+      }),
+    );
+    expect(getAppendMessageLogResult(0).note).toContain(
+      'update_id=790; callback_message_id=321; callback_query_id=cb_1',
     );
   });
 
