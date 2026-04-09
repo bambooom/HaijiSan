@@ -172,6 +172,7 @@ describe('doPost', () => {
       expect.any(Date),
       '今天睡得不太好',
       expect.objectContaining({
+        reply: '请求已忽略。',
         status: 'ignored',
         resultCode: 'webhook-duplicate',
       }),

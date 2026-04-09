@@ -185,7 +185,7 @@ function buildWebhookIgnoredResult(
   resultCode: string,
 ): CommandHandlingResult {
   return {
-    reply: '',
+    reply: '请求已忽略。',
     handlingMode: 'rule',
     status: 'ignored',
     note: message,
