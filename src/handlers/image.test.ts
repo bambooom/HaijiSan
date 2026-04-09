@@ -4,6 +4,9 @@ const mocks = vi.hoisted(() => ({
   downloadTelegramFile: vi.fn(),
   extractHealthDataFromImage: vi.fn(),
   executeInsertData: vi.fn(),
+  executeUpdateData: vi.fn(),
+  executeFoodInsertWorkflow: vi.fn(),
+  findReferenceRowByFoodName: vi.fn(),
 }));
 
 vi.mock('../services/telegram', () => ({
@@ -16,6 +19,17 @@ vi.mock('../services/image-ocr', () => ({
 
 vi.mock('../tools', () => ({
   executeInsertData: mocks.executeInsertData,
+  executeUpdateData: mocks.executeUpdateData,
+}));
+
+vi.mock('../services/food-workflow', () => ({
+  executeFoodInsertWorkflow: mocks.executeFoodInsertWorkflow,
+}));
+
+vi.mock('../tables', () => ({
+  refCaloriesTable: {
+    findEntryRowByFoodName: mocks.findReferenceRowByFoodName,
+  },
 }));
 
 import { handleIncomingImage } from './image';
@@ -28,6 +42,7 @@ describe('handleIncomingImage', () => {
       base64Data: 'encoded-image',
       mimeType: 'image/jpeg',
     });
+    mocks.findReferenceRowByFoodName.mockReturnValue(null);
   });
 
   it('stores nutrition label OCR output into REF_CALORIES', () => {
@@ -96,6 +111,135 @@ describe('handleIncomingImage', () => {
     });
     expect(result.reply).toBe('已记录热量参考：Greek Yogurt。');
     expect(result.resultCode).toBe('image-ocr-inserted');
+  });
+
+  it('updates an existing nutrition reference when the OCR food name already exists', () => {
+    mocks.findReferenceRowByFoodName.mockReturnValue({
+      rowNumber: 5,
+      entry: {
+        food_ref_id: 'ref_1',
+      },
+    });
+    mocks.extractHealthDataFromImage.mockReturnValue({
+      kind: 'nutrition_label',
+      appSource: 'camera',
+      occurredAt: null,
+      recognizedText: 'Greek Yogurt 200g 210 kcal',
+      summary: 'Nutrition label for yogurt.',
+      foodName: 'Greek Yogurt',
+      brand: 'Example Brand',
+      servingSize: 200,
+      servingUnit: 'g',
+      caloriesKcal: 210,
+      proteinG: 12,
+      fatG: 7,
+      carbsG: 24,
+      confidence: 0.91,
+      note: '',
+      weightKg: null,
+      bmi: null,
+      bodyFatPct: null,
+      leanBodyMassKg: null,
+      sleepStart: null,
+      sleepEnd: null,
+      sleepHours: null,
+      sleepQuality: null,
+      workoutName: null,
+      durationMin: null,
+      workoutLevel: null,
+      avgHr: null,
+      maxHr: null,
+      minHr: null,
+      workoutCaloriesKcal: null,
+    });
+    mocks.executeUpdateData.mockReturnValue({
+      tool: 'updateData',
+      sheet: 'REF_CALORIES',
+      selector: { type: 'row-number', rowNumber: 5 },
+      updates: { food_name: 'Greek Yogurt' },
+    });
+
+    const result = handleIncomingImage(
+      'file_update',
+      '早餐营养标签',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    const updateCall = mocks.executeUpdateData.mock.calls[0];
+    const updateRequest = updateCall?.[0] as
+      | { updates: Record<string, unknown>; selector: { rowNumber: number } }
+      | undefined;
+
+    expect(updateCall?.[1]).toEqual(new Date('2026-04-08T10:00:00Z'));
+    expect(updateRequest).toMatchObject({
+      selector: { rowNumber: 5 },
+    });
+    expect(updateRequest?.updates).toMatchObject({
+      food_name: 'Greek Yogurt',
+      calories_kcal: 210,
+    });
+    expect(result.reply).toBe('已更新热量参考：Greek Yogurt。');
+    expect(result.resultCode).toBe('image-ocr-updated');
+  });
+
+  it('routes food photo OCR into the FOOD_LOG workflow', () => {
+    mocks.extractHealthDataFromImage.mockReturnValue({
+      kind: 'food_photo',
+      appSource: 'camera',
+      occurredAt: null,
+      recognizedText: 'Chicken salad',
+      summary: 'Chicken salad with avocado',
+      foodName: 'Chicken salad',
+      brand: '',
+      servingSize: null,
+      servingUnit: '',
+      caloriesKcal: null,
+      proteinG: null,
+      fatG: null,
+      carbsG: null,
+      confidence: 0.8,
+      note: '',
+      weightKg: null,
+      bmi: null,
+      bodyFatPct: null,
+      leanBodyMassKg: null,
+      sleepStart: null,
+      sleepEnd: null,
+      sleepHours: null,
+      sleepQuality: null,
+      workoutName: null,
+      durationMin: null,
+      workoutLevel: null,
+      avgHr: null,
+      maxHr: null,
+      minHr: null,
+      workoutCaloriesKcal: null,
+    });
+    mocks.executeFoodInsertWorkflow.mockReturnValue({
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
+      record: { food_log_id: 'food_1' },
+    });
+
+    const result = handleIncomingImage(
+      'food_photo_1',
+      '午餐',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    const foodInsertCall = mocks.executeFoodInsertWorkflow.mock.calls[0];
+    const foodInsertRequest = foodInsertCall?.[0] as InsertDataRequest | undefined;
+
+    expect(foodInsertCall?.[1]).toEqual(new Date('2026-04-08T10:00:00Z'));
+    expect(foodInsertRequest).toMatchObject({
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
+    });
+    expect(foodInsertRequest?.record).toMatchObject({
+      meal_type: 'lunch',
+      meal_text: 'Chicken salad with avocado',
+    });
+    expect(result.reply).toBe('已记录餐食图片。');
   });
 
   it('stores workout screenshots into WORKOUT_LOG', () => {

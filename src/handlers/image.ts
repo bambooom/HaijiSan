@@ -1,31 +1,35 @@
-import { executeInsertData } from '../tools';
-import type { InsertDataRequest } from '../tools/types';
+import { executeInsertData, executeUpdateData } from '../tools';
+import type { InsertDataRequest, UpdateDataRequest } from '../tools/types';
 import type {
   CommandAuditFields,
   CommandHandlingResult,
   HealthDataSource,
   HealthScreenshotExtractionResult,
+  MealType,
 } from '../types';
 import { buildCommandLogFields } from '../utils/log-meta';
+import { executeFoodInsertWorkflow } from '../services/food-workflow';
 import { extractHealthDataFromImage } from '../services/image-ocr';
 import { downloadTelegramFile } from '../services/telegram';
+import { refCaloriesTable } from '../tables';
 
 function createTraceId(timestamp: Date): string {
   return `image_${timestamp.getTime()}`;
 }
 
 function createAudit(
+  action: 'insertData' | 'updateData' = 'insertData',
   sheet = '',
   changedFields: string[] = [],
 ): CommandAuditFields {
   return {
     toolCallCount: sheet ? 1 : 0,
     readCount: 0,
-    insertCount: sheet ? 1 : 0,
-    updateCount: 0,
+    insertCount: sheet && action === 'insertData' ? 1 : 0,
+    updateCount: sheet && action === 'updateData' ? 1 : 0,
     readSheetNames: [],
     writeSheetNames: sheet ? [sheet] : [],
-    primaryAction: sheet ? 'insertData' : '',
+    primaryAction: sheet ? action : '',
     primaryTargetSheet: sheet,
     primarySelectorType: '',
     primarySelectorValue: '',
@@ -76,6 +80,53 @@ function buildOcrNote(
     .join('; ');
 }
 
+function inferMealType(text: string, occurredAt: string | null): MealType {
+  const normalizedText = text.trim().toLowerCase();
+
+  if (/早餐|早饭|breakfast/.test(normalizedText)) {
+    return 'breakfast';
+  }
+
+  if (/午餐|午饭|lunch/.test(normalizedText)) {
+    return 'lunch';
+  }
+
+  if (/晚餐|晚饭|dinner/.test(normalizedText)) {
+    return 'dinner';
+  }
+
+  if (occurredAt) {
+    const hour = Number(occurredAt.slice(11, 13));
+
+    if (hour >= 4 && hour < 10) {
+      return 'breakfast';
+    }
+
+    if (hour >= 10 && hour < 15) {
+      return 'lunch';
+    }
+
+    if (hour >= 17 && hour < 22) {
+      return 'dinner';
+    }
+  }
+
+  return 'snack';
+}
+
+function buildFoodPhotoMealText(
+  extraction: HealthScreenshotExtractionResult,
+  caption: string,
+): string {
+  return [
+    asTrimmedString(extraction.summary),
+    asTrimmedString(extraction.foodName),
+    asTrimmedString(caption),
+    asTrimmedString(extraction.recognizedText),
+  ]
+    .find(Boolean) || 'OCR food photo';
+}
+
 function inferHealthSource(
   extraction: HealthScreenshotExtractionResult,
 ): HealthDataSource {
@@ -121,6 +172,57 @@ function toNutritionLabelRequest(
       fat_g: extraction.fatG,
       carbs_g: extraction.carbsG,
       source: 'nutrition_label',
+      note: buildOcrNote(extraction, caption),
+    },
+  };
+}
+
+function toNutritionLabelUpdateRequest(
+  rowNumber: number,
+  extraction: HealthScreenshotExtractionResult,
+  caption: string,
+): UpdateDataRequest {
+  const foodName =
+    extraction.foodName || asTrimmedString(caption) || 'OCR nutrition label';
+
+  return {
+    tool: 'updateData',
+    sheet: 'REF_CALORIES',
+    selector: {
+      type: 'row-number',
+      rowNumber,
+    },
+    updates: {
+      food_name: foodName,
+      brand: extraction.brand,
+      serving_size: extraction.servingSize,
+      serving_unit: extraction.servingUnit,
+      calories_kcal: extraction.caloriesKcal,
+      protein_g: extraction.proteinG,
+      fat_g: extraction.fatG,
+      carbs_g: extraction.carbsG,
+      source: 'nutrition_label',
+      note: buildOcrNote(extraction, caption),
+    },
+  };
+}
+
+function toFoodPhotoRequest(
+  extraction: HealthScreenshotExtractionResult,
+  caption: string,
+): InsertDataRequest {
+  const mealText = buildFoodPhotoMealText(extraction, caption);
+  const routingText = [caption, extraction.summary, extraction.foodName]
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    tool: 'insertData',
+    sheet: 'FOOD_LOG',
+    record: {
+      occurred_at: extraction.occurredAt ?? undefined,
+      meal_type: inferMealType(routingText, extraction.occurredAt),
+      meal_text: mealText,
       note: buildOcrNote(extraction, caption),
     },
   };
@@ -190,17 +292,21 @@ function toWorkoutLogRequest(
 
 function formatInsertReply(
   extraction: HealthScreenshotExtractionResult,
-  request: InsertDataRequest,
+  request: InsertDataRequest | UpdateDataRequest,
 ): string {
   switch (request.sheet) {
     case 'REF_CALORIES':
-      return `已记录热量参考：${String(request.record.food_name)}。`;
+      return request.tool === 'updateData'
+        ? `已更新热量参考：${String(request.updates.food_name)}。`
+        : `已记录热量参考：${String(request.record.food_name)}。`;
     case 'BODY_LOG':
       return `已记录身体指标截图。`;
     case 'SLEEP_LOG':
       return `已记录睡眠截图数据。`;
     case 'WORKOUT_LOG':
       return `已记录运动截图数据。`;
+    case 'FOOD_LOG':
+      return `已记录餐食图片。`;
     default:
       return extraction.kind === 'unsupported'
         ? '这张图片我暂时还不能稳定解析。'
@@ -208,13 +314,26 @@ function formatInsertReply(
   }
 }
 
-function buildInsertRequest(
+function buildWriteRequest(
   extraction: HealthScreenshotExtractionResult,
   caption: string,
-): InsertDataRequest | null {
+): InsertDataRequest | UpdateDataRequest | null {
   switch (extraction.kind) {
-    case 'nutrition_label':
-      return toNutritionLabelRequest(extraction, caption);
+    case 'nutrition_label': {
+      const foodName =
+        extraction.foodName || asTrimmedString(caption) || 'OCR nutrition label';
+      const existingReference = refCaloriesTable.findEntryRowByFoodName(foodName);
+
+      return existingReference
+        ? toNutritionLabelUpdateRequest(
+            existingReference.rowNumber,
+            extraction,
+            caption,
+          )
+        : toNutritionLabelRequest(extraction, caption);
+    }
+    case 'food_photo':
+      return toFoodPhotoRequest(extraction, caption);
     case 'body_metrics':
       return toBodyLogRequest(extraction, caption);
     case 'sleep_summary':
@@ -239,7 +358,7 @@ export function handleIncomingImage(
       referenceTimestamp: timestamp,
       userPrompt: caption,
     });
-    const request = buildInsertRequest(extraction, caption);
+    const request = buildWriteRequest(extraction, caption);
 
     if (!request) {
       return buildImageResult(
@@ -255,13 +374,39 @@ export function handleIncomingImage(
       );
     }
 
-    const result = executeInsertData(request, timestamp);
+    if (request.tool === 'updateData') {
+      const result = executeUpdateData(request, timestamp);
+
+      return buildImageResult(
+        formatInsertReply(extraction, request),
+        timestamp,
+        {
+          tool: request.tool,
+          note: `${request.sheet}; ${buildOcrNote(extraction, caption)}`,
+          resultCode: 'image-ocr-updated',
+          audit: createAudit(
+            request.tool,
+            request.sheet,
+            Object.keys(result.updates).sort(),
+          ),
+        },
+      );
+    }
+
+    const result =
+      request.sheet === 'FOOD_LOG'
+        ? executeFoodInsertWorkflow(request, timestamp)
+        : executeInsertData(request, timestamp);
 
     return buildImageResult(formatInsertReply(extraction, request), timestamp, {
-      tool: 'insertData',
+      tool: request.tool,
       note: `${request.sheet}; ${buildOcrNote(extraction, caption)}`,
       resultCode: 'image-ocr-inserted',
-      audit: createAudit(request.sheet, Object.keys(result.record).sort()),
+      audit: createAudit(
+        request.tool,
+        request.sheet,
+        Object.keys(result.record).sort(),
+      ),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

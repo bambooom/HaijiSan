@@ -47,6 +47,7 @@ const OCR_MAX_ATTEMPTS = 3;
 
 const KIND_VALUES: HealthScreenshotKind[] = [
   'nutrition_label',
+  'food_photo',
   'body_metrics',
   'sleep_summary',
   'workout_summary',
@@ -212,11 +213,12 @@ function buildSystemInstruction(referenceTimestamp: Date): string {
   return [
     'You extract structured health information from a single screenshot or photo.',
     `Current local timestamp: ${currentTimestamp}. Use it when interpreting relative date labels such as today, yesterday, 今天, 昨天, 本周, or recent workout summaries.`,
-    'Classify the image into exactly one kind: nutrition_label, body_metrics, sleep_summary, workout_summary, unsupported.',
+    'Classify the image into exactly one kind: nutrition_label, food_photo, body_metrics, sleep_summary, workout_summary, unsupported.',
     'Return one JSON object only. Do not wrap it in markdown.',
     'If a value is not visible or not reliable, return null for numbers or null for optional timestamps, and use empty strings only for free-text fields such as brand, note, appSource, recognizedText, or summary.',
     'Use occurredAt for the time the measurement or activity shown in the screenshot actually happened. If the screenshot only implies a date but not a time, use 00:00:00 for that date. If the screenshot does not provide a trustworthy occurrence time, return null.',
     'For nutrition_label screenshots, extract foodName, brand, servingSize, servingUnit, caloriesKcal, proteinG, fatG, carbsG, and confidence.',
+    'For food_photo images, identify the likely meal or dishes, return kind=food_photo, fill foodName when there is a clear primary dish, keep a concise meal summary in summary, preserve useful visible text in recognizedText, and use occurredAt only when the image itself implies a trustworthy meal time.',
     'For body_metrics screenshots, extract weightKg, bmi, bodyFatPct, leanBodyMassKg, occurredAt, appSource, confidence, and a short summary.',
     'For sleep_summary screenshots, extract sleepStart, sleepEnd, sleepHours, sleepQuality, occurredAt, appSource, confidence, and a short summary.',
     'For workout_summary screenshots, extract workoutName, durationMin, workoutLevel, avgHr, maxHr, minHr, workoutCaloriesKcal, occurredAt, appSource, confidence, and a short summary.',

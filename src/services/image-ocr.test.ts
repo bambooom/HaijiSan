@@ -147,6 +147,46 @@ describe('extractHealthDataFromImage', () => {
     });
   });
 
+  it('supports food photo classification for downstream FOOD_LOG workflow use', () => {
+    mocks.fetch.mockReturnValue({
+      getResponseCode: () => 200,
+      getContentText: () =>
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      kind: 'food_photo',
+                      appSource: 'camera',
+                      occurredAt: null,
+                      recognizedText: 'Chicken salad',
+                      summary: 'Chicken salad with avocado.',
+                      foodName: 'Chicken salad',
+                      confidence: 0.78,
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = extractHealthDataFromImage({
+      base64Data: 'encoded-image',
+      mimeType: 'image/jpeg',
+    });
+
+    expect(result).toMatchObject({
+      kind: 'food_photo',
+      foodName: 'Chicken salad',
+      summary: 'Chicken salad with avocado.',
+      recognizedText: 'Chicken salad',
+    });
+  });
+
   it('retries transient failures and normalizes unsupported output fields', () => {
     mocks.fetch
       .mockReturnValueOnce({

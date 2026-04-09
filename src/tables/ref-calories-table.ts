@@ -2,6 +2,11 @@ import { SHEET_SCHEMAS } from '../constants/sheet-schema';
 import type { FoodReferenceEntry } from '../types';
 import { SheetTable } from './sheet-table';
 
+type FoodReferenceRow = {
+  rowNumber: number;
+  entry: FoodReferenceEntry;
+};
+
 export function normalizeFoodName(value: string): string {
   return value
     .trim()
@@ -18,16 +23,16 @@ export class RefCaloriesTable extends SheetTable<FoodReferenceEntry> {
     });
   }
 
-  findByFoodName(foodName: string): FoodReferenceEntry | null {
+  findEntryRowByFoodName(foodName: string): FoodReferenceRow | null {
     const exactName = foodName.trim();
 
     if (!exactName) {
       return null;
     }
 
-    const entries = this.listEntries();
-    const exactMatch = entries.find(
-      (entry) => entry.food_name.trim() === exactName,
+    const entryRows = this.listEntryRows();
+    const exactMatch = entryRows.find(
+      ({ entry }) => entry.food_name.trim() === exactName,
     );
 
     if (exactMatch) {
@@ -37,10 +42,14 @@ export class RefCaloriesTable extends SheetTable<FoodReferenceEntry> {
     const normalizedName = normalizeFoodName(foodName);
 
     return (
-      entries.find(
-        (entry) => normalizeFoodName(entry.food_name) === normalizedName,
+      entryRows.find(
+        ({ entry }) => normalizeFoodName(entry.food_name) === normalizedName,
       ) ?? null
     );
+  }
+
+  findByFoodName(foodName: string): FoodReferenceEntry | null {
+    return this.findEntryRowByFoodName(foodName)?.entry ?? null;
   }
 }
 

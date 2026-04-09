@@ -2,6 +2,7 @@ import type { SleepQuality, WorkoutLevel } from './core';
 
 export const HEALTH_SCREENSHOT_KIND_VALUES = [
   'nutrition_label',
+  'food_photo',
   'body_metrics',
   'sleep_summary',
   'workout_summary',
