@@ -18,6 +18,11 @@ import { sendChatAction, sendText } from './services/telegram';
 import { botLogTable } from './tables';
 import { CommandHandlingResult } from './types';
 
+const WEBHOOK_PROCESSING_TTL_SECONDS = 90;
+const WEBHOOK_DONE_TTL_SECONDS = 6 * 60 * 60;
+
+type WebhookUpdateState = 'processing' | 'done';
+
 interface TelegramUpdate {
   update_id?: number;
   message?: {
@@ -127,6 +132,40 @@ function parseUpdate(e: GoogleAppsScript.Events.DoPost): TelegramUpdate | null {
   return JSON.parse(contents) as TelegramUpdate;
 }
 
+function getWebhookCache(): GoogleAppsScript.Cache.Cache | null {
+  if (
+    typeof CacheService === 'undefined' ||
+    typeof CacheService.getScriptCache !== 'function'
+  ) {
+    return null;
+  }
+
+  return CacheService.getScriptCache();
+}
+
+function getUpdateDedupeKey(updateId: number | undefined): string | null {
+  return typeof updateId === 'number' ? `telegram_update:${updateId}` : null;
+}
+
+function getCachedUpdateState(key: string): WebhookUpdateState | null {
+  const value = getWebhookCache()?.get(key);
+
+  return value === 'processing' || value === 'done' ? value : null;
+}
+
+function setCachedUpdateState(key: string, state: WebhookUpdateState): void {
+  const ttlSeconds =
+    state === 'done'
+      ? WEBHOOK_DONE_TTL_SECONDS
+      : WEBHOOK_PROCESSING_TTL_SECONDS;
+
+  getWebhookCache()?.put(key, state, ttlSeconds);
+}
+
+function clearCachedUpdateState(key: string): void {
+  getWebhookCache()?.remove(key);
+}
+
 function buildWebhookFailureResult(message: string): CommandHandlingResult {
   return {
     reply: '系统异常，未完成处理。',
@@ -162,6 +201,8 @@ function doPost(
   e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
   let rawLogText = '[unparsed update]';
+  let dedupeKey: string | null = null;
+  let processingMarked = false;
 
   try {
     const update = parseUpdate(e);
@@ -183,6 +224,19 @@ function doPost(
       : update.message
         ? getRawMessageText(update.message)
         : '[unknown update]';
+
+    dedupeKey = getUpdateDedupeKey(update.update_id);
+
+    if (dedupeKey) {
+      const cachedState = getCachedUpdateState(dedupeKey);
+
+      if (cachedState === 'done' || cachedState === 'processing') {
+        return createOkResponse();
+      }
+
+      setCachedUpdateState(dedupeKey, 'processing');
+      processingMarked = true;
+    }
 
     const chatId = getUpdateChatId(update);
     const timestamp = new Date();
@@ -251,6 +305,11 @@ function doPost(
 
       botLogTable.appendMessageLog(timestamp, rawLogText, queuedResult);
 
+      if (dedupeKey) {
+        setCachedUpdateState(dedupeKey, 'done');
+        processingMarked = false;
+      }
+
       return createOkResponse();
     }
 
@@ -269,6 +328,11 @@ function doPost(
           `[callback] ${update.callback_query.data}`,
           result,
         );
+
+        if (dedupeKey) {
+          setCachedUpdateState(dedupeKey, 'done');
+          processingMarked = false;
+        }
       }
 
       return createOkResponse();
@@ -287,6 +351,11 @@ function doPost(
 
       if (result) {
         botLogTable.appendMessageLog(timestamp, update.message.text, result);
+
+        if (dedupeKey) {
+          setCachedUpdateState(dedupeKey, 'done');
+          processingMarked = false;
+        }
 
         return createOkResponse();
       }
@@ -315,8 +384,17 @@ function doPost(
     }
 
     botLogTable.appendMessageLog(timestamp, rawLogText, result);
+
+    if (dedupeKey) {
+      setCachedUpdateState(dedupeKey, 'done');
+      processingMarked = false;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    if (dedupeKey && processingMarked) {
+      clearCachedUpdateState(dedupeKey);
+    }
 
     try {
       botLogTable.appendMessageLog(

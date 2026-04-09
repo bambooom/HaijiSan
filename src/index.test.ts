@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   sendChatAction: vi.fn(),
   sendText: vi.fn(),
   appendMessageLog: vi.fn(),
+  cacheGet: vi.fn(),
+  cachePut: vi.fn(),
+  cacheRemove: vi.fn(),
   buildDailySummaryMessage: vi.fn(() => 'digest'),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
@@ -65,6 +68,13 @@ Object.assign(globalThis, {
   ContentService: {
     createTextOutput: mocks.createTextOutput,
   },
+  CacheService: {
+    getScriptCache: () => ({
+      get: mocks.cacheGet,
+      put: mocks.cachePut,
+      remove: mocks.cacheRemove,
+    }),
+  },
 });
 
 import { doPost } from './index';
@@ -72,6 +82,7 @@ import { doPost } from './index';
 describe('doPost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.cacheGet.mockReturnValue(null);
     mocks.handleIncomingText.mockReturnValue({
       reply: '已记录。',
       handlingMode: 'ai',
@@ -122,7 +133,7 @@ describe('doPost', () => {
     mocks.handleOcrConfirmationReply.mockReturnValue(null);
   });
 
-  it('processes a webhook update once and caches completion by update_id', () => {
+  it('processes a webhook update once and marks it done by update_id', () => {
     doPost({
       postData: {
         contents: JSON.stringify({
@@ -141,9 +152,21 @@ describe('doPost', () => {
       replyMarkup: undefined,
     });
     expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
+    expect(mocks.cachePut).toHaveBeenNthCalledWith(
+      1,
+      'telegram_update:123',
+      'processing',
+      90,
+    );
+    expect(mocks.cachePut).toHaveBeenNthCalledWith(
+      2,
+      'telegram_update:123',
+      'done',
+      21600,
+    );
   });
 
-  it('processes repeated webhook deliveries instead of suppressing them', () => {
+  it('ignores repeated webhook deliveries after a successful text update', () => {
     doPost({
       postData: {
         contents: JSON.stringify({
@@ -156,6 +179,8 @@ describe('doPost', () => {
         }),
       },
     } as GoogleAppsScript.Events.DoPost);
+
+    mocks.cacheGet.mockReturnValue('done');
 
     doPost({
       postData: {
@@ -170,9 +195,9 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    expect(mocks.handleIncomingText).toHaveBeenCalledTimes(2);
-    expect(mocks.sendText).toHaveBeenCalledTimes(2);
-    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(2);
+    expect(mocks.handleIncomingText).toHaveBeenCalledTimes(1);
+    expect(mocks.sendText).toHaveBeenCalledTimes(1);
+    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
   });
 
   it('clears the processing marker when business logic fails before completion', () => {
@@ -206,9 +231,10 @@ describe('doPost', () => {
         note: 'boom',
       }),
     );
+    expect(mocks.cacheRemove).toHaveBeenCalledWith('telegram_update:456');
   });
 
-  it('routes photo messages into the image handler and logs the caption', () => {
+  it('routes photo messages into the queue and marks the update done', () => {
     doPost({
       postData: {
         contents: JSON.stringify({
@@ -245,6 +271,54 @@ describe('doPost', () => {
       '[image] 早餐营养标签',
       expect.objectContaining({ reply: '正在识别，请稍后。' }),
     );
+    expect(mocks.cachePut).toHaveBeenNthCalledWith(
+      1,
+      'telegram_update:789',
+      'processing',
+      90,
+    );
+    expect(mocks.cachePut).toHaveBeenNthCalledWith(
+      2,
+      'telegram_update:789',
+      'done',
+      21600,
+    );
+  });
+
+  it('ignores repeated image webhook deliveries without sending another placeholder', () => {
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 793,
+          message: {
+            message_id: 13,
+            chat: { id: 'test-chat-id' },
+            caption: '早餐营养标签',
+            photo: [{ file_id: 'small' }, { file_id: 'large' }],
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    mocks.cacheGet.mockReturnValue('done');
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({
+          update_id: 793,
+          message: {
+            message_id: 13,
+            chat: { id: 'test-chat-id' },
+            caption: '早餐营养标签',
+            photo: [{ file_id: 'small' }, { file_id: 'large' }],
+          },
+        }),
+      },
+    } as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.sendText).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueImageOcrJob).toHaveBeenCalledTimes(1);
+    expect(mocks.appendMessageLog).toHaveBeenCalledTimes(1);
   });
 
   it('continues processing when typing status fails to send', () => {
