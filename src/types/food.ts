@@ -8,6 +8,13 @@ export interface IngredientEstimateInput {
   unit: string;
 }
 
+export interface FoodLogInsertRequest {
+  tool: 'insertFoodLog';
+  sheet: 'FOOD_LOG';
+  record: Record<string, unknown>;
+  items: IngredientEstimateInput[];
+}
+
 export interface IngredientEstimateResult extends IngredientEstimateInput {
   estimatedCalories: number | null;
   confidence: IngredientEstimateConfidence;

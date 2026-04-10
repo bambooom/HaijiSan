@@ -91,6 +91,46 @@ describe('food-workflow', () => {
     });
   });
 
+  it('prefers AI-structured meal items when they are provided', () => {
+    const result = buildMealStructure(
+      {
+        meal_type: 'lunch',
+        meal_text: '鸡蛋和菠菜',
+      },
+      [
+        {
+          itemName: '鸡蛋',
+          quantity: 2,
+          unit: 'piece',
+        },
+        {
+          itemName: '菠菜',
+          quantity: 100,
+          unit: 'g',
+        },
+      ],
+    );
+
+    expect(result).toEqual({
+      mealType: 'lunch',
+      mealText: '鸡蛋和菠菜',
+      shouldPersist: true,
+      items: [
+        {
+          itemName: '鸡蛋',
+          quantity: 2,
+          unit: 'piece',
+        },
+        {
+          itemName: '菠菜',
+          quantity: 100,
+          unit: 'g',
+        },
+      ],
+      note: 'food-workflow: using AI-structured meal items',
+    });
+  });
+
   it('resolves and aggregates local REF_CALORIES matches per item', () => {
     mocks.findByFoodName.mockImplementation((itemName: string) => {
       if (itemName === '鸡蛋') {
@@ -311,6 +351,116 @@ describe('food-workflow', () => {
         food_log_id: 'food_1',
       },
     });
+  });
+
+  it('uses AI-structured items to scale local reference nutrition and stock deductions', () => {
+    mocks.findByFoodName.mockImplementation((itemName: string) => {
+      if (itemName === '鸡蛋') {
+        return {
+          food_ref_id: 'ref_egg',
+          food_name: '鸡蛋',
+          brand: '',
+          serving_size: 1,
+          serving_unit: 'piece',
+          calories_kcal: 78,
+          protein_g: 6.3,
+          fat_g: 5.3,
+          carbs_g: 0.6,
+          source: 'manual_entry',
+          updated_at: '2026-04-08 10:00:00',
+          note: '',
+        };
+      }
+
+      if (itemName === '菠菜') {
+        return {
+          food_ref_id: 'ref_spinach',
+          food_name: '菠菜',
+          brand: '',
+          serving_size: 100,
+          serving_unit: 'g',
+          calories_kcal: 23,
+          protein_g: 2.9,
+          fat_g: 0.4,
+          carbs_g: 3.6,
+          source: 'manual_entry',
+          updated_at: '2026-04-08 10:00:00',
+          note: '',
+        };
+      }
+
+      return null;
+    });
+    mocks.findStockByName.mockImplementation((itemName: string) => {
+      if (itemName === '鸡蛋') {
+        return {
+          stock_item_id: 'stock_egg',
+          item_name: '鸡蛋',
+          quantity: 6,
+          unit: '个/份',
+          purchased_at: '2026-04-08 08:00:00',
+          updated_at: '2026-04-08 08:00:00',
+          purchase_channel: '',
+          linked_food_ref_id: 'ref_egg',
+          note: 'keep me',
+        };
+      }
+
+      return null;
+    });
+    mocks.executeInsertData.mockReturnValue({
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
+      record: {
+        food_log_id: 'food_structured_1',
+      },
+    });
+
+    executeFoodInsertWorkflow(
+      {
+        tool: 'insertFoodLog',
+        sheet: 'FOOD_LOG',
+        record: {
+          occurred_at: '2026-04-08 12:30:00',
+          meal_type: 'lunch',
+          meal_text: '鸡蛋和菠菜',
+        },
+        items: [
+          {
+            itemName: '鸡蛋',
+            quantity: 2,
+            unit: 'piece',
+          },
+          {
+            itemName: '菠菜',
+            quantity: 100,
+            unit: 'g',
+          },
+        ],
+      },
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    const insertCall = mocks.executeInsertData.mock.calls[0];
+    const insertRequest = insertCall?.[0] as InsertDataRequest | undefined;
+
+    expect(insertRequest?.record).toMatchObject({
+      meal_text: '鸡蛋和菠菜',
+      calories_kcal: 179,
+      protein_g: 15.5,
+      fat_g: 11,
+      carbs_g: 4.8,
+      linked_food_ref_ids: 'ref_egg, ref_spinach',
+      linked_stock_item_ids: 'stock_egg',
+    });
+    expect(mocks.adjustStock).toHaveBeenCalledWith(
+      new Date('2026-04-08T10:00:00Z'),
+      '鸡蛋',
+      -2,
+      '个/份',
+      undefined,
+      undefined,
+    );
   });
 
   it('uses AI fallback estimates for unresolved items during insert execution', () => {

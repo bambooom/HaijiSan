@@ -6,7 +6,7 @@ import type {
   ToolRecord,
   ToolSelector,
 } from '../../tools/types';
-import type { ConversationTurn } from '../../types';
+import type { ConversationTurn, FoodLogInsertRequest } from '../../types';
 import { spreadsheetService } from '../spreadsheet';
 
 type GeminiFunctionCall = {
@@ -50,10 +50,10 @@ export type AiStartResponse =
     }
   | {
       mode: 'tool';
-      request: GenericToolRequest;
+      request: GenericToolRequest | FoodLogInsertRequest;
       functionCall: {
         id?: string;
-        name: 'readData' | 'insertData' | 'updateData';
+        name: 'readData' | 'insertData' | 'updateData' | 'insertFoodLog';
         args: Record<string, unknown>;
       };
       modelContent: GeminiContent;
@@ -105,6 +105,12 @@ function listSheetsForOperation(
     )
     .map(([sheet]) => sheet)
     .sort();
+}
+
+function listGenericInsertSheets(): string[] {
+  return listSheetsForOperation('insert').filter(
+    (sheet) => sheet !== 'FOOD_LOG',
+  );
 }
 
 function listSelectorsForOperation(operation: 'read' | 'update'): string[] {
@@ -216,6 +222,8 @@ function buildSystemInstruction(referenceTimestamp: Date): string {
     'Do not output natural-language timestamp strings such as today 08:55, tomorrow morning, or similar phrases inside tool arguments.',
     'For sheets that use occurred_at, include occurred_at when the user implied a date or time such as 今天, 昨天, 早餐, 晚饭, 8:55, or similar semantic clues.',
     'If the user clearly wants to log data but did not specify an event time, it is acceptable to omit occurred_at and let the app default it to now.',
+    'For FOOD_LOG inserts, always call insertFoodLog instead of insertData.',
+    "insertFoodLog must include both a concise FOOD_LOG record and an items array that preserves each food item's quantity and unit from the user's wording.",
     'For FOOD_LOG, map Chinese meal words into the schema enum values: 早餐 or 早饭 -> breakfast; 午餐 or 午饭 -> lunch; 晚餐 or 晚饭 -> dinner; 加餐, 零食, 下午茶, 夜宵 -> snack unless the user clearly means a normal dinner.',
     'For SLEEP_LOG, route sleep-related statements into SLEEP_LOG rather than FOOD_LOG. Phrases like 睡眠, 睡得, 入睡, 醒来, 2:30-7:06, or 02:30 到 07:06 usually mean a sleep record with sleep_start_at, sleep_end_at, sleep_quality, and source=manual.',
     'For WORKOUT_LOG, route exercise-related statements into WORKOUT_LOG. Phrases like 跑步, 骑车, 训练, 心率, 消耗, 卡路里, or 时长 usually mean a workout record rather than food or status data.',
@@ -298,16 +306,56 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
         properties: {
           sheet: {
             type: 'string',
-            enum: listSheetsForOperation('insert'),
+            enum: listGenericInsertSheets(),
             description: 'Target sheet key to insert into.',
           },
           record: {
             type: 'object',
             description:
-              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss. Never pass natural-language timestamp strings like today 08:55. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. For FOOD_LOG, meal_type must be exactly one of breakfast, lunch, dinner, snack; convert Chinese meal words like 早餐/早饭/午饭/晚饭/夜宵 into those exact enum values instead of copying the original Chinese word. For SLEEP_LOG, put the sleep interval into sleep_start_at and sleep_end_at, map sleep quality into good, normal, or poor, and use source=manual for user-entered text. For WORKOUT_LOG, use workout_name, workout_level, duration_min, heart-rate fields, and calories_kcal instead of putting exercise details into other sheets.",
+              "Flat JSON object containing field keys and values for the target sheet. Do not include auto-generated fields. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss. Never pass natural-language timestamp strings like today 08:55. For event-log sheets, infer occurred_at from the user's natural-language meaning whenever possible; if no event time was provided, occurred_at may be omitted and the app will default it to now. Do not use insertData for FOOD_LOG; use insertFoodLog instead. For SLEEP_LOG, put the sleep interval into sleep_start_at and sleep_end_at, map sleep quality into good, normal, or poor, and use source=manual for user-entered text. For WORKOUT_LOG, use workout_name, workout_level, duration_min, heart-rate fields, and calories_kcal instead of putting exercise details into other sheets.",
           },
         },
         required: ['sheet', 'record'],
+      },
+    },
+    {
+      name: 'insertFoodLog',
+      description:
+        'Insert one FOOD_LOG record together with structured meal items. Use this for all food logging requests.',
+      parameters: {
+        type: 'object',
+        properties: {
+          record: {
+            type: 'object',
+            description:
+              'Flat FOOD_LOG record containing field keys and values. Do not include auto-generated fields. meal_type must be exactly one of breakfast, lunch, dinner, snack. meal_text should be a concise summary of what was eaten. All timestamp values must use the exact format yyyy-MM-dd HH:mm:ss.',
+          },
+          items: {
+            type: 'array',
+            description:
+              "Structured meal items for downstream nutrition and stock resolution. Preserve the user's quantity and unit instead of flattening everything into one serving.",
+            items: {
+              type: 'object',
+              properties: {
+                itemName: {
+                  type: 'string',
+                  description: 'Food item name.',
+                },
+                quantity: {
+                  type: 'number',
+                  description: 'Positive quantity for the item.',
+                },
+                unit: {
+                  type: 'string',
+                  description:
+                    'Unit that matches the user wording, such as g, ml, piece, bowl, cup, 份, 个.',
+                },
+              },
+              required: ['itemName', 'quantity', 'unit'],
+            },
+          },
+        },
+        required: ['record', 'items'],
       },
     },
     {
@@ -470,6 +518,44 @@ function getRequiredRecord(
   return value as ToolRecord;
 }
 
+function getRequiredFoodLogItems(
+  args: Record<string, unknown>,
+  key: string,
+): FoodLogInsertRequest['items'] {
+  const value = args[key];
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Function argument ${key} must be an array.`);
+  }
+
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw new Error(`Function argument ${key}[${index}] must be an object.`);
+    }
+
+    const itemRecord = item as Record<string, unknown>;
+    const itemName = getRequiredString(itemRecord, 'itemName');
+    const quantity = itemRecord.quantity;
+    const unit = getRequiredString(itemRecord, 'unit');
+
+    if (
+      typeof quantity !== 'number' ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0
+    ) {
+      throw new Error(
+        `Function argument ${key}[${index}].quantity must be a positive number.`,
+      );
+    }
+
+    return {
+      itemName,
+      quantity,
+      unit,
+    };
+  });
+}
+
 function buildReadSelector(args: Record<string, unknown>): ToolSelector {
   const selectorType = getRequiredString(args, 'selectorType');
 
@@ -503,7 +589,7 @@ function buildReadSelector(args: Record<string, unknown>): ToolSelector {
 
 function mapFunctionCallToRequest(
   functionCall: GeminiFunctionCall,
-): GenericToolRequest {
+): GenericToolRequest | FoodLogInsertRequest {
   const name = functionCall.name;
   const args = functionCall.args;
 
@@ -524,6 +610,13 @@ function mapFunctionCallToRequest(
         tool: 'insertData',
         sheet: getRequiredString(args, 'sheet') as GenericToolRequest['sheet'],
         record: getRequiredRecord(args, 'record'),
+      };
+    case 'insertFoodLog':
+      return {
+        tool: 'insertFoodLog',
+        sheet: 'FOOD_LOG',
+        record: getRequiredRecord(args, 'record'),
+        items: getRequiredFoodLogItems(args, 'items'),
       };
     case 'updateData':
       return {
@@ -564,6 +657,7 @@ export function startAiResponse(
 
     if (
       functionCall.name !== 'readData' &&
+      functionCall.name !== 'insertFoodLog' &&
       functionCall.name !== 'insertData' &&
       functionCall.name !== 'updateData'
     ) {

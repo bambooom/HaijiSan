@@ -390,23 +390,36 @@ describe('handleAiText', () => {
     mocks.startAiResponse.mockReturnValue({
       mode: 'tool',
       request: {
-        tool: 'insertData',
+        tool: 'insertFoodLog',
         sheet: 'FOOD_LOG',
         record: {
           occurred_at: '2026-04-08 12:30:00',
           meal_type: 'lunch',
           meal_text: '原味酸奶',
         },
+        items: [
+          {
+            itemName: '原味酸奶',
+            quantity: 1,
+            unit: 'cup',
+          },
+        ],
       },
       functionCall: {
-        name: 'insertData',
+        name: 'insertFoodLog',
         args: {
-          sheet: 'FOOD_LOG',
           record: {
             occurred_at: '2026-04-08 12:30:00',
             meal_type: 'lunch',
             meal_text: '原味酸奶',
           },
+          items: [
+            {
+              itemName: '原味酸奶',
+              quantity: 1,
+              unit: 'cup',
+            },
+          ],
         },
       },
       modelContent: {

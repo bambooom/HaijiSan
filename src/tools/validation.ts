@@ -11,7 +11,10 @@ import type {
   ToolRecord,
   UpdateDataRequest,
 } from './types';
+import type { FoodLogInsertRequest as StructuredFoodLogInsertRequest } from '../types';
 import { TOOL_REGISTRY } from './registry';
+
+export type AiToolRequest = GenericToolRequest | StructuredFoodLogInsertRequest;
 
 export function getFieldByKey(
   schema: SheetSchema,
@@ -153,6 +156,46 @@ export function validateUpdateDataRequest(
   return errors;
 }
 
+export function validateFoodLogInsertRequest(
+  request: StructuredFoodLogInsertRequest,
+): string[] {
+  const recordErrors = validateInsertDataRequest({
+    tool: 'insertData',
+    sheet: 'FOOD_LOG',
+    record: request.record,
+  });
+
+  if (request.items.length === 0) {
+    return recordErrors.concat(
+      'FOOD_LOG items must contain at least one item.',
+    );
+  }
+
+  const itemErrors = request.items.flatMap((item, index) => {
+    const errors: string[] = [];
+
+    if (!item.itemName.trim()) {
+      errors.push(
+        `FOOD_LOG items[${index}].itemName must be a non-empty string.`,
+      );
+    }
+
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      errors.push(
+        `FOOD_LOG items[${index}].quantity must be a positive number.`,
+      );
+    }
+
+    if (!item.unit.trim()) {
+      errors.push(`FOOD_LOG items[${index}].unit must be a non-empty string.`);
+    }
+
+    return errors;
+  });
+
+  return recordErrors.concat(itemErrors);
+}
+
 export function validateGenericToolRequest(
   request: GenericToolRequest,
 ): string[] {
@@ -164,4 +207,10 @@ export function validateGenericToolRequest(
     case 'updateData':
       return validateUpdateDataRequest(request);
   }
+}
+
+export function validateAiToolRequest(request: AiToolRequest): string[] {
+  return request.tool === 'insertFoodLog'
+    ? validateFoodLogInsertRequest(request)
+    : validateGenericToolRequest(request);
 }

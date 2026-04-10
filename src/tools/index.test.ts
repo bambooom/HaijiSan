@@ -16,6 +16,7 @@ import type {
   ToolSelector,
   UpdateDataRequest,
 } from './types';
+import type { FoodLogInsertRequest as StructuredFoodLogInsertRequest } from '../types';
 
 let TOOL_REGISTRY: typeof import('./registry').TOOL_REGISTRY;
 let executeGenericToolRequest: typeof import('./index').executeGenericToolRequest;
@@ -23,6 +24,8 @@ let executeInsertData: typeof import('./index').executeInsertData;
 let executeReadData: typeof import('./index').executeReadData;
 let executeUpdateData: typeof import('./index').executeUpdateData;
 let validateGenericToolRequest: typeof import('./validation').validateGenericToolRequest;
+let validateAiToolRequest: typeof import('./validation').validateAiToolRequest;
+let validateFoodLogInsertRequest: typeof import('./validation').validateFoodLogInsertRequest;
 let validateInsertDataRequest: typeof import('./validation').validateInsertDataRequest;
 let validateReadDataRequest: typeof import('./validation').validateReadDataRequest;
 let validateUpdateDataRequest: typeof import('./validation').validateUpdateDataRequest;
@@ -39,6 +42,8 @@ beforeAll(async () => {
   executeInsertData = executionModule.executeInsertData;
   executeReadData = executionModule.executeReadData;
   executeUpdateData = executionModule.executeUpdateData;
+  validateAiToolRequest = validationModule.validateAiToolRequest;
+  validateFoodLogInsertRequest = validationModule.validateFoodLogInsertRequest;
   validateGenericToolRequest = validationModule.validateGenericToolRequest;
   validateInsertDataRequest = validationModule.validateInsertDataRequest;
   validateReadDataRequest = validationModule.validateReadDataRequest;
@@ -197,6 +202,57 @@ describe('generic tool contract', () => {
         },
       }),
     ).toEqual([]);
+  });
+
+  it('validates structured FOOD_LOG insert requests with item-level checks', () => {
+    const request: StructuredFoodLogInsertRequest = {
+      tool: 'insertFoodLog',
+      sheet: 'FOOD_LOG',
+      record: {
+        occurred_at: '2026-04-08 12:30:00',
+        meal_type: 'lunch',
+        meal_text: '鸡蛋和菠菜',
+      },
+      items: [
+        {
+          itemName: '鸡蛋',
+          quantity: 2,
+          unit: 'piece',
+        },
+      ],
+    };
+
+    expect(validateFoodLogInsertRequest(request)).toEqual([]);
+    expect(validateAiToolRequest(request)).toEqual([]);
+  });
+
+  it('rejects invalid structured FOOD_LOG insert requests', () => {
+    const request: StructuredFoodLogInsertRequest = {
+      tool: 'insertFoodLog',
+      sheet: 'FOOD_LOG',
+      record: {
+        occurred_at: '2026-04-08 12:30:00',
+        meal_type: 'lunch',
+        meal_text: '鸡蛋和菠菜',
+        food_log_id: 'food_1',
+      },
+      items: [
+        {
+          itemName: '',
+          quantity: 0,
+          unit: ' ',
+        },
+      ],
+    };
+
+    expect(validateFoodLogInsertRequest(request)).toEqual(
+      expect.arrayContaining([
+        'Field food_log_id on FOOD_LOG is auto-generated and cannot be provided.',
+        'FOOD_LOG items[0].itemName must be a non-empty string.',
+        'FOOD_LOG items[0].quantity must be a positive number.',
+        'FOOD_LOG items[0].unit must be a non-empty string.',
+      ]),
+    );
   });
 
   it('executes readData with selector filtering and field projection', () => {

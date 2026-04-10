@@ -145,7 +145,7 @@ describe('Gemini native function calling', () => {
     );
     expect(
       payload.tools[0]?.functionDeclarations.map((tool) => tool.name),
-    ).toEqual(['readData', 'insertData', 'updateData']);
+    ).toEqual(['readData', 'insertData', 'insertFoodLog', 'updateData']);
     expect(payload.contents).toEqual([
       {
         role: 'user',
@@ -211,6 +211,84 @@ describe('Gemini native function calling', () => {
       functionCall: {
         id: 'call-1',
         name: 'readData',
+      },
+    });
+  });
+
+  it('maps Gemini insertFoodLog calls to a structured FOOD_LOG request', () => {
+    mocks.fetch.mockReturnValue({
+      getResponseCode: () => 200,
+      getContentText: () =>
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      id: 'call-food-1',
+                      name: 'insertFoodLog',
+                      args: {
+                        record: {
+                          occurred_at: '2026-04-08 12:30:00',
+                          meal_type: 'lunch',
+                          meal_text: '鸡蛋和菠菜',
+                        },
+                        items: [
+                          {
+                            itemName: '鸡蛋',
+                            quantity: 2,
+                            unit: 'piece',
+                          },
+                          {
+                            itemName: '菠菜',
+                            quantity: 100,
+                            unit: 'g',
+                          },
+                        ],
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = startAiResponse(
+      '午餐吃了两个鸡蛋和100克菠菜',
+      [],
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(result).toMatchObject({
+      mode: 'tool',
+      request: {
+        tool: 'insertFoodLog',
+        sheet: 'FOOD_LOG',
+        record: {
+          occurred_at: '2026-04-08 12:30:00',
+          meal_type: 'lunch',
+          meal_text: '鸡蛋和菠菜',
+        },
+        items: [
+          {
+            itemName: '鸡蛋',
+            quantity: 2,
+            unit: 'piece',
+          },
+          {
+            itemName: '菠菜',
+            quantity: 100,
+            unit: 'g',
+          },
+        ],
+      },
+      functionCall: {
+        id: 'call-food-1',
+        name: 'insertFoodLog',
       },
     });
   });
@@ -285,7 +363,13 @@ describe('Gemini native function calling', () => {
       tools: Array<{
         functionDeclarations: Array<{
           name: string;
-          parameters: { properties: { record: { description: string } } };
+          description?: string;
+          parameters: {
+            properties: {
+              record: { description: string };
+              items?: { description: string };
+            };
+          };
         }>;
       }>;
     };
@@ -303,6 +387,28 @@ describe('Gemini native function calling', () => {
       insertDeclaration?.parameters.properties.record.description,
     ).toContain(
       'Never pass natural-language timestamp strings like today 08:55.',
+    );
+    expect(
+      insertDeclaration?.parameters.properties.record.description,
+    ).toContain(
+      'Do not use insertData for FOOD_LOG; use insertFoodLog instead.',
+    );
+
+    const insertFoodLogDeclaration =
+      payload.tools[0]?.functionDeclarations.find(
+        (tool) => tool.name === 'insertFoodLog',
+      );
+
+    expect(insertFoodLogDeclaration?.description).toContain(
+      'structured meal items',
+    );
+    expect(
+      insertFoodLogDeclaration?.parameters.properties.items?.description,
+    ).toContain("Preserve the user's quantity and unit");
+    expect(
+      insertFoodLogDeclaration?.parameters.properties.record.description,
+    ).toContain(
+      'meal_type must be exactly one of breakfast, lunch, dinner, snack.',
     );
     expect(
       insertDeclaration?.parameters.properties.record.description,

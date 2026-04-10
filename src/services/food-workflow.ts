@@ -1,6 +1,10 @@
 import { estimateIngredientCalories } from './food-estimation';
 import { refCaloriesTable, stockTable } from '../tables';
-import type { MealType } from '../types';
+import type {
+  FoodLogInsertRequest,
+  FoodReferenceEntry,
+  MealType,
+} from '../types';
 import type {
   InsertDataRequest,
   InsertDataResult,
@@ -49,6 +53,28 @@ function buildDraftItems(mealText: string): IngredientEstimateInput[] {
     }));
 }
 
+function normalizeStructuredItems(
+  items: IngredientEstimateInput[] | undefined,
+): IngredientEstimateInput[] {
+  if (!items || items.length === 0) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      itemName: normalizeMealText(item.itemName),
+      quantity: item.quantity,
+      unit: normalizeMealText(item.unit),
+    }))
+    .filter(
+      (item) =>
+        Boolean(item.itemName) &&
+        Boolean(item.unit) &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0,
+    );
+}
+
 function sumNullableNumbers(
   values: Array<number | null | undefined>,
 ): number | null {
@@ -71,6 +97,74 @@ function uniqueValues(values: string[]): string[] {
 
 function normalizeUnit(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function roundNutritionValue(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function isServingUnit(value: string): boolean {
+  return new Set(['serving', 'servings', '份', 'portion']).has(
+    normalizeUnit(value),
+  );
+}
+
+function isPieceUnit(value: string): boolean {
+  return new Set(['piece', 'pieces', '个']).has(normalizeUnit(value));
+}
+
+function scaleNullableNumber(
+  value: number | null,
+  scale: number,
+): number | null {
+  return value === null ? null : roundNutritionValue(value * scale);
+}
+
+function resolveReferenceScale(
+  item: IngredientEstimateInput,
+  reference: FoodReferenceEntry,
+): number | null {
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+    return null;
+  }
+
+  const itemUnit = normalizeUnit(item.unit);
+  const referenceUnit = normalizeUnit(reference.serving_unit);
+  const referenceSize = reference.serving_size;
+
+  if (!itemUnit) {
+    return null;
+  }
+
+  if (isServingUnit(itemUnit)) {
+    return item.quantity;
+  }
+
+  if (itemUnit === referenceUnit) {
+    if (
+      typeof referenceSize === 'number' &&
+      Number.isFinite(referenceSize) &&
+      referenceSize > 0
+    ) {
+      return item.quantity / referenceSize;
+    }
+
+    return item.quantity;
+  }
+
+  if (isPieceUnit(itemUnit) && isPieceUnit(referenceUnit)) {
+    if (
+      typeof referenceSize === 'number' &&
+      Number.isFinite(referenceSize) &&
+      referenceSize > 0
+    ) {
+      return item.quantity / referenceSize;
+    }
+
+    return item.quantity;
+  }
+
+  return null;
 }
 
 function canAutoAdjustStock(
@@ -246,33 +340,56 @@ function resolveDraftItem(item: IngredientEstimateInput): MealResolvedItem {
     };
   }
 
+  const referenceScale = resolveReferenceScale(item, matchedReference);
+
+  if (referenceScale === null) {
+    return {
+      ...item,
+      estimatedCalories: null,
+      proteinG: null,
+      fatG: null,
+      carbsG: null,
+      source: 'ai',
+      note: 'local REF_CALORIES match found, but quantity/unit could not be scaled reliably',
+    };
+  }
+
   return {
     ...item,
-    estimatedCalories: matchedReference.calories_kcal,
-    proteinG: matchedReference.protein_g,
-    fatG: matchedReference.fat_g,
-    carbsG: matchedReference.carbs_g,
+    estimatedCalories: scaleNullableNumber(
+      matchedReference.calories_kcal,
+      referenceScale,
+    ),
+    proteinG: scaleNullableNumber(matchedReference.protein_g, referenceScale),
+    fatG: scaleNullableNumber(matchedReference.fat_g, referenceScale),
+    carbsG: scaleNullableNumber(matchedReference.carbs_g, referenceScale),
     source: 'reference',
     linkedFoodRefId: matchedReference.food_ref_id,
-    note: 'matched local REF_CALORIES by item name',
+    note: 'matched local REF_CALORIES by item name and scaled by quantity/unit',
   };
 }
 
-export function buildMealStructure(record: ToolRecord): MealStructureResult {
+export function buildMealStructure(
+  record: ToolRecord,
+  structuredItems?: IngredientEstimateInput[],
+): MealStructureResult {
   const mealText = normalizeMealText(record.meal_text);
   const mealType = (record.meal_type as MealType | undefined) ?? 'snack';
-  const items = buildDraftItems(mealText);
+  const items = normalizeStructuredItems(structuredItems);
+  const draftItems = items.length > 0 ? items : buildDraftItems(mealText);
 
   return {
     mealType,
     mealText,
     shouldPersist: Boolean(mealText),
-    items,
+    items: draftItems,
     note: !mealText
       ? 'food-workflow: empty meal_text'
-      : items.length <= 1
-        ? 'food-workflow: single-item draft from meal_text'
-        : 'food-workflow: multi-item draft from meal_text',
+      : items.length > 0
+        ? 'food-workflow: using AI-structured meal items'
+        : draftItems.length <= 1
+          ? 'food-workflow: single-item draft from meal_text'
+          : 'food-workflow: multi-item draft from meal_text',
   };
 }
 
@@ -329,10 +446,13 @@ export function enrichFoodInsertRecord(record: ToolRecord): ToolRecord {
 }
 
 export function executeFoodInsertWorkflow(
-  request: InsertDataRequest,
+  request: InsertDataRequest | FoodLogInsertRequest,
   timestamp: Date,
 ): InsertDataResult {
-  const draft = buildMealStructure(request.record);
+  const draft = buildMealStructure(
+    request.record,
+    request.tool === 'insertFoodLog' ? request.items : undefined,
+  );
   const resolution = resolveMealWithAiFallback(draft, timestamp);
   const enrichedRecord = applyResolvedFieldsToFoodRecord(
     request.record,
@@ -347,7 +467,8 @@ export function executeFoodInsertWorkflow(
 
   return executeInsertData(
     {
-      ...request,
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
       record: finalRecord,
     },
     timestamp,

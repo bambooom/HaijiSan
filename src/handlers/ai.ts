@@ -12,13 +12,16 @@ import type {
   GenericToolResult,
   ToolSelector,
 } from '../tools/types';
-import { validateGenericToolRequest } from '../tools/validation';
+import { validateAiToolRequest } from '../tools/validation';
 import type {
   CommandAuditFields,
   CommandHandlingResult,
   ConversationTurn,
+  FoodLogInsertRequest,
 } from '../types';
 import { buildCommandLogFields } from '../utils/log-meta';
+
+type AiToolRequest = GenericToolRequest | FoodLogInsertRequest;
 
 function createTraceId(timestamp: Date): string {
   return `ai_${timestamp.getTime()}`;
@@ -78,9 +81,7 @@ function formatSelectorValue(selector: ToolSelector): string {
   }
 }
 
-function buildAuditFromRequest(
-  request: GenericToolRequest,
-): CommandAuditFields {
+function buildAuditFromRequest(request: AiToolRequest): CommandAuditFields {
   switch (request.tool) {
     case 'readData':
       return {
@@ -97,6 +98,7 @@ function buildAuditFromRequest(
         changedFields: [],
       };
     case 'insertData':
+    case 'insertFoodLog':
       return {
         toolCallCount: 1,
         readCount: 0,
@@ -194,10 +196,13 @@ function formatToolResult(result: GenericToolResult): string {
 }
 
 function executeAiToolRequest(
-  request: GenericToolRequest,
+  request: AiToolRequest,
   timestamp: Date,
 ): GenericToolResult {
-  if (request.tool === 'insertData' && request.sheet === 'FOOD_LOG') {
+  if (
+    request.tool === 'insertFoodLog' ||
+    (request.tool === 'insertData' && request.sheet === 'FOOD_LOG')
+  ) {
     return executeFoodInsertWorkflow(request, timestamp);
   }
 
@@ -223,7 +228,7 @@ export function handleAiText(
 
     const audit = buildAuditFromRequest(response.request);
 
-    const errors = validateGenericToolRequest(response.request);
+    const errors = validateAiToolRequest(response.request);
 
     if (errors.length > 0) {
       return buildAiResult(
