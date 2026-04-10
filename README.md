@@ -181,19 +181,17 @@ flowchart TD
   - Text-based AI routing for direct reply, readData, insertData, and updateData
   - Non-food log writes for body, sleep, workout, and status records
   - FOOD_LOG dedicated workflow with local REF_CALORIES enrichment, multi-item draft splitting, and Gemini fallback estimation for unresolved items
+  - Food-photo OCR conversion into FOOD_LOG drafts, with confirmation/review kept inside the Telegram flow when the write still needs user verification
   - FOOD_LOG stock side effects for safe direct stock matches
+  - FOOD_LOG pending stock confirmation flow that records the meal first, then asks the user to confirm stock deduction separately
+  - Direct stock-deduction quantity correction through Telegram reply input, including explicit examples and zero-to-cancel guidance
   - BOT_LOG audit logging
   - Telegram webhook idempotency protection
   - Generic OCR extraction service for nutrition labels, food photos, and health screenshots
   - Telegram image ingress for nutrition labels, food photos, and health screenshots
   - Nutrition-label OCR create-or-update flow for REF_CALORIES
-- Partially implemented:
-  - Food-photo OCR currently converts the extracted summary into a FOOD_LOG draft, but quantity and unit understanding is still rough
-  - Stock side effects currently prefer safe exact matches and do not yet cover broader quantity/unit conversion cases
 - Planned next:
-  - Better quantity and unit extraction for FOOD_LOG and stock deduction
-  - Richer food-photo understanding beyond a summary-first draft
-  - OCR confidence and review paths for lower-certainty writes
+  - Better support for outside-food photos where a rough main-dish identification and calorie estimate is enough, without requiring a highly structured FOOD_LOG draft
 
 ## Feature List
 
