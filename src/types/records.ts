@@ -8,6 +8,9 @@ import type {
   StatusEntryType,
   WorkoutLevel,
 } from './core';
+import { SheetRow } from './spreadsheet';
+import { SheetSchema } from './sheet-schema';
+import { type SpreadsheetService } from '../services/spreadsheet';
 
 export interface StatusLogEntry {
   entry_id: string;
@@ -145,4 +148,40 @@ export interface FoodReferenceEntry {
   source: ReferenceSource;
   updated_at: string;
   note: string;
+}
+
+export type TimestampFormatter = {
+  getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
+};
+
+export type EntryRow<TRecord> = {
+  rowNumber: number;
+  entry: TRecord;
+  values: SheetRow;
+};
+
+export type DateMatchPredicate<TRecord> = (
+  entry: TRecord,
+  dateStamp: string,
+) => boolean;
+export type DateRangeMatchPredicate<TRecord> = (
+  entry: TRecord,
+  startDateStamp: string,
+  endDateStamp: string,
+) => boolean;
+
+export interface SheetTableOptions {
+  schema: SheetSchema;
+  spreadsheet?: SpreadsheetService;
+  idPrefix?: string;
+}
+
+export interface LogSheetTableOptions<
+  TRecord extends object,
+> extends SheetTableOptions {
+  matchesDate?: DateMatchPredicate<TRecord>;
+  matchesDateRange?: DateRangeMatchPredicate<TRecord>;
+  sortValue?: (entry: TRecord) => string;
+  isIncluded?: (entry: TRecord) => boolean;
+  eventTimeKey?: string;
 }

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   getDailyDigestTriggerStatus: vi.fn(),
 }));
 
-vi.mock('./services/digest-trigger', () => ({
+vi.mock('./services/daily/trigger', () => ({
   installDailyDigestTrigger: mocks.installDailyDigestTrigger,
   disableDailyDigestTrigger: mocks.disableDailyDigestTrigger,
   getDailyDigestTriggerStatus: mocks.getDailyDigestTriggerStatus,

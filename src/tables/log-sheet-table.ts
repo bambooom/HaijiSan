@@ -1,4 +1,9 @@
-import type { SheetSchema } from '../types';
+import type {
+  EntryRow,
+  DateMatchPredicate,
+  DateRangeMatchPredicate,
+  LogSheetTableOptions,
+} from '../types';
 import { type SpreadsheetService } from '../services/spreadsheet';
 import {
   matchesRecordDate,
@@ -10,33 +15,6 @@ import {
   listRecentEntries,
 } from '../shared/record-query';
 import { SheetTable } from './sheet-table';
-
-type EntryRow<TRecord> = {
-  rowNumber: number;
-  entry: TRecord;
-  values: import('../types').SheetRow;
-};
-
-type DateMatchPredicate<TRecord> = (
-  entry: TRecord,
-  dateStamp: string,
-) => boolean;
-type DateRangeMatchPredicate<TRecord> = (
-  entry: TRecord,
-  startDateStamp: string,
-  endDateStamp: string,
-) => boolean;
-
-type LogSheetTableOptions<TRecord extends object> = {
-  schema: SheetSchema;
-  spreadsheet?: SpreadsheetService;
-  matchesDate?: DateMatchPredicate<TRecord>;
-  matchesDateRange?: DateRangeMatchPredicate<TRecord>;
-  sortValue?: (entry: TRecord) => string;
-  isIncluded?: (entry: TRecord) => boolean;
-  eventTimeKey?: string;
-  idPrefix?: string;
-};
 
 export class LogSheetTable<TRecord extends object> {
   private readonly baseTable: SheetTable<TRecord>;

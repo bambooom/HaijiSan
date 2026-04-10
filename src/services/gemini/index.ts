@@ -1,46 +1,17 @@
-import { GEMINI_API_KEY, GEMINI_MODEL } from '../../app-config';
 import { TOOL_REGISTRY } from '../../tools/registry';
 import type {
   GenericToolRequest,
   GenericToolResult,
   ToolRecord,
   ToolSelector,
-} from '../../tools/types';
-import type { ConversationTurn, FoodLogInsertRequest } from '../../types';
+  ConversationTurn,
+  FoodLogInsertRequest,
+  GeminiContent,
+  GeminiFunctionCall,
+  GeminiResponse,
+} from '../../types';
+import { executeGeminiRequest } from './transport';
 import { spreadsheetService } from '../spreadsheet';
-
-type GeminiFunctionCall = {
-  id?: string;
-  name?: string;
-  args?: Record<string, unknown>;
-};
-
-type GeminiPart = {
-  text?: string;
-  functionCall?: GeminiFunctionCall;
-  functionResponse?: {
-    id?: string;
-    name: string;
-    response: Record<string, unknown>;
-  };
-  [key: string]: unknown;
-};
-
-export type GeminiContent = {
-  role?: string;
-  parts?: GeminiPart[];
-  [key: string]: unknown;
-};
-
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: GeminiContent;
-    finishReason?: string;
-  }>;
-  promptFeedback?: {
-    blockReason?: string;
-  };
-};
 
 export type AiStartResponse =
   | {
@@ -90,10 +61,6 @@ function buildConversationContents(history: ConversationTurn[], text: string) {
   });
 
   return contents;
-}
-
-function getGeminiUrl(): string {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 }
 
 function listSheetsForOperation(
@@ -189,19 +156,6 @@ function buildFieldMeaningSummary(): string {
     })
     .filter((line): line is string => Boolean(line))
     .join('\n');
-}
-
-function sleepBeforeRetry(delayMs: number): void {
-  if (
-    typeof Utilities !== 'undefined' &&
-    typeof Utilities.sleep === 'function'
-  ) {
-    Utilities.sleep(delayMs);
-  }
-}
-
-function isRetryableGeminiStatus(status: number): boolean {
-  return GEMINI_RETRYABLE_STATUS_CODES.has(status);
 }
 
 function buildSystemInstruction(referenceTimestamp: Date): string {
@@ -387,31 +341,12 @@ function buildFunctionDeclarations(): Array<Record<string, unknown>> {
 }
 
 function callGemini(payload: Record<string, unknown>): GeminiResponse {
-  for (let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt += 1) {
-    const response = UrlFetchApp.fetch(getGeminiUrl(), {
-      method: 'post',
-      contentType: 'application/json',
-      muteHttpExceptions: true,
-      payload: JSON.stringify(payload),
-    });
-    const status = response.getResponseCode();
-    const body = response.getContentText();
-
-    if (status >= 200 && status < 300) {
-      return JSON.parse(body) as GeminiResponse;
-    }
-
-    const shouldRetry =
-      isRetryableGeminiStatus(status) && attempt < GEMINI_MAX_ATTEMPTS - 1;
-
-    if (!shouldRetry) {
-      throw new Error(`Gemini request failed (${status}): ${body}`);
-    }
-
-    sleepBeforeRetry(GEMINI_RETRY_DELAYS_MS[attempt] ?? 0);
-  }
-
-  throw new Error('Gemini request failed after retries.');
+  return executeGeminiRequest<GeminiResponse>(payload, {
+    retryableStatusCodes: GEMINI_RETRYABLE_STATUS_CODES,
+    retryDelaysMs: GEMINI_RETRY_DELAYS_MS,
+    maxAttempts: GEMINI_MAX_ATTEMPTS,
+    failureLabel: 'Gemini request',
+  });
 }
 
 function extractCandidateContent(response: GeminiResponse): GeminiContent {

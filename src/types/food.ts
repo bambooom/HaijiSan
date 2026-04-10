@@ -32,8 +32,14 @@ export interface PendingStockDeductionDraft {
   candidates: PendingStockDeductionCandidate[];
 }
 
+export type StockSideEffectPlan = {
+  linkedStockItemIds: string[];
+  pendingCandidates: PendingStockDeductionCandidate[];
+  skippedNotes: string[];
+};
+
 export interface FoodWorkflowExecutionResult {
-  insertResult: import('../tools/types').InsertDataResult;
+  insertResult: import('./tools').InsertDataResult;
   pendingStockDeduction?: PendingStockDeductionDraft;
 }
 

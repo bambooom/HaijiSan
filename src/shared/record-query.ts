@@ -1,6 +1,4 @@
-type TimestampFormatter = {
-  getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
-};
+import { TimestampFormatter } from '../types';
 
 type SortDirection = 'asc' | 'desc';
 

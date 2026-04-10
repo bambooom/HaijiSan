@@ -4,20 +4,13 @@ import type {
   SheetCellValue,
   SheetRow,
   SheetSchema,
+  TimestampFormatter,
 } from '../types';
-
-type TimestampFormatter = {
-  getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
-};
 
 const SHEET_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 const SHEET_TIMESTAMP_WITH_MILLISECONDS_PATTERN =
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/;
-
-function isEmptyCellValue(value: SheetCellValue | undefined): boolean {
-  return value === '' || value === null || value === undefined;
-}
 
 function isMissingRecordValue(value: unknown): boolean {
   return value === '' || value === null || value === undefined;
@@ -44,7 +37,7 @@ function coerceRowValue(
   field: FieldSchema,
   value: SheetCellValue | undefined,
 ): unknown {
-  if (isEmptyCellValue(value)) {
+  if (isMissingRecordValue(value)) {
     switch (field.type) {
       case 'number':
         return null;

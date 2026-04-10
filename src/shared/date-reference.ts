@@ -1,10 +1,6 @@
 const BACKFILL_DATE_NOTE_PATTERN =
   /(?:^|[;\s])backfillDate=(\d{4}-\d{2}-\d{2})(?=$|[;\s])/;
 
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
 function isValidDateParts(year: number, month: number, day: number): boolean {
   const candidate = new Date(year, month - 1, day);
 
@@ -15,15 +11,7 @@ function isValidDateParts(year: number, month: number, day: number): boolean {
   );
 }
 
-export function formatDateStamp(date: Date): string {
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-  ].join('-');
-}
-
-export function isDateStamp(value: string | null | undefined): value is string {
+function isDateStamp(value: string | null | undefined): value is string {
   if (!value) {
     return false;
   }
@@ -37,146 +25,19 @@ export function isDateStamp(value: string | null | undefined): value is string {
   return isValidDateParts(Number(match[1]), Number(match[2]), Number(match[3]));
 }
 
-function shiftDays(baseDate: Date, offset: number): string {
-  const shifted = new Date(
-    baseDate.getFullYear(),
-    baseDate.getMonth(),
-    baseDate.getDate() + offset,
-    baseDate.getHours(),
-    baseDate.getMinutes(),
-    baseDate.getSeconds(),
-    baseDate.getMilliseconds(),
-  );
-
-  return formatDateStamp(shifted);
-}
-
-function normalizeExplicitDate(
-  year: number,
-  month: number,
-  day: number,
-): string | null {
-  if (!isValidDateParts(year, month, day)) {
-    return null;
-  }
-
-  return [year, pad(month), pad(day)].join('-');
-}
-
-export function parseTargetDateReference(
-  text: string,
-  referenceDate: Date,
-): string | null {
-  const normalized = text.trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  if (normalized.includes('今天')) {
-    return formatDateStamp(referenceDate);
-  }
-
-  if (normalized.includes('大前天')) {
-    return shiftDays(referenceDate, -3);
-  }
-
-  if (normalized.includes('前天')) {
-    return shiftDays(referenceDate, -2);
-  }
-
-  if (normalized.includes('昨天')) {
-    return shiftDays(referenceDate, -1);
-  }
-
-  const fullDateMatch = normalized.match(
-    /(?<!\d)(20\d{2})[年/.-](\d{1,2})[月/.-](\d{1,2})(?:日|号)?(?!\d)/,
-  );
-
-  if (fullDateMatch) {
-    return normalizeExplicitDate(
-      Number(fullDateMatch[1]),
-      Number(fullDateMatch[2]),
-      Number(fullDateMatch[3]),
-    );
-  }
-
-  const monthDayMatch = normalized.match(
-    /(?<!\d)(\d{1,2})[月/.-](\d{1,2})(?:日|号)?(?!\d)/,
-  );
-
-  if (!monthDayMatch) {
-    return null;
-  }
-
-  const month = Number(monthDayMatch[1]);
-  const day = Number(monthDayMatch[2]);
-  const currentYear = referenceDate.getFullYear();
-  const currentYearCandidate = normalizeExplicitDate(currentYear, month, day);
-
-  if (!currentYearCandidate) {
-    return null;
-  }
-
-  const candidateDate = new Date(currentYear, month - 1, day);
-  const referenceDay = new Date(
-    referenceDate.getFullYear(),
-    referenceDate.getMonth(),
-    referenceDate.getDate(),
-  );
-
-  if (candidateDate.getTime() <= referenceDay.getTime()) {
-    return currentYearCandidate;
-  }
-
-  return normalizeExplicitDate(currentYear - 1, month, day);
-}
-
-export function resolveTargetDateTimestamp(
-  baseTimestamp: Date,
-  targetDate: string | null | undefined,
-): Date {
-  if (!isDateStamp(targetDate)) {
-    return baseTimestamp;
-  }
-
-  const [year, month, day] = targetDate.split('-').map(Number);
-
-  return new Date(
-    year,
-    month - 1,
-    day,
-    baseTimestamp.getHours(),
-    baseTimestamp.getMinutes(),
-    baseTimestamp.getSeconds(),
-    baseTimestamp.getMilliseconds(),
-  );
+function normalizeDateStampRange(
+  startDateStamp: string,
+  endDateStamp: string,
+): { startDateStamp: string; endDateStamp: string } {
+  return startDateStamp <= endDateStamp
+    ? { startDateStamp, endDateStamp }
+    : { startDateStamp: endDateStamp, endDateStamp: startDateStamp };
 }
 
 export function extractBackfillDate(note: string): string | null {
   const match = note.match(BACKFILL_DATE_NOTE_PATTERN);
 
   return match?.[1] ?? null;
-}
-
-export function appendBackfillDateNote(
-  note: string | undefined,
-  targetDate: string | undefined,
-  loggedAt: Date,
-): string {
-  const normalizedNote = note?.trim() ?? '';
-
-  if (!isDateStamp(targetDate) || targetDate === formatDateStamp(loggedAt)) {
-    return normalizedNote;
-  }
-
-  if (extractBackfillDate(normalizedNote) === targetDate) {
-    return normalizedNote;
-  }
-
-  return normalizedNote
-    ? `${normalizedNote}; backfillDate=${targetDate}`
-    : `backfillDate=${targetDate}`;
 }
 
 export function matchesRecordDate(
@@ -187,15 +48,6 @@ export function matchesRecordDate(
   return (
     loggedAt.startsWith(dateStamp) || extractBackfillDate(note) === dateStamp
   );
-}
-
-export function normalizeDateStampRange(
-  startDateStamp: string,
-  endDateStamp: string,
-): { startDateStamp: string; endDateStamp: string } {
-  return startDateStamp <= endDateStamp
-    ? { startDateStamp, endDateStamp }
-    : { startDateStamp: endDateStamp, endDateStamp: startDateStamp };
 }
 
 export function isDateStampInRange(
@@ -228,8 +80,4 @@ export function matchesRecordDateRange(
     isDateStampInRange(loggedAtDateStamp, startDateStamp, endDateStamp) ||
     isDateStampInRange(backfillDate, startDateStamp, endDateStamp)
   );
-}
-
-export function formatDateLabel(targetDate: string): string {
-  return targetDate;
 }

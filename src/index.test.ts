@@ -33,7 +33,7 @@ vi.mock('./handlers', () => ({
   handleIncomingImageMessage: mocks.handleIncomingImageMessage,
 }));
 
-vi.mock('./services/image-ocr-queue', () => ({
+vi.mock('./services/ocr/queue', () => ({
   enqueueImageOcrJob: mocks.enqueueImageOcrJob,
   processPendingImageOcrJobs: vi.fn(),
 }));
@@ -55,11 +55,11 @@ vi.mock('./tables', () => ({
   },
 }));
 
-vi.mock('./services/daily-summary', () => ({
+vi.mock('./services/daily/summary', () => ({
   buildDailySummaryMessage: mocks.buildDailySummaryMessage,
 }));
 
-vi.mock('./services/digest-trigger', () => ({
+vi.mock('./services/daily/trigger', () => ({
   installDailyDigestTrigger: mocks.installDailyDigestTrigger,
   disableDailyDigestTrigger: mocks.disableDailyDigestTrigger,
 }));

@@ -7,7 +7,7 @@ import {
   disableDailyDigestTrigger,
   getDailyDigestTriggerStatus,
   installDailyDigestTrigger,
-} from './services/digest-trigger';
+} from './services/daily/trigger';
 import type {
   CommandHandlingResult,
   CommandLogFields,

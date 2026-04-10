@@ -1,8 +1,4 @@
-import type { SheetCellValue } from '../types';
-
-type TimestampFormatter = {
-  getTimestamp: (includeMilliseconds?: boolean, date?: Date) => string;
-};
+import type { SheetCellValue, TimestampFormatter } from '../types';
 
 export function createTimestampedEntryId(
   spreadsheet: TimestampFormatter,

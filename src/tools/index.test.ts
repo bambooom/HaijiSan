@@ -15,8 +15,8 @@ import type {
   ReadDataRequest,
   ToolSelector,
   UpdateDataRequest,
-} from './types';
-import type { FoodLogInsertRequest as StructuredFoodLogInsertRequest } from '../types';
+  FoodLogInsertRequest as StructuredFoodLogInsertRequest,
+} from '../types';
 
 let TOOL_REGISTRY: typeof import('./registry').TOOL_REGISTRY;
 let executeGenericToolRequest: typeof import('./index').executeGenericToolRequest;

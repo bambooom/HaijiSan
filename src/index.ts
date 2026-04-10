@@ -1,28 +1,28 @@
 import { MY_CHAT_ID } from './app-config';
-import { processPendingImageOcrJobs } from './services/image-ocr-queue';
-import { buildDailySummaryMessage } from './services/daily-summary';
+import { processPendingImageOcrJobs } from './services/ocr/queue';
+import { buildDailySummaryMessage } from './services/daily/summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
-} from './services/digest-trigger';
+} from './services/daily/trigger';
 import { sendText } from './services/telegram';
 import {
   getRawMessageText,
   getUpdateChatId,
   parseUpdate,
-  type TelegramUpdate,
-} from './services/telegram-update';
+} from './services/telegram/update';
+import type { TelegramUpdate, WebhookContext } from './types';
 import {
   clearCachedUpdateState,
   getCachedUpdateState,
   getUpdateDedupeKey,
   logDuplicateUpdateOnce,
   setCachedUpdateState,
-} from './services/webhook-dedupe';
+} from './services/webhook/dedupe';
 import {
   buildWebhookFailureResult,
   logWebhookTrace,
-} from './services/webhook-log';
+} from './services/webhook/log';
 import {
   appendIgnoredWebhookLog,
   appendWebhookLog,
@@ -33,8 +33,7 @@ import {
   markUpdateDone,
   reportTypingFailure,
   sendTyping,
-  type WebhookContext,
-} from './services/webhook-routing';
+} from './services/webhook/routing';
 
 function createOkResponse(): GoogleAppsScript.HTML.HtmlOutput {
   return HtmlService.createHtmlOutput('ok');

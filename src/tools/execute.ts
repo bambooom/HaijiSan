@@ -6,22 +6,15 @@ import {
 import { mapRowToRecord } from '../shared/record-mapper';
 import { listRecentEntries } from '../shared/record-query';
 import { createTimestampedEntryId, formatLoggedAt } from '../shared/records';
-import type { SheetSchema } from '../types';
 import type {
+  SheetSchema,
   GenericToolRequest,
-  GenericToolResult,
-  InsertDataRequest,
-  InsertDataResult,
-  ReadDataRequest,
-  ReadDataResult,
   RuntimeRow,
   ToolRecord,
   ToolRegistryEntry,
   ToolSelector,
   ToolSheetKey,
-  UpdateDataRequest,
-  UpdateDataResult,
-} from './types';
+} from '../types';
 import { TOOL_REGISTRY, getStringRecordValue } from './registry';
 import { getFieldByKey, validateGenericToolRequest } from './validation';
 
@@ -89,7 +82,7 @@ function applyDerivedSleepFields(
   };
 }
 
-function assertValidRequest(request: GenericToolRequest): void {
+export function assertValidRequest(request: GenericToolRequest): void {
   const errors = validateGenericToolRequest(request);
 
   if (errors.length > 0) {
@@ -187,7 +180,10 @@ function sortRows(
   });
 }
 
-function selectRows(sheet: ToolSheetKey, selector: ToolSelector): RuntimeRow[] {
+export function selectRows(
+  sheet: ToolSheetKey,
+  selector: ToolSelector,
+): RuntimeRow[] {
   const entry = TOOL_REGISTRY[sheet];
   const rows = listRuntimeRows(sheet);
 
@@ -229,7 +225,10 @@ function selectRows(sheet: ToolSheetKey, selector: ToolSelector): RuntimeRow[] {
   }
 }
 
-function projectRecord(record: ToolRecord, fields?: string[]): ToolRecord {
+export function projectRecord(
+  record: ToolRecord,
+  fields?: string[],
+): ToolRecord {
   if (!fields || fields.length === 0) {
     return record;
   }
@@ -239,7 +238,7 @@ function projectRecord(record: ToolRecord, fields?: string[]): ToolRecord {
   );
 }
 
-function applyRuntimeInsertDefaults(
+export function applyRuntimeInsertDefaults(
   entry: ToolRegistryEntry,
   record: ToolRecord,
   timestamp: Date,
@@ -290,7 +289,7 @@ function applyRuntimeInsertDefaults(
   return nextRecord;
 }
 
-function applyRuntimeUpdateDefaults(
+export function applyRuntimeUpdateDefaults(
   sheet: ToolSheetKey,
   schema: SheetSchema,
   updates: ToolRecord,
@@ -312,74 +311,4 @@ function applyRuntimeUpdateDefaults(
   }
 
   return nextUpdates;
-}
-
-export function executeReadData(request: ReadDataRequest): ReadDataResult {
-  assertValidRequest(request);
-
-  return {
-    tool: 'readData',
-    sheet: request.sheet,
-    selector: request.selector,
-    rows: selectRows(request.sheet, request.selector).map((row) => ({
-      rowNumber: row.rowNumber,
-      record: projectRecord(row.record, request.fields),
-    })),
-  };
-}
-
-export function executeInsertData(
-  request: InsertDataRequest,
-  timestamp: Date = new Date(),
-): InsertDataResult {
-  assertValidRequest(request);
-
-  const entry = TOOL_REGISTRY[request.sheet];
-  const record = applyRuntimeInsertDefaults(entry, request.record, timestamp);
-
-  entry.table.insert(record);
-
-  return {
-    tool: 'insertData',
-    sheet: request.sheet,
-    record,
-  };
-}
-
-export function executeUpdateData(
-  request: UpdateDataRequest,
-  timestamp: Date = new Date(),
-): UpdateDataResult {
-  assertValidRequest(request);
-
-  const entry = TOOL_REGISTRY[request.sheet];
-  const updates = applyRuntimeUpdateDefaults(
-    request.sheet,
-    entry.schema,
-    request.updates,
-    timestamp,
-  );
-
-  entry.table.updateAtRow(request.selector.rowNumber, updates);
-
-  return {
-    tool: 'updateData',
-    sheet: request.sheet,
-    selector: request.selector,
-    updates,
-  };
-}
-
-export function executeGenericToolRequest(
-  request: GenericToolRequest,
-  timestamp?: Date,
-): GenericToolResult {
-  switch (request.tool) {
-    case 'readData':
-      return executeReadData(request);
-    case 'insertData':
-      return executeInsertData(request, timestamp);
-    case 'updateData':
-      return executeUpdateData(request, timestamp);
-  }
 }

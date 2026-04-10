@@ -3,15 +3,13 @@ import type {
   SheetSchema,
   ToolOperation,
   ToolSelectorType,
-} from '../types';
-import type {
   GenericToolRequest,
   InsertDataRequest,
   ReadDataRequest,
   ToolRecord,
   UpdateDataRequest,
-} from './types';
-import type { FoodLogInsertRequest as StructuredFoodLogInsertRequest } from '../types';
+  FoodLogInsertRequest as StructuredFoodLogInsertRequest,
+} from '../types';
 import { TOOL_REGISTRY } from './registry';
 
 export type AiToolRequest = GenericToolRequest | StructuredFoodLogInsertRequest;

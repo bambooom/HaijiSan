@@ -1,4 +1,9 @@
-import type { SheetRow, SheetSchema } from '../types';
+import type {
+  SheetRow,
+  SheetSchema,
+  EntryRow,
+  SheetTableOptions,
+} from '../types';
 import {
   spreadsheetService,
   type SpreadsheetService,
@@ -9,18 +14,6 @@ import {
   updateSheetRecordAtRow,
 } from '../shared/record-write';
 import { createTimestampedEntryId } from '../shared/records';
-
-type EntryRow<TRecord> = {
-  rowNumber: number;
-  entry: TRecord;
-  values: SheetRow;
-};
-
-type SheetTableOptions = {
-  schema: SheetSchema;
-  spreadsheet?: SpreadsheetService;
-  idPrefix?: string;
-};
 
 export class SheetTable<TRecord extends object> {
   constructor(private readonly options: SheetTableOptions) {}

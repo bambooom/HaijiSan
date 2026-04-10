@@ -13,7 +13,7 @@ import {
   extractBackfillDate,
   isDateStampInRange,
 } from '../shared/date-reference';
-import type { ToolRecord, ToolRegistryEntry, ToolSheetKey } from './types';
+import type { ToolRecord, ToolRegistryEntry, ToolSheetKey } from '../types';
 
 export function getStringRecordValue(record: ToolRecord, key: string): string {
   const value = record[key];
