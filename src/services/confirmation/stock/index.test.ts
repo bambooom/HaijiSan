@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   findFoodLogRow: vi.fn(),
   updateFoodLogAtRow: vi.fn(),
   editText: vi.fn(),
+  sendText: vi.fn(),
   answerCallbackQuery: vi.fn(),
   cacheGet: vi.fn(),
   cachePut: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../../../tables', () => ({
 
 vi.mock('../../telegram', () => ({
   editText: mocks.editText,
+  sendText: mocks.sendText,
   answerCallbackQuery: mocks.answerCallbackQuery,
 }));
 
@@ -43,12 +45,14 @@ Object.assign(globalThis, {
 import {
   createStockDeductionConfirmation,
   handleStockDeductionConfirmationCallback,
+  handleStockDeductionConfirmationReply,
 } from './index';
 
 describe('stock-deduction-confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.cacheGet.mockReturnValue(null);
+    mocks.sendText.mockReturnValue(654);
     mocks.findFoodLogRow.mockReturnValue({
       rowNumber: 8,
       entry: {
@@ -95,6 +99,7 @@ describe('stock-deduction-confirmation', () => {
       expect.stringContaining('food_1'),
       21600,
     );
+    expect(result.reply).toContain('餐食已记录，库存扣减待你确认');
     expect(result.confirmationState).toBe('pending');
     expect(result.telegramResponse?.replyMarkup).toMatchObject({
       inlineKeyboard: [
@@ -169,5 +174,292 @@ describe('stock-deduction-confirmation', () => {
       '已确认扣减',
     );
     expect(result?.resultCode).toBe('food-stock-confirmed');
+  });
+
+  it('opens a force-reply prompt for a selected stock deduction candidate', () => {
+    mocks.cacheGet.mockReturnValueOnce(
+      JSON.stringify({
+        id: 'stockconfirm',
+        kind: 'stock_deduction',
+        chatId: 'test-chat-id',
+        traceId: 'ai_1',
+        createdAtIso: '2026-04-08T10:00:00.000Z',
+        previewMessageId: 321,
+        payload: {
+          foodLogId: 'food_1',
+          mealText: '牛奶',
+          candidates: [
+            {
+              itemName: '牛奶',
+              itemQuantity: 250,
+              itemUnit: 'ml',
+              stockItemId: 'stock_milk',
+              stockItemName: '牛奶',
+              stockQuantity: 0.3,
+              stockUnit: 'l',
+              reason: 'converted 250 ml to 0.3 l; requires confirmation',
+            },
+          ],
+        },
+      }),
+    );
+
+    const result = handleStockDeductionConfirmationCallback(
+      'test-chat-id',
+      'cb_2',
+      'stock:item:0:stockconfirm',
+      321,
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.answerCallbackQuery).toHaveBeenCalledWith(
+      'cb_2',
+      '请输入新的扣减数量',
+    );
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      'test-chat-id',
+      '请输入 牛奶 新的扣减数量（单位：l），例如 0.3；输入 0 可取消这一项。',
+      {
+        replyMarkup: {
+          forceReply: true,
+          inputFieldPlaceholder:
+            '请输入新的扣减数量（l），例如 0.3；输入 0 可取消这一项',
+        },
+      },
+    );
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation:stockconfirm',
+      expect.stringContaining('"awaitingCandidateIndex":0'),
+      21600,
+    );
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation_prompt:test-chat-id:654',
+      'stockconfirm',
+      21600,
+    );
+    expect(result?.resultCode).toBe('food-stock-awaiting-input');
+  });
+
+  it('updates the target stock deduction quantity from a force-reply input', () => {
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'confirmation_prompt:test-chat-id:654') {
+        return 'stockconfirm';
+      }
+
+      if (key === 'confirmation:stockconfirm') {
+        return JSON.stringify({
+          id: 'stockconfirm',
+          kind: 'stock_deduction',
+          chatId: 'test-chat-id',
+          traceId: 'ai_1',
+          createdAtIso: '2026-04-08T10:00:00.000Z',
+          previewMessageId: 321,
+          payload: {
+            foodLogId: 'food_1',
+            mealText: '牛奶',
+            editPromptMessageId: 654,
+            awaitingCandidateIndex: 0,
+            candidates: [
+              {
+                itemName: '牛奶',
+                itemQuantity: 250,
+                itemUnit: 'ml',
+                stockItemId: 'stock_milk',
+                stockItemName: '牛奶',
+                stockQuantity: 0.3,
+                stockUnit: 'l',
+                reason: 'converted 250 ml to 0.3 l; requires confirmation',
+              },
+            ],
+          },
+        });
+      }
+
+      return null;
+    });
+
+    const result = handleStockDeductionConfirmationReply(
+      'test-chat-id',
+      654,
+      '0.4',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.cacheRemove).toHaveBeenCalledWith(
+      'confirmation_prompt:test-chat-id:654',
+    );
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation:stockconfirm',
+      expect.stringContaining('"stockQuantity":0.4'),
+      21600,
+    );
+    expect(mocks.editText).toHaveBeenCalledWith(
+      'test-chat-id',
+      321,
+      expect.stringContaining('牛奶 扣减 0.4l'),
+      {
+        replyMarkup: expect.objectContaining({
+          inlineKeyboard: expect.any(Array),
+        }),
+      },
+    );
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      'test-chat-id',
+      '已更新扣减数量，请确认或继续修正。',
+    );
+    expect(result?.resultCode).toBe('food-stock-edited');
+  });
+
+  it('re-prompts when the edited stock deduction quantity is invalid', () => {
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'confirmation_prompt:test-chat-id:654') {
+        return 'stockconfirm';
+      }
+
+      if (key === 'confirmation:stockconfirm') {
+        return JSON.stringify({
+          id: 'stockconfirm',
+          kind: 'stock_deduction',
+          chatId: 'test-chat-id',
+          traceId: 'ai_1',
+          createdAtIso: '2026-04-08T10:00:00.000Z',
+          previewMessageId: 321,
+          payload: {
+            foodLogId: 'food_1',
+            mealText: '牛奶',
+            editPromptMessageId: 654,
+            awaitingCandidateIndex: 0,
+            candidates: [
+              {
+                itemName: '牛奶',
+                itemQuantity: 250,
+                itemUnit: 'ml',
+                stockItemId: 'stock_milk',
+                stockItemName: '牛奶',
+                stockQuantity: 0.3,
+                stockUnit: 'l',
+                reason: 'converted 250 ml to 0.3 l; requires confirmation',
+              },
+            ],
+          },
+        });
+      }
+
+      return null;
+    });
+    mocks.sendText.mockReturnValueOnce(777);
+
+    const result = handleStockDeductionConfirmationReply(
+      'test-chat-id',
+      654,
+      'abc',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      'test-chat-id',
+      '数量格式不对，请输入数字。单位是 l，例如 0.3；输入 0 可取消这一项。',
+      {
+        replyMarkup: {
+          forceReply: true,
+          inputFieldPlaceholder:
+            '请输入新的扣减数量（l），例如 0.3；输入 0 可取消这一项',
+        },
+      },
+    );
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation_prompt:test-chat-id:777',
+      'stockconfirm',
+      21600,
+    );
+    expect(result?.resultCode).toBe('food-stock-invalid-input');
+  });
+
+  it('updates only the selected candidate when multiple stock deductions are pending', () => {
+    mocks.cacheGet.mockImplementation((key: string) => {
+      if (key === 'confirmation_prompt:test-chat-id:654') {
+        return 'stockconfirm';
+      }
+
+      if (key === 'confirmation:stockconfirm') {
+        return JSON.stringify({
+          id: 'stockconfirm',
+          kind: 'stock_deduction',
+          chatId: 'test-chat-id',
+          traceId: 'ai_1',
+          createdAtIso: '2026-04-08T10:00:00.000Z',
+          previewMessageId: 321,
+          payload: {
+            foodLogId: 'food_1',
+            mealText: '牛奶和麦片',
+            editPromptMessageId: 654,
+            awaitingCandidateIndex: 1,
+            candidates: [
+              {
+                itemName: '牛奶',
+                itemQuantity: 250,
+                itemUnit: 'ml',
+                stockItemId: 'stock_milk',
+                stockItemName: '牛奶',
+                stockQuantity: 0.3,
+                stockUnit: 'l',
+                reason: 'converted 250 ml to 0.3 l; requires confirmation',
+              },
+              {
+                itemName: '麦片',
+                itemQuantity: 80,
+                itemUnit: 'g',
+                stockItemId: 'stock_oats',
+                stockItemName: '麦片',
+                stockQuantity: 80,
+                stockUnit: 'g',
+                reason: 'matched stock item but requires manual confirmation',
+              },
+            ],
+          },
+        });
+      }
+
+      return null;
+    });
+
+    const result = handleStockDeductionConfirmationReply(
+      'test-chat-id',
+      654,
+      '60',
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation:stockconfirm',
+      expect.stringContaining('"stockItemName":"牛奶","stockQuantity":0.3'),
+      21600,
+    );
+    expect(mocks.cachePut).toHaveBeenCalledWith(
+      'confirmation:stockconfirm',
+      expect.stringContaining('"stockItemName":"麦片","stockQuantity":60'),
+      21600,
+    );
+    expect(mocks.editText).toHaveBeenCalledWith(
+      'test-chat-id',
+      321,
+      expect.stringContaining('1. 牛奶 扣减 0.3l'),
+      {
+        replyMarkup: expect.objectContaining({
+          inlineKeyboard: expect.any(Array),
+        }),
+      },
+    );
+    expect(mocks.editText).toHaveBeenCalledWith(
+      'test-chat-id',
+      321,
+      expect.stringContaining('2. 麦片 扣减 60g'),
+      {
+        replyMarkup: expect.objectContaining({
+          inlineKeyboard: expect.any(Array),
+        }),
+      },
+    );
+    expect(result?.resultCode).toBe('food-stock-edited');
   });
 });

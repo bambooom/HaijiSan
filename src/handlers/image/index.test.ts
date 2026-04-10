@@ -82,7 +82,7 @@ describe('handleIncomingImage', () => {
       }),
     );
     mocks.createStockDeductionConfirmation.mockImplementation(() => ({
-      reply: '这条餐食涉及待确认的库存扣减：',
+      reply: '餐食已记录，库存扣减待你确认。',
       handlingMode: 'ai',
       status: 'success',
       note: 'FOOD_LOG; stock deduction awaiting confirmation',

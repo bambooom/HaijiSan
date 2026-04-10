@@ -8,6 +8,7 @@ import {
 import {
   createStockDeductionConfirmation,
   handleStockDeductionConfirmationCallback,
+  handleStockDeductionConfirmationReply,
 } from './stock';
 
 // Keep the top-level confirmation entry small: it only routes to the
@@ -43,7 +44,15 @@ export function handleConfirmationReply(
   text: string,
   timestamp: Date,
 ): CommandHandlingResult | null {
-  return handleOcrConfirmationReply(chatId, replyToMessageId, text, timestamp);
+  return (
+    handleOcrConfirmationReply(chatId, replyToMessageId, text, timestamp) ??
+    handleStockDeductionConfirmationReply(
+      chatId,
+      replyToMessageId,
+      text,
+      timestamp,
+    )
+  );
 }
 
 export {

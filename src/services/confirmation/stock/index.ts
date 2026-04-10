@@ -2,16 +2,19 @@ import type {
   CommandHandlingResult,
   PendingStockDeductionConfirmation,
   PendingStockDeductionDraft,
+  PendingStockDeductionPayload,
 } from '../../../types';
 import { foodLogTable, stockTable } from '../../../tables';
 import {
+  consumeConfirmationPromptMapping,
   createConfirmationId,
   deletePendingConfirmation,
   loadPendingConfirmation,
+  saveConfirmationPromptMapping,
   savePendingConfirmation,
 } from '../core';
 import {
-  appendRemovalCancelledNote,
+  appendEditCancelledNote,
   buildCancelledNote,
   buildConfirmedNote,
   buildStockAudit,
@@ -24,11 +27,13 @@ import {
   buildStockConfirmedText,
   buildStockEditKeyboard,
   buildStockEditText,
+  buildStockForceReplyMarkup,
   buildStockMainKeyboard,
   buildStockPreviewText,
   parseStockCallbackData,
 } from './ui';
-import { answerCallbackQuery, editText } from '../../telegram';
+import { answerCallbackQuery, editText, sendText } from '../../telegram';
+import { roundToOneDecimal } from '../../../utils/value';
 
 export function createStockDeductionConfirmation(
   chatId: string,
@@ -43,7 +48,11 @@ export function createStockDeductionConfirmation(
     traceId,
     createdAtIso: timestamp.toISOString(),
     previewMessageId: null,
-    payload: draft,
+    payload: {
+      ...draft,
+      editPromptMessageId: null,
+      awaitingCandidateIndex: null,
+    },
   };
 
   savePendingConfirmation(pending);
@@ -74,7 +83,7 @@ export function handleStockDeductionConfirmationCallback(
 
   const pending = loadPendingConfirmation<
     'stock_deduction',
-    PendingStockDeductionDraft
+    PendingStockDeductionPayload
   >(parsed.id);
 
   if (
@@ -180,7 +189,7 @@ export function handleStockDeductionConfirmationCallback(
       });
     }
     case 'edit':
-      answerCallbackQuery(callbackQueryId, '请选择要移除的扣减项');
+      answerCallbackQuery(callbackQueryId, '请选择要修改的扣减项');
       editText(chatId, messageId, buildStockEditText(withMessage), {
         replyMarkup: buildStockEditKeyboard(withMessage),
       });
@@ -201,58 +210,197 @@ export function handleStockDeductionConfirmationCallback(
         confirmationState: 'pending',
         resultCode: 'food-stock-preview',
       });
-    case 'remove': {
-      const nextCandidates = withMessage.payload.candidates.filter(
-        (_candidate, index) => index !== parsed.index,
-      );
+    case 'item': {
+      const targetCandidate = withMessage.payload.candidates[parsed.index];
 
-      if (nextCandidates.length === 0) {
-        const cancelledPending: PendingStockDeductionConfirmation = {
-          ...withMessage,
-          payload: {
-            ...withMessage.payload,
-            candidates: nextCandidates,
-          },
-        };
+      if (!targetCandidate) {
+        answerCallbackQuery(callbackQueryId, '这项待扣减内容已不存在');
 
-        answerCallbackQuery(callbackQueryId, '已移除全部待扣减项');
-        editText(
-          chatId,
-          messageId,
-          '这次库存扣减的候选项已全部移除。\n\n状态：已取消',
-        );
-        deletePendingConfirmation(withMessage.id);
-        updateFoodLogAfterDecision(withMessage, {
-          note: appendRemovalCancelledNote(withMessage),
-        });
-
-        return buildStockResult(cancelledPending, '已取消这次库存扣减。', {
-          note: 'FOOD_LOG; stock deduction cancelled after removing all items',
-          confirmationState: 'cancelled',
-          resultCode: 'food-stock-cancelled',
-          audit: buildStockAudit(['note']),
+        return buildStockResult(withMessage, '库存扣减修正项不存在。', {
+          note: 'FOOD_LOG; stock deduction candidate missing during edit',
+          confirmationState: 'pending',
+          resultCode: 'food-stock-edit-missing',
+          status: 'failed',
         });
       }
 
+      const promptMessageId = sendText(
+        chatId,
+        `请输入 ${targetCandidate.stockItemName} 新的扣减数量（单位：${targetCandidate.stockUnit}），例如 ${roundToOneDecimal(targetCandidate.stockQuantity)}；输入 0 可取消这一项。`,
+        {
+          replyMarkup: buildStockForceReplyMarkup(
+            targetCandidate.stockUnit,
+            roundToOneDecimal(targetCandidate.stockQuantity),
+          ),
+        },
+      );
       const nextPending: PendingStockDeductionConfirmation = {
         ...withMessage,
         payload: {
           ...withMessage.payload,
-          candidates: nextCandidates,
+          awaitingCandidateIndex: parsed.index,
+          editPromptMessageId: promptMessageId,
         },
       };
 
       savePendingConfirmation(nextPending);
-      answerCallbackQuery(callbackQueryId, '已移除该扣减项');
-      editText(chatId, messageId, buildStockEditText(nextPending), {
-        replyMarkup: buildStockEditKeyboard(nextPending),
-      });
+      answerCallbackQuery(callbackQueryId, '请输入新的扣减数量');
 
-      return buildStockResult(nextPending, '已更新待确认扣减项。', {
-        note: 'FOOD_LOG; stock deduction candidate removed',
+      if (promptMessageId !== null) {
+        saveConfirmationPromptMapping(chatId, promptMessageId, nextPending.id);
+      }
+
+      return buildStockResult(nextPending, '等待库存扣减数量输入。', {
+        note: 'FOOD_LOG; awaiting stock deduction quantity input',
         confirmationState: 'pending',
-        resultCode: 'food-stock-edited',
+        resultCode: 'food-stock-awaiting-input',
       });
     }
   }
+}
+
+export function handleStockDeductionConfirmationReply(
+  chatId: string,
+  replyToMessageId: number,
+  text: string,
+  _timestamp: Date,
+): CommandHandlingResult | null {
+  const confirmationId = consumeConfirmationPromptMapping(
+    chatId,
+    replyToMessageId,
+  );
+
+  if (!confirmationId) {
+    return null;
+  }
+
+  const pending = loadPendingConfirmation<
+    'stock_deduction',
+    PendingStockDeductionPayload
+  >(confirmationId);
+
+  if (
+    !pending ||
+    pending.chatId !== chatId ||
+    pending.payload.awaitingCandidateIndex === null
+  ) {
+    return null;
+  }
+
+  const parsedQuantity = Number(text.trim());
+
+  if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
+    const candidate =
+      pending.payload.candidates[pending.payload.awaitingCandidateIndex];
+    const nextPromptId = sendText(
+      chatId,
+      `数量格式不对，请输入数字。单位是 ${candidate?.stockUnit ?? '当前库存单位'}，例如 ${candidate ? roundToOneDecimal(candidate.stockQuantity) : 1}；输入 0 可取消这一项。`,
+      {
+        replyMarkup: buildStockForceReplyMarkup(
+          candidate?.stockUnit ?? '',
+          candidate ? roundToOneDecimal(candidate.stockQuantity) : 1,
+        ),
+      },
+    );
+
+    if (nextPromptId !== null) {
+      saveConfirmationPromptMapping(chatId, nextPromptId, pending.id);
+    }
+
+    savePendingConfirmation({
+      ...pending,
+      payload: {
+        ...pending.payload,
+        editPromptMessageId: nextPromptId,
+      },
+    });
+
+    return buildStockResult(pending, '库存扣减数量输入无效。', {
+      status: 'failed',
+      note: 'FOOD_LOG; invalid stock deduction quantity input',
+      confirmationState: 'pending',
+      resultCode: 'food-stock-invalid-input',
+    });
+  }
+
+  const nextQuantity = roundToOneDecimal(parsedQuantity);
+  const nextCandidates = pending.payload.candidates.flatMap(
+    (candidate, index) => {
+      if (index !== pending.payload.awaitingCandidateIndex) {
+        return [candidate];
+      }
+
+      if (nextQuantity <= 0) {
+        return [];
+      }
+
+      return [
+        {
+          ...candidate,
+          stockQuantity: nextQuantity,
+        },
+      ];
+    },
+  );
+
+  if (nextCandidates.length === 0) {
+    const cancelledPending: PendingStockDeductionConfirmation = {
+      ...pending,
+      payload: {
+        ...pending.payload,
+        candidates: [],
+        awaitingCandidateIndex: null,
+        editPromptMessageId: null,
+      },
+    };
+
+    if (pending.previewMessageId !== null) {
+      editText(
+        chatId,
+        pending.previewMessageId,
+        '这次库存扣减的候选项数量都已调整为 0。\n\n状态：已取消',
+      );
+    }
+
+    deletePendingConfirmation(pending.id);
+    updateFoodLogAfterDecision(pending, {
+      note: appendEditCancelledNote(pending),
+    });
+
+    return buildStockResult(cancelledPending, '已取消这次库存扣减。', {
+      note: 'FOOD_LOG; stock deduction cancelled after editing all items to zero',
+      confirmationState: 'cancelled',
+      resultCode: 'food-stock-cancelled',
+      audit: buildStockAudit(['note']),
+    });
+  }
+
+  const nextPending: PendingStockDeductionConfirmation = {
+    ...pending,
+    payload: {
+      ...pending.payload,
+      candidates: nextCandidates,
+      awaitingCandidateIndex: null,
+      editPromptMessageId: null,
+    },
+  };
+
+  savePendingConfirmation(nextPending);
+
+  if (nextPending.previewMessageId !== null) {
+    editText(
+      chatId,
+      nextPending.previewMessageId,
+      buildStockPreviewText(nextPending),
+      { replyMarkup: buildStockMainKeyboard(nextPending.id) },
+    );
+  }
+
+  sendText(chatId, '已更新扣减数量，请确认或继续修正。');
+
+  return buildStockResult(nextPending, '已更新扣减数量，请确认或继续修正。', {
+    note: 'FOOD_LOG; stock deduction quantity updated',
+    confirmationState: 'pending',
+    resultCode: 'food-stock-edited',
+  });
 }

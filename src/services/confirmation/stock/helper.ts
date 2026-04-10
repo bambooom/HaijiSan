@@ -74,7 +74,7 @@ export function buildCancelledNote(
     .join('；')}`;
 }
 
-export function appendRemovalCancelledNote(
+export function appendEditCancelledNote(
   pending: PendingStockDeductionConfirmation,
 ): string {
   const currentNote =
@@ -84,6 +84,6 @@ export function appendRemovalCancelledNote(
 
   return appendFoodLogNote(
     currentNote,
-    '库存扣减已取消：用户移除了全部待确认项',
+    '库存扣减已取消：用户将全部待确认扣减数量调整为 0',
   );
 }

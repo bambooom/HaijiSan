@@ -26,6 +26,11 @@ export type PendingOcrConfirmation = PendingConfirmation<
   PendingOcrPayload
 >;
 
+export type PendingStockDeductionPayload = PendingStockDeductionDraft & {
+  editPromptMessageId: number | null;
+  awaitingCandidateIndex: number | null;
+};
+
 export type OcrCallbackData =
   | {
       action: 'confirm' | 'cancel' | 'edit' | 'back';
@@ -39,7 +44,7 @@ export type OcrCallbackData =
 
 export type PendingStockDeductionConfirmation = PendingConfirmation<
   'stock_deduction',
-  PendingStockDeductionDraft
+  PendingStockDeductionPayload
 >;
 
 export type StockCallbackData =
@@ -48,7 +53,7 @@ export type StockCallbackData =
       id: string;
     }
   | {
-      action: 'remove';
+      action: 'item';
       id: string;
       index: number;
     };

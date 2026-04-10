@@ -3,7 +3,7 @@ import type {
   PendingStockDeductionConfirmation,
   StockCallbackData,
 } from '../../../types';
-import { buildInlineKeyboard } from '../core';
+import { buildForceReply, buildInlineKeyboard } from '../core';
 
 export function buildStockMainKeyboard(id: string) {
   return buildInlineKeyboard([
@@ -21,8 +21,8 @@ export function buildStockEditKeyboard(
   return buildInlineKeyboard([
     ...pending.payload.candidates.map((candidate, index) => [
       {
-        text: `移除 ${candidate.stockItemName}`,
-        callbackData: `stock:remove:${index}:${pending.id}`,
+        text: `修改 ${candidate.stockItemName}（当前 ${candidate.stockQuantity}${candidate.stockUnit}）`,
+        callbackData: `stock:item:${index}:${pending.id}`,
       },
     ]),
     [
@@ -36,7 +36,7 @@ export function buildStockPreviewText(
   pending: PendingStockDeductionConfirmation,
 ): string {
   const lines = [
-    '这条餐食涉及待确认的库存扣减：',
+    '餐食已记录，库存扣减待你确认。',
     `餐食：${pending.payload.mealText || '未命名餐食'}`,
     '',
     ...pending.payload.candidates.map(
@@ -51,7 +51,16 @@ export function buildStockPreviewText(
 export function buildStockEditText(
   pending: PendingStockDeductionConfirmation,
 ): string {
-  return `${buildStockPreviewText(pending)}\n\n请选择要移除的扣减项：`;
+  return `${buildStockPreviewText(pending)}\n\n请选择要修改数量的扣减项：`;
+}
+
+export function buildStockForceReplyMarkup(
+  stockUnit: string,
+  exampleQuantity: number,
+) {
+  return buildForceReply(
+    `请输入新的扣减数量（${stockUnit}），例如 ${exampleQuantity}；输入 0 可取消这一项`,
+  );
 }
 
 export function buildStockConfirmedText(
@@ -83,11 +92,11 @@ export function parseStockCallbackData(data: string): StockCallbackData | null {
     }
   }
 
-  if (parts.length === 4 && parts[0] === 'stock' && parts[1] === 'remove') {
+  if (parts.length === 4 && parts[0] === 'stock' && parts[1] === 'item') {
     const index = Number(parts[2]);
 
     if (Number.isInteger(index) && index >= 0) {
-      return { action: 'remove', index, id: parts[3] };
+      return { action: 'item', index, id: parts[3] };
     }
   }
 
