@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  TelegramInlineKeyboardButton,
+  TelegramReplyMarkup,
+} from '../types';
 
 const mocks = vi.hoisted(() => ({
   downloadTelegramFile: vi.fn(),
@@ -39,6 +43,16 @@ vi.mock('../tables', () => ({
 
 import { handleIncomingImage } from './image';
 import type { InsertDataRequest } from '../tools/types';
+
+function getInlineKeyboard(
+  replyMarkup: TelegramReplyMarkup | undefined,
+): TelegramInlineKeyboardButton[][] | undefined {
+  if (!replyMarkup || !('inlineKeyboard' in replyMarkup)) {
+    return undefined;
+  }
+
+  return replyMarkup.inlineKeyboard;
+}
 
 describe('handleIncomingImage', () => {
   beforeEach(() => {
@@ -262,6 +276,84 @@ describe('handleIncomingImage', () => {
       meal_text: 'Chicken salad with avocado',
     });
     expect(result.reply).toBe('已记录餐食图片。');
+  });
+
+  it('returns a pending stock confirmation for uncertain FOOD_LOG stock deductions', () => {
+    mocks.extractHealthDataFromImage.mockReturnValue({
+      kind: 'food_photo',
+      appSource: 'camera',
+      occurredAt: null,
+      recognizedText: 'Milk',
+      summary: 'Milk',
+      foodName: 'Milk',
+      brand: '',
+      servingSize: null,
+      servingUnit: '',
+      caloriesKcal: null,
+      proteinG: null,
+      fatG: null,
+      carbsG: null,
+      confidence: 0.8,
+      note: '',
+      weightKg: null,
+      bmi: null,
+      bodyFatPct: null,
+      leanBodyMassKg: null,
+      sleepStart: null,
+      sleepEnd: null,
+      sleepHours: null,
+      sleepQuality: null,
+      workoutName: null,
+      durationMin: null,
+      workoutLevel: null,
+      avgHr: null,
+      maxHr: null,
+      minHr: null,
+      workoutCaloriesKcal: null,
+    });
+    mocks.executeFoodInsertWorkflow.mockReturnValue({
+      insertResult: {
+        tool: 'insertData',
+        sheet: 'FOOD_LOG',
+        record: { food_log_id: 'food_1' },
+      },
+      pendingStockDeduction: {
+        foodLogId: 'food_1',
+        mealText: 'Milk',
+        candidates: [
+          {
+            itemName: 'Milk',
+            itemQuantity: 250,
+            itemUnit: 'ml',
+            stockItemId: 'stock_milk',
+            stockItemName: 'Milk',
+            stockQuantity: 0.3,
+            stockUnit: 'l',
+            reason: 'converted 250 ml to 0.3 l; requires confirmation',
+          },
+        ],
+      },
+    });
+
+    const result = handleIncomingImage(
+      'food_photo_pending',
+      '午餐',
+      new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
+    );
+
+    expect(result.confirmationState).toBe('pending');
+    expect(result.resultCode).toBe('food-stock-pending');
+    const inlineKeyboard = getInlineKeyboard(
+      result.telegramResponse?.replyMarkup,
+    );
+
+    expect(inlineKeyboard?.[0]?.[0]?.text).toBe('确认扣减');
+    expect(inlineKeyboard?.[0]?.[0]?.callbackData).toMatch(/^stock:confirm:/);
+    expect(inlineKeyboard?.[0]?.[1]?.text).toBe('取消');
+    expect(inlineKeyboard?.[0]?.[1]?.callbackData).toMatch(/^stock:cancel:/);
+    expect(inlineKeyboard?.[0]?.[2]?.text).toBe('修正');
+    expect(inlineKeyboard?.[0]?.[2]?.callbackData).toMatch(/^stock:edit:/);
   });
 
   it('stores workout screenshots into WORKOUT_LOG', () => {

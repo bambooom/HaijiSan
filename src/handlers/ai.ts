@@ -4,6 +4,7 @@ import {
   EXPANDED_CONVERSATION_CONTEXT_TURNS,
 } from '../constants/ai';
 import { executeFoodInsertWorkflow } from '../services/food-workflow';
+import { createStockDeductionConfirmation } from '../services/confirmation';
 import { generateFinalAiReply, startAiResponse } from '../services/gemini';
 import { botLogTable } from '../tables/bot-log-table';
 import { executeGenericToolRequest } from '../tools';
@@ -18,6 +19,7 @@ import type {
   CommandHandlingResult,
   ConversationTurn,
   FoodLogInsertRequest,
+  FoodWorkflowExecutionResult,
 } from '../types';
 import { buildCommandLogFields } from '../utils/log-meta';
 
@@ -46,6 +48,7 @@ function buildAiResult(
     status: overrides?.status ?? 'success',
     note: overrides?.note ?? '',
     audit: overrides?.audit,
+    telegramResponse: overrides?.telegramResponse,
     ...logFields,
   };
 }
@@ -195,10 +198,16 @@ function formatToolResult(result: GenericToolResult): string {
   }
 }
 
+function isFoodWorkflowExecutionResult(
+  value: GenericToolResult | FoodWorkflowExecutionResult,
+): value is FoodWorkflowExecutionResult {
+  return 'insertResult' in value;
+}
+
 function executeAiToolRequest(
   request: AiToolRequest,
   timestamp: Date,
-): GenericToolResult {
+): GenericToolResult | FoodWorkflowExecutionResult {
   if (
     request.tool === 'insertFoodLog' ||
     (request.tool === 'insertData' && request.sheet === 'FOOD_LOG')
@@ -212,6 +221,7 @@ function executeAiToolRequest(
 export function handleAiText(
   text: string,
   timestamp: Date,
+  chatId = '',
 ): CommandHandlingResult {
   try {
     const conversationHistory = getConversationHistory(text);
@@ -245,7 +255,32 @@ export function handleAiText(
       );
     }
 
-    const toolResult = executeAiToolRequest(response.request, timestamp);
+    const executionResult = executeAiToolRequest(response.request, timestamp);
+    const toolResult = isFoodWorkflowExecutionResult(executionResult)
+      ? executionResult.insertResult
+      : executionResult;
+
+    if (
+      isFoodWorkflowExecutionResult(executionResult) &&
+      executionResult.pendingStockDeduction
+    ) {
+      const confirmation = createStockDeductionConfirmation(
+        chatId,
+        createTraceId(timestamp),
+        executionResult.pendingStockDeduction,
+        timestamp,
+      );
+
+      return buildAiResult(confirmation.reply, timestamp, {
+        intent: 'ai-tool',
+        tool: response.request.tool,
+        note: `${response.request.tool} ${response.request.sheet}; stock deduction awaiting confirmation`,
+        audit,
+        resultCode: 'food-stock-pending',
+        confirmationState: 'pending',
+        telegramResponse: confirmation.telegramResponse,
+      });
+    }
 
     try {
       const reply = generateFinalAiReply({

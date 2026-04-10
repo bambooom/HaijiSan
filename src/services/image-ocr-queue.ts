@@ -1,6 +1,6 @@
 import type { CommandHandlingResult } from '../types';
 import { handleIncomingImageMessage } from '../handlers';
-import { attachConfirmationPreviewMessage } from './ocr-confirmation';
+import { attachConfirmationPreviewMessage } from './confirmation';
 import { editText } from './telegram';
 import { botLogTable } from '../tables';
 

@@ -15,6 +15,28 @@ export interface FoodLogInsertRequest {
   items: IngredientEstimateInput[];
 }
 
+export interface PendingStockDeductionCandidate {
+  itemName: string;
+  itemQuantity: number;
+  itemUnit: string;
+  stockItemId: string;
+  stockItemName: string;
+  stockQuantity: number;
+  stockUnit: string;
+  reason: string;
+}
+
+export interface PendingStockDeductionDraft {
+  foodLogId: string;
+  mealText: string;
+  candidates: PendingStockDeductionCandidate[];
+}
+
+export interface FoodWorkflowExecutionResult {
+  insertResult: import('../tools/types').InsertDataResult;
+  pendingStockDeduction?: PendingStockDeductionDraft;
+}
+
 export interface IngredientEstimateResult extends IngredientEstimateInput {
   estimatedCalories: number | null;
   confidence: IngredientEstimateConfidence;

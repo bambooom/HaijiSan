@@ -2,9 +2,9 @@ import { handleIncomingImageMessage, handleIncomingText } from '../handlers';
 import { enqueueImageOcrJob } from './image-ocr-queue';
 import {
   attachConfirmationPreviewMessage,
-  handleOcrConfirmationCallback,
-  handleOcrConfirmationReply,
-} from './ocr-confirmation';
+  handleConfirmationCallback,
+  handleConfirmationReply,
+} from './confirmation';
 import { sendChatAction, sendText } from './telegram';
 import { getImageFileId, type TelegramUpdate } from './telegram-update';
 import { setCachedUpdateState } from './webhook-dedupe';
@@ -134,7 +134,7 @@ export function handleCallbackRoute(context: WebhookContext): RouteOutcome {
     return 'unhandled';
   }
 
-  const result = handleOcrConfirmationCallback(
+  const result = handleConfirmationCallback(
     context.chatId,
     context.update.callback_query.id,
     context.update.callback_query.data,
@@ -164,7 +164,7 @@ export function handleReplyRoute(context: WebhookContext): RouteOutcome {
     return 'unhandled';
   }
 
-  const result = handleOcrConfirmationReply(
+  const result = handleConfirmationReply(
     context.chatId,
     context.update.message.reply_to_message.message_id,
     context.update.message.text,
@@ -196,7 +196,11 @@ export function handleDefaultRoute(context: WebhookContext): void {
         context.timestamp,
         context.chatId,
       )
-    : handleIncomingText(context.update.message?.text ?? '', context.timestamp);
+    : handleIncomingText(
+        context.update.message?.text ?? '',
+        context.timestamp,
+        context.chatId,
+      );
 
   const sentMessageId = sendText(context.chatId, result.reply, {
     replyMarkup: result.telegramResponse?.replyMarkup,

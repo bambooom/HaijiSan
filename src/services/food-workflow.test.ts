@@ -345,11 +345,14 @@ describe('food-workflow', () => {
       undefined,
     );
     expect(result).toEqual({
-      tool: 'insertData',
-      sheet: 'FOOD_LOG',
-      record: {
-        food_log_id: 'food_1',
+      insertResult: {
+        tool: 'insertData',
+        sheet: 'FOOD_LOG',
+        record: {
+          food_log_id: 'food_1',
+        },
       },
+      pendingStockDeduction: undefined,
     });
   });
 
@@ -460,6 +463,87 @@ describe('food-workflow', () => {
       '个/份',
       undefined,
       undefined,
+    );
+  });
+
+  it('returns a pending stock confirmation draft for non-safe but convertible stock deductions', () => {
+    mocks.findByFoodName.mockReturnValue({
+      food_ref_id: 'ref_milk',
+      food_name: '牛奶',
+      brand: '',
+      serving_size: 250,
+      serving_unit: 'ml',
+      calories_kcal: 120,
+      protein_g: 8,
+      fat_g: 4,
+      carbs_g: 12,
+      source: 'manual_entry',
+      updated_at: '2026-04-08 10:00:00',
+      note: '',
+    });
+    mocks.findStockByName.mockReturnValue({
+      stock_item_id: 'stock_milk',
+      item_name: '牛奶',
+      quantity: 2,
+      unit: 'l',
+      purchased_at: '2026-04-08 08:00:00',
+      updated_at: '2026-04-08 08:00:00',
+      purchase_channel: '',
+      linked_food_ref_id: 'ref_milk',
+      note: 'keep me',
+    });
+    mocks.executeInsertData.mockReturnValue({
+      tool: 'insertData',
+      sheet: 'FOOD_LOG',
+      record: {
+        food_log_id: 'food_pending_1',
+      },
+    });
+
+    const result = executeFoodInsertWorkflow(
+      {
+        tool: 'insertFoodLog',
+        sheet: 'FOOD_LOG',
+        record: {
+          occurred_at: '2026-04-08 12:30:00',
+          meal_type: 'lunch',
+          meal_text: '牛奶',
+        },
+        items: [
+          {
+            itemName: '牛奶',
+            quantity: 250,
+            unit: 'ml',
+          },
+        ],
+      },
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.adjustStock).not.toHaveBeenCalled();
+    expect(result.pendingStockDeduction).toEqual({
+      foodLogId: 'food_pending_1',
+      mealText: '牛奶',
+      candidates: [
+        expect.objectContaining({
+          stockItemId: 'stock_milk',
+          stockItemName: '牛奶',
+          stockQuantity: 0.3,
+          stockUnit: 'l',
+        }),
+      ],
+    });
+    const pendingInsertCall = mocks.executeInsertData.mock.calls[0];
+    const pendingInsertRequest = pendingInsertCall?.[0] as
+      | InsertDataRequest
+      | undefined;
+
+    expect(mocks.executeInsertData).toHaveBeenCalledWith(
+      expect.any(Object),
+      new Date('2026-04-08T10:00:00Z'),
+    );
+    expect(pendingInsertRequest?.record.note).toEqual(
+      expect.stringContaining('库存扣减待确认'),
     );
   });
 

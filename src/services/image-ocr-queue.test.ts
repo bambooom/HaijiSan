@@ -18,7 +18,7 @@ vi.mock('../handlers', () => ({
   handleIncomingImageMessage: mocks.handleIncomingImageMessage,
 }));
 
-vi.mock('./ocr-confirmation', () => ({
+vi.mock('./confirmation', () => ({
   attachConfirmationPreviewMessage: mocks.attachConfirmationPreviewMessage,
 }));
 

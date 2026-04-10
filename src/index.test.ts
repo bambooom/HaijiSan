@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
   handleIncomingText: vi.fn(),
   handleIncomingImageMessage: vi.fn(),
   enqueueImageOcrJob: vi.fn(),
-  handleOcrConfirmationCallback: vi.fn(),
-  handleOcrConfirmationReply: vi.fn(),
+  handleConfirmationCallback: vi.fn(),
+  handleConfirmationReply: vi.fn(),
   attachConfirmationPreviewMessage: vi.fn(),
   sendChatAction: vi.fn(),
   sendText: vi.fn(),
@@ -38,9 +38,9 @@ vi.mock('./services/image-ocr-queue', () => ({
   processPendingImageOcrJobs: vi.fn(),
 }));
 
-vi.mock('./services/ocr-confirmation', () => ({
-  handleOcrConfirmationCallback: mocks.handleOcrConfirmationCallback,
-  handleOcrConfirmationReply: mocks.handleOcrConfirmationReply,
+vi.mock('./services/confirmation', () => ({
+  handleConfirmationCallback: mocks.handleConfirmationCallback,
+  handleConfirmationReply: mocks.handleConfirmationReply,
   attachConfirmationPreviewMessage: mocks.attachConfirmationPreviewMessage,
 }));
 
@@ -149,8 +149,8 @@ describe('doPost', () => {
       resultCode: 'image-ocr-queued',
     });
     mocks.sendText.mockReturnValue(321);
-    mocks.handleOcrConfirmationCallback.mockReturnValue(null);
-    mocks.handleOcrConfirmationReply.mockReturnValue(null);
+    mocks.handleConfirmationCallback.mockReturnValue(null);
+    mocks.handleConfirmationReply.mockReturnValue(null);
   });
 
   it('processes a webhook update once and marks it done by update_id', () => {
@@ -445,6 +445,7 @@ describe('doPost', () => {
     expect(mocks.handleIncomingText).toHaveBeenCalledWith(
       '今天睡得不太好',
       expect.any(Date),
+      'test-chat-id',
     );
     expect(mocks.sendText).toHaveBeenLastCalledWith(
       'test-chat-id',
@@ -477,7 +478,7 @@ describe('doPost', () => {
   });
 
   it('routes callback queries into the OCR confirmation handler', () => {
-    mocks.handleOcrConfirmationCallback.mockReturnValue({
+    mocks.handleConfirmationCallback.mockReturnValue({
       reply: '已确认热量参考：Greek Yogurt。',
       handlingMode: 'ai',
       status: 'success',
@@ -505,7 +506,7 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    expect(mocks.handleOcrConfirmationCallback).toHaveBeenCalledWith(
+    expect(mocks.handleConfirmationCallback).toHaveBeenCalledWith(
       'test-chat-id',
       'cb_1',
       'ocr:confirm:pending_1',
@@ -525,7 +526,7 @@ describe('doPost', () => {
   });
 
   it('routes force-reply edits into the OCR confirmation reply handler', () => {
-    mocks.handleOcrConfirmationReply.mockReturnValue({
+    mocks.handleConfirmationReply.mockReturnValue({
       reply: '已更新热量，请确认或继续修正。',
       handlingMode: 'ai',
       status: 'success',
@@ -554,7 +555,7 @@ describe('doPost', () => {
       },
     } as GoogleAppsScript.Events.DoPost);
 
-    expect(mocks.handleOcrConfirmationReply).toHaveBeenCalledWith(
+    expect(mocks.handleConfirmationReply).toHaveBeenCalledWith(
       'test-chat-id',
       654,
       '220',

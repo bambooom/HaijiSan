@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  TelegramInlineKeyboardButton,
+  TelegramReplyMarkup,
+} from '../types';
 
 const mocks = vi.hoisted(() => ({
   appConfig: Object.assign(globalThis, {
@@ -48,6 +52,16 @@ vi.mock('../tables/bot-log-table', () => ({
 }));
 
 import { handleAiText } from './ai';
+
+function getInlineKeyboard(
+  replyMarkup: TelegramReplyMarkup | undefined,
+): TelegramInlineKeyboardButton[][] | undefined {
+  if (!replyMarkup || !('inlineKeyboard' in replyMarkup)) {
+    return undefined;
+  }
+
+  return replyMarkup.inlineKeyboard;
+}
 
 describe('handleAiText', () => {
   beforeEach(() => {
@@ -451,5 +465,94 @@ describe('handleAiText', () => {
     expect(mocks.executeGenericToolRequest).not.toHaveBeenCalled();
     expect(result.status).toBe('success');
     expect(result.reply).toBe('已记录午餐。');
+  });
+
+  it('returns a pending stock confirmation when FOOD_LOG stock side effects need review', () => {
+    mocks.startAiResponse.mockReturnValue({
+      mode: 'tool',
+      request: {
+        tool: 'insertFoodLog',
+        sheet: 'FOOD_LOG',
+        record: {
+          occurred_at: '2026-04-08 12:30:00',
+          meal_type: 'lunch',
+          meal_text: '牛奶',
+        },
+        items: [
+          {
+            itemName: '牛奶',
+            quantity: 250,
+            unit: 'ml',
+          },
+        ],
+      },
+      functionCall: {
+        name: 'insertFoodLog',
+        args: {
+          record: {
+            occurred_at: '2026-04-08 12:30:00',
+            meal_type: 'lunch',
+            meal_text: '牛奶',
+          },
+          items: [
+            {
+              itemName: '牛奶',
+              quantity: 250,
+              unit: 'ml',
+            },
+          ],
+        },
+      },
+      modelContent: {
+        role: 'model',
+        parts: [],
+      },
+    });
+    mocks.executeFoodInsertWorkflow.mockReturnValue({
+      insertResult: {
+        tool: 'insertData',
+        sheet: 'FOOD_LOG',
+        record: {
+          food_log_id: 'food_1',
+          meal_text: '牛奶',
+        },
+      },
+      pendingStockDeduction: {
+        foodLogId: 'food_1',
+        mealText: '牛奶',
+        candidates: [
+          {
+            itemName: '牛奶',
+            itemQuantity: 250,
+            itemUnit: 'ml',
+            stockItemId: 'stock_milk',
+            stockItemName: '牛奶',
+            stockQuantity: 0.3,
+            stockUnit: 'l',
+            reason: 'converted 250 ml to 0.3 l; requires confirmation',
+          },
+        ],
+      },
+    });
+
+    const result = handleAiText(
+      '午餐喝了 250ml 牛奶',
+      new Date('2026-04-08T10:00:00Z'),
+      'test-chat-id',
+    );
+
+    expect(mocks.generateFinalAiReply).not.toHaveBeenCalled();
+    expect(result.confirmationState).toBe('pending');
+    expect(result.resultCode).toBe('food-stock-pending');
+    const inlineKeyboard = getInlineKeyboard(
+      result.telegramResponse?.replyMarkup,
+    );
+
+    expect(inlineKeyboard?.[0]?.[0]?.text).toBe('确认扣减');
+    expect(inlineKeyboard?.[0]?.[0]?.callbackData).toMatch(/^stock:confirm:/);
+    expect(inlineKeyboard?.[0]?.[1]?.text).toBe('取消');
+    expect(inlineKeyboard?.[0]?.[1]?.callbackData).toMatch(/^stock:cancel:/);
+    expect(inlineKeyboard?.[0]?.[2]?.text).toBe('修正');
+    expect(inlineKeyboard?.[0]?.[2]?.callbackData).toMatch(/^stock:edit:/);
   });
 });

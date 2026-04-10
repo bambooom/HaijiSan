@@ -1,15 +1,13 @@
 import { estimateIngredientCalories } from './food-estimation';
 import { refCaloriesTable, stockTable } from '../tables';
 import type {
+  FoodWorkflowExecutionResult,
   FoodLogInsertRequest,
   FoodReferenceEntry,
   MealType,
+  PendingStockDeductionCandidate,
 } from '../types';
-import type {
-  InsertDataRequest,
-  InsertDataResult,
-  ToolRecord,
-} from '../tools/types';
+import type { InsertDataRequest, ToolRecord } from '../tools/types';
 import { executeInsertData } from '../tools';
 import type {
   IngredientEstimateInput,
@@ -26,6 +24,12 @@ const STOCK_SIDE_EFFECT_UNITS = new Set([
   '份',
   '个/份',
 ]);
+
+type StockSideEffectPlan = {
+  linkedStockItemIds: string[];
+  pendingCandidates: PendingStockDeductionCandidate[];
+  skippedNotes: string[];
+};
 
 function normalizeMealText(value: unknown): string {
   return typeof value === 'string'
@@ -113,11 +117,63 @@ function isPieceUnit(value: string): boolean {
   return new Set(['piece', 'pieces', '个']).has(normalizeUnit(value));
 }
 
+function isWeightUnit(value: string): boolean {
+  return new Set(['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms']).has(
+    normalizeUnit(value),
+  );
+}
+
+function isVolumeUnit(value: string): boolean {
+  return new Set([
+    'ml',
+    'milliliter',
+    'milliliters',
+    'l',
+    'liter',
+    'liters',
+  ]).has(normalizeUnit(value));
+}
+
 function scaleNullableNumber(
   value: number | null,
   scale: number,
 ): number | null {
   return value === null ? null : roundNutritionValue(value * scale);
+}
+
+function convertMetricUnit(
+  quantity: number,
+  fromUnit: string,
+  toUnit: string,
+): number | null {
+  const from = normalizeUnit(fromUnit);
+  const to = normalizeUnit(toUnit);
+
+  if (from === to) {
+    return quantity;
+  }
+
+  if (isWeightUnit(from) && isWeightUnit(to)) {
+    if (from === 'g' && to === 'kg') {
+      return quantity / 1000;
+    }
+
+    if (from === 'kg' && to === 'g') {
+      return quantity * 1000;
+    }
+  }
+
+  if (isVolumeUnit(from) && isVolumeUnit(to)) {
+    if (from === 'ml' && to === 'l') {
+      return quantity / 1000;
+    }
+
+    if (from === 'l' && to === 'ml') {
+      return quantity * 1000;
+    }
+  }
+
+  return null;
 }
 
 function resolveReferenceScale(
@@ -196,6 +252,84 @@ function canAutoAdjustStock(
   );
 }
 
+function resolveStockQuantity(
+  item: MealResolvedItem,
+  stockUnit: string,
+): number | null {
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+    return null;
+  }
+
+  const normalizedItemUnit = normalizeUnit(item.unit);
+  const normalizedStockUnit = normalizeUnit(stockUnit);
+
+  if (normalizedItemUnit === normalizedStockUnit) {
+    return item.quantity;
+  }
+
+  const metricQuantity = convertMetricUnit(
+    item.quantity,
+    normalizedItemUnit,
+    normalizedStockUnit,
+  );
+
+  if (metricQuantity !== null) {
+    return metricQuantity;
+  }
+
+  if (
+    (isServingUnit(normalizedItemUnit) || isPieceUnit(normalizedItemUnit)) &&
+    STOCK_SIDE_EFFECT_UNITS.has(normalizedStockUnit)
+  ) {
+    return item.quantity;
+  }
+
+  if (isPieceUnit(normalizedItemUnit) && isPieceUnit(normalizedStockUnit)) {
+    return item.quantity;
+  }
+
+  return null;
+}
+
+function appendRecordNotes(record: ToolRecord, notes: string[]): ToolRecord {
+  if (notes.length === 0) {
+    return record;
+  }
+
+  const existingNote =
+    typeof record.note === 'string' && record.note.trim()
+      ? record.note.trim()
+      : '';
+
+  return {
+    ...record,
+    note: [existingNote, ...notes].filter(Boolean).join('\n'),
+  };
+}
+
+function buildPendingCandidateReason(
+  item: MealResolvedItem,
+  stockUnit: string,
+  stockQuantity: number,
+): string {
+  const normalizedItemUnit = normalizeUnit(item.unit);
+  const normalizedStockUnit = normalizeUnit(stockUnit);
+
+  if (normalizedItemUnit === normalizedStockUnit) {
+    return Number.isInteger(stockQuantity)
+      ? 'matched stock item but requires manual confirmation'
+      : 'matched stock item with fractional quantity; requires confirmation';
+  }
+
+  return `converted ${item.quantity} ${item.unit} to ${roundNutritionValue(stockQuantity)} ${stockUnit}; requires confirmation`;
+}
+
+function formatStockCandidateSummary(
+  candidate: PendingStockDeductionCandidate,
+): string {
+  return `${candidate.stockItemName} -${candidate.stockQuantity}${candidate.stockUnit}`;
+}
+
 function applyResolvedFieldsToFoodRecord(
   baseRecord: ToolRecord,
   draft: MealStructureResult,
@@ -236,39 +370,112 @@ function applyStockSideEffects(
   record: ToolRecord,
   resolution: MealResolutionResult,
   timestamp: Date,
-): ToolRecord {
-  const linkedStockItemIds = uniqueValues(
-    resolution.items.flatMap((item) => {
+): { record: ToolRecord; stockPlan: StockSideEffectPlan } {
+  const stockPlan = resolution.items.reduce<StockSideEffectPlan>(
+    (plan, item) => {
       const stockEntry = stockTable.findByName(item.itemName);
 
-      if (!stockEntry || !canAutoAdjustStock(item, stockEntry.unit)) {
-        return [];
+      if (!stockEntry || item.source !== 'reference') {
+        return plan;
       }
 
-      const result = stockTable.adjustStock(
-        timestamp,
-        stockEntry.item_name,
-        -item.quantity,
-        stockEntry.unit,
-        undefined,
-        undefined,
-      );
+      const stockQuantity = resolveStockQuantity(item, stockEntry.unit);
 
-      return result.ok ? [stockEntry.stock_item_id] : [];
-    }),
+      if (stockQuantity === null) {
+        return {
+          ...plan,
+          skippedNotes: plan.skippedNotes.concat(
+            `${item.itemName} 未扣减库存：单位 ${item.unit} 无法可靠换算为 ${stockEntry.unit}`,
+          ),
+        };
+      }
+
+      if (canAutoAdjustStock(item, stockEntry.unit)) {
+        const result = stockTable.adjustStock(
+          timestamp,
+          stockEntry.item_name,
+          -stockQuantity,
+          stockEntry.unit,
+          undefined,
+          undefined,
+        );
+
+        return result.ok
+          ? {
+              ...plan,
+              linkedStockItemIds: plan.linkedStockItemIds.concat(
+                stockEntry.stock_item_id,
+              ),
+            }
+          : {
+              ...plan,
+              skippedNotes: plan.skippedNotes.concat(
+                `${item.itemName} 未扣减库存：${result.reason}`,
+              ),
+            };
+      }
+
+      return {
+        ...plan,
+        pendingCandidates: plan.pendingCandidates.concat({
+          itemName: item.itemName,
+          itemQuantity: item.quantity,
+          itemUnit: item.unit,
+          stockItemId: stockEntry.stock_item_id,
+          stockItemName: stockEntry.item_name,
+          stockQuantity: roundNutritionValue(stockQuantity),
+          stockUnit: stockEntry.unit,
+          reason: buildPendingCandidateReason(
+            item,
+            stockEntry.unit,
+            stockQuantity,
+          ),
+        }),
+      };
+    },
+    {
+      linkedStockItemIds: [],
+      pendingCandidates: [],
+      skippedNotes: [],
+    },
   );
 
+  const linkedStockItemIds = uniqueValues(stockPlan.linkedStockItemIds);
+  let nextRecord = record;
+
   if (
-    linkedStockItemIds.length === 0 ||
-    (typeof record.linked_stock_item_ids === 'string' &&
-      record.linked_stock_item_ids.trim())
+    linkedStockItemIds.length > 0 &&
+    !(
+      typeof record.linked_stock_item_ids === 'string' &&
+      record.linked_stock_item_ids.trim()
+    )
   ) {
-    return record;
+    nextRecord = {
+      ...nextRecord,
+      linked_stock_item_ids: linkedStockItemIds.join(', '),
+    };
+  }
+
+  const stockNotes: string[] = [];
+
+  if (stockPlan.pendingCandidates.length > 0) {
+    stockNotes.push(
+      `库存扣减待确认：${stockPlan.pendingCandidates
+        .map(formatStockCandidateSummary)
+        .join('；')}`,
+    );
+  }
+
+  if (stockPlan.skippedNotes.length > 0) {
+    stockNotes.push(...stockPlan.skippedNotes);
   }
 
   return {
-    ...record,
-    linked_stock_item_ids: linkedStockItemIds.join(', '),
+    record: appendRecordNotes(nextRecord, stockNotes),
+    stockPlan: {
+      ...stockPlan,
+      linkedStockItemIds,
+    },
   };
 }
 
@@ -448,7 +655,7 @@ export function enrichFoodInsertRecord(record: ToolRecord): ToolRecord {
 export function executeFoodInsertWorkflow(
   request: InsertDataRequest | FoodLogInsertRequest,
   timestamp: Date,
-): InsertDataResult {
+): FoodWorkflowExecutionResult {
   const draft = buildMealStructure(
     request.record,
     request.tool === 'insertFoodLog' ? request.items : undefined,
@@ -459,18 +666,33 @@ export function executeFoodInsertWorkflow(
     draft,
     resolution,
   );
-  const finalRecord = applyStockSideEffects(
+  const stockSideEffects = applyStockSideEffects(
     enrichedRecord,
     resolution,
     timestamp,
   );
 
-  return executeInsertData(
+  const insertResult = executeInsertData(
     {
       tool: 'insertData',
       sheet: 'FOOD_LOG',
-      record: finalRecord,
+      record: stockSideEffects.record,
     },
     timestamp,
   );
+
+  const foodLogId = insertResult.record.food_log_id;
+
+  return {
+    insertResult,
+    pendingStockDeduction:
+      typeof foodLogId === 'string' &&
+      stockSideEffects.stockPlan.pendingCandidates.length > 0
+        ? {
+            foodLogId,
+            mealText: draft.mealText,
+            candidates: stockSideEffects.stockPlan.pendingCandidates,
+          }
+        : undefined,
+  };
 }

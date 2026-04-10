@@ -6,6 +6,7 @@ import { handleIncomingImage } from './image';
 export function handleIncomingText(
   text: string,
   timestamp: Date,
+  chatId: string,
 ): CommandHandlingResult {
   const trimmed = text.trim();
 
@@ -13,7 +14,7 @@ export function handleIncomingText(
     return handleCommand(text, timestamp);
   }
 
-  return handleAiText(text, timestamp);
+  return handleAiText(text, timestamp, chatId);
 }
 
 export function handleIncomingImageMessage(

@@ -3,11 +3,13 @@ import type { InsertDataRequest, UpdateDataRequest } from '../tools/types';
 import type {
   CommandAuditFields,
   CommandHandlingResult,
+  FoodWorkflowExecutionResult,
   HealthDataSource,
   HealthScreenshotExtractionResult,
   MealType,
 } from '../types';
 import { buildCommandLogFields } from '../utils/log-meta';
+import { createStockDeductionConfirmation } from '../services/confirmation';
 import { executeFoodInsertWorkflow } from '../services/food-workflow';
 import { extractHealthDataFromImage } from '../services/image-ocr';
 import { createNutritionLabelConfirmation } from '../services/ocr-confirmation';
@@ -57,6 +59,7 @@ function buildImageResult(
     status: overrides?.status ?? 'success',
     note: overrides?.note ?? '',
     audit: overrides?.audit,
+    telegramResponse: overrides?.telegramResponse,
     ...logFields,
   };
 }
@@ -316,6 +319,14 @@ function formatInsertReply(
   }
 }
 
+function isFoodWorkflowExecutionResult(
+  value:
+    | ReturnType<typeof executeFoodInsertWorkflow>
+    | ReturnType<typeof executeInsertData>,
+): value is FoodWorkflowExecutionResult {
+  return 'insertResult' in value;
+}
+
 function buildWriteRequest(
   extraction: HealthScreenshotExtractionResult,
   caption: string,
@@ -413,6 +424,36 @@ export function handleIncomingImage(
         ? executeFoodInsertWorkflow(request, timestamp)
         : executeInsertData(request, timestamp);
 
+    if (
+      request.sheet === 'FOOD_LOG' &&
+      isFoodWorkflowExecutionResult(result) &&
+      result.pendingStockDeduction
+    ) {
+      const confirmation = createStockDeductionConfirmation(
+        chatId,
+        createTraceId(timestamp),
+        result.pendingStockDeduction,
+        timestamp,
+      );
+
+      return buildImageResult(confirmation.reply, timestamp, {
+        tool: request.tool,
+        note: `${request.sheet}; ${buildOcrNote(extraction, caption)}; stock deduction awaiting confirmation`,
+        resultCode: 'food-stock-pending',
+        confirmationState: 'pending',
+        audit: createAudit(
+          request.tool,
+          request.sheet,
+          Object.keys(result.insertResult.record).sort(),
+        ),
+        telegramResponse: confirmation.telegramResponse,
+      });
+    }
+
+    const insertResult = isFoodWorkflowExecutionResult(result)
+      ? result.insertResult
+      : result;
+
     return buildImageResult(formatInsertReply(extraction, request), timestamp, {
       tool: request.tool,
       note: `${request.sheet}; ${buildOcrNote(extraction, caption)}`,
@@ -420,7 +461,7 @@ export function handleIncomingImage(
       audit: createAudit(
         request.tool,
         request.sheet,
-        Object.keys(result.record).sort(),
+        Object.keys(insertResult.record).sort(),
       ),
     });
   } catch (error) {

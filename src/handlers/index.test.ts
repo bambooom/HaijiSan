@@ -71,7 +71,7 @@ describe('handleIncomingText', () => {
   it('routes slash commands to handleCommand', () => {
     const timestamp = new Date('2026-04-08T10:00:00Z');
 
-    const result = handleIncomingText('/help', timestamp);
+    const result = handleIncomingText('/help', timestamp, 'test-chat-id');
 
     expect(mocks.handleCommand).toHaveBeenCalledWith('/help', timestamp);
     expect(mocks.handleAiText).not.toHaveBeenCalled();
@@ -81,9 +81,17 @@ describe('handleIncomingText', () => {
   it('routes natural language text to handleAiText', () => {
     const timestamp = new Date('2026-04-08T10:00:00Z');
 
-    const result = handleIncomingText('今天吃了酸奶', timestamp);
+    const result = handleIncomingText(
+      '今天吃了酸奶',
+      timestamp,
+      'test-chat-id',
+    );
 
-    expect(mocks.handleAiText).toHaveBeenCalledWith('今天吃了酸奶', timestamp);
+    expect(mocks.handleAiText).toHaveBeenCalledWith(
+      '今天吃了酸奶',
+      timestamp,
+      'test-chat-id',
+    );
     expect(mocks.handleCommand).not.toHaveBeenCalled();
     expect(result.reply).toBe('ai');
   });
@@ -91,7 +99,7 @@ describe('handleIncomingText', () => {
   it('keeps empty text on the command path', () => {
     const timestamp = new Date('2026-04-08T10:00:00Z');
 
-    handleIncomingText('   ', timestamp);
+    handleIncomingText('   ', timestamp, 'test-chat-id');
 
     expect(mocks.handleCommand).toHaveBeenCalledWith('   ', timestamp);
     expect(mocks.handleAiText).not.toHaveBeenCalled();

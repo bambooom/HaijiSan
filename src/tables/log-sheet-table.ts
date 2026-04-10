@@ -11,6 +11,12 @@ import {
 } from '../shared/record-query';
 import { SheetTable } from './sheet-table';
 
+type EntryRow<TRecord> = {
+  rowNumber: number;
+  entry: TRecord;
+  values: import('../types').SheetRow;
+};
+
 type DateMatchPredicate<TRecord> = (
   entry: TRecord,
   dateStamp: string,
@@ -112,6 +118,16 @@ export class LogSheetTable<TRecord extends object> {
 
   listEntries(): TRecord[] {
     return this.baseTable.listEntries();
+  }
+
+  listEntryRows(): EntryRow<TRecord>[] {
+    return this.baseTable.listEntryRows();
+  }
+
+  findEntryRow(
+    predicate: (entry: TRecord) => boolean,
+  ): EntryRow<TRecord> | null {
+    return this.baseTable.findEntryRow(predicate);
   }
 
   listByDate(date: Date): TRecord[] {

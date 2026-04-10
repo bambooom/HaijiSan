@@ -1,107 +1,33 @@
 import { executeInsertData, executeUpdateData } from '../tools';
 import type { InsertDataRequest, UpdateDataRequest } from '../tools/types';
-import type {
-  CommandAuditFields,
-  CommandHandlingResult,
-  TelegramReplyMarkup,
-} from '../types';
+import type { CommandAuditFields, CommandHandlingResult } from '../types';
+import {
+  buildForceReply,
+  buildInlineKeyboard,
+  consumeConfirmationPromptMapping,
+  createConfirmationId,
+  deletePendingConfirmation,
+  loadPendingConfirmation,
+  saveConfirmationPromptMapping,
+  savePendingConfirmation,
+  type PendingConfirmation,
+} from './confirmation-framework';
 import { answerCallbackQuery, editText, sendText } from './telegram';
-
-const OCR_CONFIRMATION_TTL_SECONDS = 6 * 60 * 60;
 
 type NutritionRequest = InsertDataRequest | UpdateDataRequest;
 
 type EditableField = 'calories_kcal';
 
-type PendingOcrConfirmation = {
-  id: string;
-  kind: 'nutrition_label';
-  chatId: string;
-  traceId: string;
+type PendingOcrPayload = {
   request: NutritionRequest;
-  createdAtIso: string;
-  previewMessageId: number | null;
   editPromptMessageId: number | null;
   awaitingField: EditableField | null;
 };
 
-function getCache(): GoogleAppsScript.Cache.Cache | null {
-  if (
-    typeof CacheService === 'undefined' ||
-    typeof CacheService.getScriptCache !== 'function'
-  ) {
-    return null;
-  }
-
-  return CacheService.getScriptCache();
-}
-
-function getPendingKey(id: string): string {
-  return `ocr_confirmation:${id}`;
-}
-
-function getPromptKey(chatId: string, messageId: number): string {
-  return `ocr_confirmation_prompt:${chatId}:${messageId}`;
-}
-
-function createConfirmationId(): string {
-  if (
-    typeof Utilities !== 'undefined' &&
-    typeof Utilities.getUuid === 'function'
-  ) {
-    return Utilities.getUuid().replace(/-/g, '').slice(0, 12);
-  }
-
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function savePendingConfirmation(pending: PendingOcrConfirmation): void {
-  getCache()?.put(
-    getPendingKey(pending.id),
-    JSON.stringify(pending),
-    OCR_CONFIRMATION_TTL_SECONDS,
-  );
-}
-
-function deletePendingConfirmation(id: string): void {
-  getCache()?.remove(getPendingKey(id));
-}
-
-function loadPendingConfirmation(id: string): PendingOcrConfirmation | null {
-  const raw = getCache()?.get(getPendingKey(id));
-
-  if (!raw) {
-    return null;
-  }
-
-  return JSON.parse(raw) as PendingOcrConfirmation;
-}
-
-function savePromptMapping(
-  chatId: string,
-  messageId: number,
-  confirmationId: string,
-): void {
-  getCache()?.put(
-    getPromptKey(chatId, messageId),
-    confirmationId,
-    OCR_CONFIRMATION_TTL_SECONDS,
-  );
-}
-
-function consumePromptMapping(
-  chatId: string,
-  messageId: number,
-): string | null {
-  const key = getPromptKey(chatId, messageId);
-  const confirmationId = getCache()?.get(key) ?? null;
-
-  if (confirmationId) {
-    getCache()?.remove(key);
-  }
-
-  return confirmationId;
-}
+type PendingOcrConfirmation = PendingConfirmation<
+  'nutrition_label',
+  PendingOcrPayload
+>;
 
 function buildAudit(
   request: NutritionRequest,
@@ -150,11 +76,11 @@ function formatMetric(
 }
 
 function buildPreviewText(pending: PendingOcrConfirmation): string {
-  const record = getRecordFromRequest(pending.request);
+  const record = getRecordFromRequest(pending.payload.request);
 
   return [
     '请确认这条营养参考：',
-    `食物：${getFoodName(pending.request)}`,
+    `食物：${getFoodName(pending.payload.request)}`,
     `热量：${formatMetric(record.calories_kcal, 'kcal')}`,
     `蛋白质：${formatMetric(record.protein_g, 'g')}`,
     `脂肪：${formatMetric(record.fat_g, 'g')}`,
@@ -177,35 +103,28 @@ function buildCancelledText(pending: PendingOcrConfirmation): string {
   return `${buildPreviewText(pending)}\n\n状态：已取消`;
 }
 
-function buildMainKeyboard(id: string): TelegramReplyMarkup {
-  return {
-    inlineKeyboard: [
-      [
-        { text: '确认', callbackData: `ocr:confirm:${id}` },
-        { text: '取消', callbackData: `ocr:cancel:${id}` },
-        { text: '修正', callbackData: `ocr:edit:${id}` },
-      ],
+function buildMainKeyboard(id: string) {
+  return buildInlineKeyboard([
+    [
+      { text: '确认', callbackData: `ocr:confirm:${id}` },
+      { text: '取消', callbackData: `ocr:cancel:${id}` },
+      { text: '修正', callbackData: `ocr:edit:${id}` },
     ],
-  };
+  ]);
 }
 
-function buildEditKeyboard(id: string): TelegramReplyMarkup {
-  return {
-    inlineKeyboard: [
-      [{ text: '修改热量', callbackData: `ocr:field:calories_kcal:${id}` }],
-      [
-        { text: '返回', callbackData: `ocr:back:${id}` },
-        { text: '取消', callbackData: `ocr:cancel:${id}` },
-      ],
+function buildEditKeyboard(id: string) {
+  return buildInlineKeyboard([
+    [{ text: '修改热量', callbackData: `ocr:field:calories_kcal:${id}` }],
+    [
+      { text: '返回', callbackData: `ocr:back:${id}` },
+      { text: '取消', callbackData: `ocr:cancel:${id}` },
     ],
-  };
+  ]);
 }
 
-function buildForceReplyMarkup(): TelegramReplyMarkup {
-  return {
-    forceReply: true,
-    inputFieldPlaceholder: '请输入正确的热量（kcal）',
-  };
+function buildForceReplyMarkup() {
+  return buildForceReply('请输入正确的热量（kcal）');
 }
 
 function parseCallbackData(data: string): {
@@ -244,27 +163,30 @@ function updatePendingCalories(
   calories: number,
 ): PendingOcrConfirmation {
   const nextRequest =
-    pending.request.tool === 'updateData'
+    pending.payload.request.tool === 'updateData'
       ? {
-          ...pending.request,
+          ...pending.payload.request,
           updates: {
-            ...pending.request.updates,
+            ...pending.payload.request.updates,
             calories_kcal: calories,
           },
         }
       : {
-          ...pending.request,
+          ...pending.payload.request,
           record: {
-            ...pending.request.record,
+            ...pending.payload.request.record,
             calories_kcal: calories,
           },
         };
 
   return {
     ...pending,
-    request: nextRequest,
-    awaitingField: null,
-    editPromptMessageId: null,
+    payload: {
+      ...pending.payload,
+      request: nextRequest,
+      awaitingField: null,
+      editPromptMessageId: null,
+    },
   };
 }
 
@@ -282,7 +204,7 @@ function buildResult(
     audit: overrides?.audit,
     traceId: pending.traceId,
     intent: 'image-ocr',
-    tool: pending.request.tool,
+    tool: pending.payload.request.tool,
     confirmationState: overrides?.confirmationState ?? 'pending',
     resultCode: overrides?.resultCode ?? 'image-ocr-pending',
     telegramResponse: overrides?.telegramResponse,
@@ -300,11 +222,13 @@ export function createNutritionLabelConfirmation(
     kind: 'nutrition_label',
     chatId,
     traceId,
-    request,
     createdAtIso: timestamp.toISOString(),
     previewMessageId: null,
-    editPromptMessageId: null,
-    awaitingField: null,
+    payload: {
+      request,
+      editPromptMessageId: null,
+      awaitingField: null,
+    },
   };
 
   savePendingConfirmation(pending);
@@ -317,22 +241,6 @@ export function createNutritionLabelConfirmation(
       pendingConfirmationId: pending.id,
       replyMarkup: buildMainKeyboard(pending.id),
     },
-  });
-}
-
-export function attachConfirmationPreviewMessage(
-  confirmationId: string,
-  messageId: number,
-): void {
-  const pending = loadPendingConfirmation(confirmationId);
-
-  if (!pending) {
-    return;
-  }
-
-  savePendingConfirmation({
-    ...pending,
-    previewMessageId: messageId,
   });
 }
 
@@ -349,7 +257,9 @@ export function handleOcrConfirmationCallback(
     return null;
   }
 
-  const pending = loadPendingConfirmation(parsed.id);
+  const pending = loadPendingConfirmation<'nutrition_label', PendingOcrPayload>(
+    parsed.id,
+  );
 
   if (!pending || pending.chatId !== chatId) {
     answerCallbackQuery(callbackQueryId, '这条确认已失效。');
@@ -376,13 +286,13 @@ export function handleOcrConfirmationCallback(
   switch (parsed.action) {
     case 'confirm': {
       const committedReply =
-        withMessage.request.tool === 'updateData'
-          ? `已更新热量参考：${getFoodName(withMessage.request)}。`
-          : `已记录热量参考：${getFoodName(withMessage.request)}。`;
+        withMessage.payload.request.tool === 'updateData'
+          ? `已更新热量参考：${getFoodName(withMessage.payload.request)}。`
+          : `已记录热量参考：${getFoodName(withMessage.payload.request)}。`;
 
-      if (withMessage.request.tool === 'updateData') {
+      if (withMessage.payload.request.tool === 'updateData') {
         const executionResult = executeUpdateData(
-          withMessage.request,
+          withMessage.payload.request,
           timestamp,
         );
 
@@ -395,17 +305,20 @@ export function handleOcrConfirmationCallback(
         deletePendingConfirmation(withMessage.id);
 
         return buildResult(withMessage, committedReply, timestamp, {
-          note: `${withMessage.request.sheet}; confirmed`,
+          note: `${withMessage.payload.request.sheet}; confirmed`,
           confirmationState: 'confirmed',
           resultCode: 'image-ocr-confirmed',
           audit: buildAudit(
-            withMessage.request,
+            withMessage.payload.request,
             Object.keys(executionResult.updates).sort(),
           ),
         });
       }
 
-      const executionResult = executeInsertData(withMessage.request, timestamp);
+      const executionResult = executeInsertData(
+        withMessage.payload.request,
+        timestamp,
+      );
 
       answerCallbackQuery(callbackQueryId, '已确认');
       editText(
@@ -416,11 +329,11 @@ export function handleOcrConfirmationCallback(
       deletePendingConfirmation(withMessage.id);
 
       return buildResult(withMessage, committedReply, timestamp, {
-        note: `${withMessage.request.sheet}; confirmed`,
+        note: `${withMessage.payload.request.sheet}; confirmed`,
         confirmationState: 'confirmed',
         resultCode: 'image-ocr-confirmed',
         audit: buildAudit(
-          withMessage.request,
+          withMessage.payload.request,
           Object.keys(executionResult.record).sort(),
         ),
       });
@@ -431,7 +344,7 @@ export function handleOcrConfirmationCallback(
       deletePendingConfirmation(withMessage.id);
 
       return buildResult(withMessage, '已取消这条 OCR 结果。', timestamp, {
-        note: `${withMessage.request.sheet}; cancelled`,
+        note: `${withMessage.payload.request.sheet}; cancelled`,
         confirmationState: 'cancelled',
         resultCode: 'image-ocr-cancelled',
       });
@@ -442,7 +355,7 @@ export function handleOcrConfirmationCallback(
       });
 
       return buildResult(withMessage, '进入修正模式。', timestamp, {
-        note: `${withMessage.request.sheet}; editing`,
+        note: `${withMessage.payload.request.sheet}; editing`,
         confirmationState: 'pending',
         resultCode: 'image-ocr-editing',
       });
@@ -453,7 +366,7 @@ export function handleOcrConfirmationCallback(
       });
 
       return buildResult(withMessage, '已返回确认视图。', timestamp, {
-        note: `${withMessage.request.sheet}; back to preview`,
+        note: `${withMessage.payload.request.sheet}; back to preview`,
         confirmationState: 'pending',
         resultCode: 'image-ocr-preview',
       });
@@ -464,18 +377,21 @@ export function handleOcrConfirmationCallback(
       });
       const nextPending = {
         ...withMessage,
-        awaitingField: parsed.field ?? null,
-        editPromptMessageId: promptMessageId,
+        payload: {
+          ...withMessage.payload,
+          awaitingField: parsed.field ?? null,
+          editPromptMessageId: promptMessageId,
+        },
       };
 
       savePendingConfirmation(nextPending);
 
       if (promptMessageId !== null) {
-        savePromptMapping(chatId, promptMessageId, nextPending.id);
+        saveConfirmationPromptMapping(chatId, promptMessageId, nextPending.id);
       }
 
       return buildResult(nextPending, '等待热量输入。', timestamp, {
-        note: `${withMessage.request.sheet}; awaiting calories correction`,
+        note: `${withMessage.payload.request.sheet}; awaiting calories correction`,
         confirmationState: 'pending',
         resultCode: 'image-ocr-awaiting-field-input',
       });
@@ -489,18 +405,23 @@ export function handleOcrConfirmationReply(
   text: string,
   timestamp: Date,
 ): CommandHandlingResult | null {
-  const confirmationId = consumePromptMapping(chatId, replyToMessageId);
+  const confirmationId = consumeConfirmationPromptMapping(
+    chatId,
+    replyToMessageId,
+  );
 
   if (!confirmationId) {
     return null;
   }
 
-  const pending = loadPendingConfirmation(confirmationId);
+  const pending = loadPendingConfirmation<'nutrition_label', PendingOcrPayload>(
+    confirmationId,
+  );
 
   if (
     !pending ||
     pending.chatId !== chatId ||
-    pending.awaitingField !== 'calories_kcal'
+    pending.payload.awaitingField !== 'calories_kcal'
   ) {
     return null;
   }
@@ -517,16 +438,19 @@ export function handleOcrConfirmationReply(
     );
 
     if (nextPromptId !== null) {
-      savePromptMapping(chatId, nextPromptId, pending.id);
+      saveConfirmationPromptMapping(chatId, nextPromptId, pending.id);
       savePendingConfirmation({
         ...pending,
-        editPromptMessageId: nextPromptId,
+        payload: {
+          ...pending.payload,
+          editPromptMessageId: nextPromptId,
+        },
       });
     }
 
     return buildResult(pending, '热量输入无效。', timestamp, {
       status: 'failed',
-      note: `${pending.request.sheet}; invalid calories input`,
+      note: `${pending.payload.request.sheet}; invalid calories input`,
       confirmationState: 'pending',
       resultCode: 'image-ocr-invalid-field-input',
     });
@@ -547,7 +471,7 @@ export function handleOcrConfirmationReply(
   sendText(chatId, '已更新热量，请确认或继续修正。');
 
   return buildResult(nextPending, '已更新热量，请确认或继续修正。', timestamp, {
-    note: `${nextPending.request.sheet}; calories updated`,
+    note: `${nextPending.payload.request.sheet}; calories updated`,
     confirmationState: 'pending',
     resultCode: 'image-ocr-field-updated',
   });

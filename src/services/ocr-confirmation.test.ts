@@ -68,7 +68,7 @@ describe('ocr-confirmation', () => {
     );
 
     expect(mocks.cachePut).toHaveBeenCalledWith(
-      'ocr_confirmation:abc123def456',
+      'confirmation:abc123def456',
       expect.stringContaining('Greek Yogurt'),
       21600,
     );
@@ -91,21 +91,23 @@ describe('ocr-confirmation', () => {
         kind: 'nutrition_label',
         chatId: 'test-chat-id',
         traceId: 'image_1',
-        request: {
-          tool: 'insertData',
-          sheet: 'REF_CALORIES',
-          record: {
-            food_name: 'Greek Yogurt',
-            calories_kcal: 210,
-            protein_g: 12,
-            fat_g: 7,
-            carbs_g: 24,
+        payload: {
+          request: {
+            tool: 'insertData',
+            sheet: 'REF_CALORIES',
+            record: {
+              food_name: 'Greek Yogurt',
+              calories_kcal: 210,
+              protein_g: 12,
+              fat_g: 7,
+              carbs_g: 24,
+            },
           },
+          editPromptMessageId: null,
+          awaitingField: null,
         },
         createdAtIso: '2026-04-08T10:00:00.000Z',
         previewMessageId: 321,
-        editPromptMessageId: null,
-        awaitingField: null,
       }),
     );
     mocks.executeInsertData.mockReturnValue({
@@ -142,18 +144,20 @@ describe('ocr-confirmation', () => {
         kind: 'nutrition_label',
         chatId: 'test-chat-id',
         traceId: 'image_1',
-        request: {
-          tool: 'insertData',
-          sheet: 'REF_CALORIES',
-          record: {
-            food_name: 'Greek Yogurt',
-            calories_kcal: 210,
+        payload: {
+          request: {
+            tool: 'insertData',
+            sheet: 'REF_CALORIES',
+            record: {
+              food_name: 'Greek Yogurt',
+              calories_kcal: 210,
+            },
           },
+          editPromptMessageId: null,
+          awaitingField: null,
         },
         createdAtIso: '2026-04-08T10:00:00.000Z',
         previewMessageId: 321,
-        editPromptMessageId: null,
-        awaitingField: null,
       }),
     );
 
@@ -182,18 +186,20 @@ describe('ocr-confirmation', () => {
         kind: 'nutrition_label',
         chatId: 'test-chat-id',
         traceId: 'image_1',
-        request: {
-          tool: 'insertData',
-          sheet: 'REF_CALORIES',
-          record: {
-            food_name: 'Greek Yogurt',
-            calories_kcal: 210,
+        payload: {
+          request: {
+            tool: 'insertData',
+            sheet: 'REF_CALORIES',
+            record: {
+              food_name: 'Greek Yogurt',
+              calories_kcal: 210,
+            },
           },
+          editPromptMessageId: 654,
+          awaitingField: 'calories_kcal',
         },
         createdAtIso: '2026-04-08T10:00:00.000Z',
         previewMessageId: 321,
-        editPromptMessageId: 654,
-        awaitingField: 'calories_kcal',
       }),
     );
 
