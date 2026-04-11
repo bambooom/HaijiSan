@@ -2,12 +2,14 @@ import {
   buildTodayNutritionReply,
   getTodayNutritionSummary,
 } from './nutrition';
+import { buildDailyInsight } from './insight';
 import {
   bodyLogTable,
   sleepLogTable,
   statusLogTable,
   workoutLogTable,
 } from '../../tables';
+import { formatDateLabel } from '../../utils/value';
 
 export function buildDailySummaryMessage(timestamp: Date): string {
   const nutritionSummary = getTodayNutritionSummary(timestamp);
@@ -29,17 +31,15 @@ export function buildDailySummaryMessage(timestamp: Date): string {
   }
 
   const deterministicSummary = sections.join('\n\n');
-  return [`📋 今日总结 ${formatDateLabel(timestamp)}`, deterministicSummary]
+  const aiInsight = buildDailyInsight(timestamp, deterministicSummary);
+
+  return [
+    `📋 今日总结 ${formatDateLabel(timestamp)}`,
+    deterministicSummary,
+    aiInsight,
+  ]
     .filter((section): section is string => Boolean(section))
     .join('\n\n');
-}
-
-function formatDateLabel(timestamp: Date): string {
-  return [
-    timestamp.getFullYear(),
-    String(timestamp.getMonth() + 1).padStart(2, '0'),
-    String(timestamp.getDate()).padStart(2, '0'),
-  ].join('-');
 }
 
 function buildBodySection(timestamp: Date): {

@@ -13,6 +13,7 @@ Object.assign(globalThis, {
 const mocks = vi.hoisted(() => ({
   getTodayNutritionSummary: vi.fn(),
   buildTodayNutritionReply: vi.fn(),
+  buildDailyInsight: vi.fn(),
   listBodyByDate: vi.fn(),
   listRecentBodies: vi.fn(),
   listSleepByDate: vi.fn(),
@@ -25,6 +26,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./nutrition', () => ({
   getTodayNutritionSummary: mocks.getTodayNutritionSummary,
   buildTodayNutritionReply: mocks.buildTodayNutritionReply,
+}));
+
+vi.mock('./insight', () => ({
+  buildDailyInsight: mocks.buildDailyInsight,
 }));
 
 vi.mock('../../tables', () => ({
@@ -57,6 +62,7 @@ describe('daily summary', () => {
     mocks.listWorkoutByDate.mockReturnValue([]);
     mocks.listRecentWorkouts.mockReturnValue([]);
     mocks.listStatusByDate.mockReturnValue([]);
+    mocks.buildDailyInsight.mockReturnValue(null);
   });
 
   it('builds a deterministic digest from recorded data', () => {
@@ -179,6 +185,31 @@ describe('daily summary', () => {
     );
     expect(result).toContain('运动：今天共 1 次，合计 35 分钟；项目 跑步。');
     expect(result).toContain('状态：排便已记录。');
+  });
+
+  it('appends AI insight when it is available', () => {
+    mocks.getTodayNutritionSummary.mockReturnValue({
+      meals: [{ food_log_id: '1' }],
+      proteinStatus: 'low',
+      proteinTarget: 66,
+      totalProtein: 56.7,
+      vegetableStatus: 'enough',
+      totalVegetableGrams: 380,
+      carbsStatus: 'moderate',
+      totalCarbs: 19.1,
+      carbCalorieShare: 0.1,
+    });
+    mocks.buildTodayNutritionReply.mockReturnValue(
+      '今天共记录 2 餐，热量约 840 kcal。',
+    );
+    mocks.buildDailyInsight.mockReturnValue(
+      'Insights:\n近几天睡眠整体稳定，今天运动量中等。',
+    );
+
+    const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
+
+    expect(result).toContain('Insights:');
+    expect(result).toContain('近几天睡眠整体稳定，今天运动量中等。');
   });
 
   it('returns the empty-data fallback when nothing is available', () => {

@@ -55,3 +55,11 @@ export function normalizeText(value: unknown): string {
 export function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values));
 }
+
+export function formatDateLabel(timestamp: Date): string {
+  return [
+    timestamp.getFullYear(),
+    String(timestamp.getMonth() + 1).padStart(2, '0'),
+    String(timestamp.getDate()).padStart(2, '0'),
+  ].join('-');
+}
