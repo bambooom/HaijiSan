@@ -761,4 +761,24 @@ describe('food-workflow', () => {
     expect(insertRequest?.record.meal_text).toBe('未知配菜');
     expect(insertRequest?.record.calories_kcal).toBeUndefined();
   });
+
+  it('blocks FOOD_LOG inserts when domain validation fails', () => {
+    expect(() =>
+      executeFoodInsertWorkflow(
+        {
+          tool: 'insertData',
+          sheet: 'FOOD_LOG',
+          record: {
+            occurred_at: '2026-04-08 12:30:00',
+            meal_type: 'lunch',
+            meal_text: '鸡蛋',
+            calories_kcal: -10,
+          },
+        },
+        new Date('2026-04-08T10:00:00Z'),
+      ),
+    ).toThrow('FOOD_LOG domain validation failed');
+
+    expect(mocks.executeInsertData).not.toHaveBeenCalled();
+  });
 });

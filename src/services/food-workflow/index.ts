@@ -11,6 +11,7 @@ import {
   resolveMealWithAiFallback,
 } from './meal';
 import { applyStockSideEffects } from './stock';
+import { assertValidFoodLogDomainRecord } from '../validation/domain';
 
 // This orchestration layer keeps the FOOD_LOG write path readable:
 // 1) normalize meal items, 2) enrich nutrition, 3) plan stock side effects,
@@ -29,6 +30,7 @@ export function executeFoodInsertWorkflow(
     draft,
     resolution,
   );
+  assertValidFoodLogDomainRecord(enrichedRecord);
   const stockSideEffects = applyStockSideEffects(
     enrichedRecord,
     resolution,

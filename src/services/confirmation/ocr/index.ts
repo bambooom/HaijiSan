@@ -26,6 +26,7 @@ import {
   parseOcrCallbackData,
 } from './ui';
 import { answerCallbackQuery, editText, sendText } from '../../telegram';
+import { validateNutritionRequest } from '../../validation/domain';
 
 export function createNutritionLabelConfirmation(
   chatId: string,
@@ -101,6 +102,21 @@ export function handleOcrConfirmationCallback(
 
   switch (parsed.action) {
     case 'confirm': {
+      const validationErrors = validateNutritionRequest(
+        withMessage.payload.request,
+      );
+
+      if (validationErrors.length > 0) {
+        answerCallbackQuery(callbackQueryId, '校验失败，请先修正数据');
+
+        return buildOcrResult(withMessage, '确认前校验失败，请先修正数据。', {
+          status: 'failed',
+          note: `${withMessage.payload.request.sheet}; validation failed; ${validationErrors.join('; ')}`,
+          confirmationState: 'pending',
+          resultCode: 'image-ocr-validation-failed',
+        });
+      }
+
       const committedReply =
         withMessage.payload.request.tool === 'updateData'
           ? `已更新热量参考：${getFoodName(withMessage.payload.request)}。`

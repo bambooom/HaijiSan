@@ -222,4 +222,45 @@ describe('ocr-confirmation', () => {
     expect(editOptions?.replyMarkup?.inlineKeyboard).toBeDefined();
     expect(replyResult?.resultCode).toBe('image-ocr-field-updated');
   });
+
+  it('does not confirm invalid nutrition data even when the user presses confirm', () => {
+    mocks.cacheGet.mockReturnValueOnce(
+      JSON.stringify({
+        id: 'abc123def456',
+        kind: 'nutrition_label',
+        chatId: 'test-chat-id',
+        traceId: 'image_1',
+        payload: {
+          request: {
+            tool: 'insertData',
+            sheet: 'REF_CALORIES',
+            record: {
+              food_name: 'Greek Yogurt',
+              calories_kcal: -210,
+            },
+          },
+          editPromptMessageId: null,
+          awaitingField: null,
+        },
+        createdAtIso: '2026-04-08T10:00:00.000Z',
+        previewMessageId: 321,
+      }),
+    );
+
+    const result = handleOcrConfirmationCallback(
+      'test-chat-id',
+      'cb_invalid',
+      'ocr:confirm:abc123def456',
+      321,
+      new Date('2026-04-08T10:00:00Z'),
+    );
+
+    expect(mocks.executeInsertData).not.toHaveBeenCalled();
+    expect(mocks.answerCallbackQuery).toHaveBeenCalledWith(
+      'cb_invalid',
+      '校验失败，请先修正数据',
+    );
+    expect(result?.resultCode).toBe('image-ocr-validation-failed');
+    expect(result?.confirmationState).toBe('pending');
+  });
 });
