@@ -81,6 +81,12 @@ describe('Gemini native function calling', () => {
       'personal health, nutrition, and logging assistant',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'calm, steady, observant, and dependable',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
+      'never use Markdown. Use only the simplest Telegram HTML tags',
+    );
+    expect(payload.systemInstruction.parts[0]?.text).toContain(
       'Current local timestamp for interpreting relative dates: 2026-04-08 18:00:00.',
     );
     expect(payload.systemInstruction.parts[0]?.text).toContain(

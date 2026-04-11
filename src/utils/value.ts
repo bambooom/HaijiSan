@@ -70,3 +70,22 @@ export function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+export function normalizeTelegramHtmlReply(value: string): string {
+  return value
+    .trim()
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,3}\s+(.+)$/gm, (_match, text: string) => {
+      return `<b>${escapeHtml(text.trim())}</b>`;
+    })
+    .replace(/^(?:-|\*)\s+/gm, '• ')
+    .replace(/\*\*([^*\n]+)\*\*/g, (_match, text: string) => {
+      return `<b>${escapeHtml(text)}</b>`;
+    })
+    .replace(/__([^_\n]+)__/g, (_match, text: string) => {
+      return `<b>${escapeHtml(text)}</b>`;
+    })
+    .replace(/`([^`\n]+)`/g, (_match, text: string) => {
+      return `<code>${escapeHtml(text)}</code>`;
+    });
+}

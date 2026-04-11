@@ -73,10 +73,10 @@ describe('handleAiText', () => {
   it('returns direct Gemini replies as ai results', () => {
     mocks.startAiResponse.mockReturnValue({
       mode: 'reply',
-      reply: '今天我可以帮你记录或查询。',
+      reply: '### 今天我可以帮你记录或查询\n- `饮食`\n- **睡眠**',
       modelContent: {
         role: 'model',
-        parts: [{ text: '今天我可以帮你记录或查询。' }],
+        parts: [{ text: '### 今天我可以帮你记录或查询\n- `饮食`\n- **睡眠**' }],
       },
     });
 
@@ -93,7 +93,9 @@ describe('handleAiText', () => {
     );
     expect(result.handlingMode).toBe('ai');
     expect(result.status).toBe('success');
-    expect(result.reply).toContain('记录或查询');
+    expect(result.reply).toContain('<b>今天我可以帮你记录或查询</b>');
+    expect(result.reply).toContain('• <code>饮食</code>');
+    expect(result.reply).toContain('• <b>睡眠</b>');
     expect(result.resultCode).toBe('ai-direct-reply');
     expect(result.audit).toEqual({
       toolCallCount: 0,
@@ -165,7 +167,7 @@ describe('handleAiText', () => {
         },
       ],
     });
-    mocks.generateFinalAiReply.mockReturnValue('你最近记录里提到了酸奶。');
+    mocks.generateFinalAiReply.mockReturnValue('**你最近记录里提到了酸奶。**');
 
     const timestamp = new Date('2026-04-08T10:00:00Z');
     mocks.listRecentConversationTurns.mockReturnValue([
@@ -219,7 +221,7 @@ describe('handleAiText', () => {
     });
     expect(result.status).toBe('success');
     expect(result.tool).toBe('readData');
-    expect(result.reply).toContain('酸奶');
+    expect(result.reply).toContain('<b>你最近记录里提到了酸奶。</b>');
     expect(result.resultCode).toBe('ai-tool-executed');
     expect(result.audit).toEqual({
       toolCallCount: 1,

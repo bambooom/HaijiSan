@@ -210,7 +210,7 @@ describe('daily summary', () => {
       '今天共记录 2 餐，热量约 840 kcal。',
     );
     mocks.buildDailyInsight.mockReturnValue(
-      'Insights:\n近几天 <稳定>，今天运动量中等。',
+      '💡 灰二的观察\n近几天 <稳定>，今天运动量中等。',
     );
 
     const result = buildDailySummaryHtmlMessage(
@@ -222,7 +222,7 @@ describe('daily summary', () => {
       '<b>🍽️ 饮食</b><br>今天共记录 2 餐，热量约 840 kcal。',
     );
     expect(result).toContain(
-      '<b>Insights:</b><br>近几天 &lt;稳定&gt;，今天运动量中等。',
+      '<b>💡 灰二的观察</b><br>近几天 &lt;稳定&gt;，今天运动量中等。',
     );
   });
 
@@ -242,14 +242,14 @@ describe('daily summary', () => {
       '今天共记录 2 餐，热量约 840 kcal。',
     );
     mocks.buildDailyInsight.mockReturnValue(
-      'Insights:\n近几天睡眠整体稳定，今天运动量中等。',
+      '💡 灰二的观察\n近几天睡眠整体稳定，今天运动量中等。',
     );
 
     const result = buildDailySummaryHtmlMessage(
       new Date('2026-04-02T23:30:00'),
     );
 
-    expect(result).toContain('Insights:');
+    expect(result).toContain('💡 灰二的观察');
     expect(result).toContain('近几天睡眠整体稳定，今天运动量中等。');
   });
 

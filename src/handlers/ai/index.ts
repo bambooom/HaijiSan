@@ -2,6 +2,7 @@ import { createStockDeductionConfirmation } from '../../services/confirmation';
 import { generateFinalAiReply, startAiResponse } from '../../services/gemini';
 import { validateAiToolRequest } from '../../tools/validation';
 import type { CommandHandlingResult } from '../../types';
+import { normalizeTelegramHtmlReply } from '../../utils/value';
 import {
   buildAiResult,
   buildAuditFromRequest,
@@ -25,12 +26,16 @@ export function handleAiText(
     const response = startAiResponse(text, conversationHistory, timestamp);
 
     if (response.mode === 'reply') {
-      return buildAiResult(response.reply, timestamp, {
-        intent: 'ai-reply',
-        note: '',
-        audit: createEmptyAudit(),
-        resultCode: 'ai-direct-reply',
-      });
+      return buildAiResult(
+        normalizeTelegramHtmlReply(response.reply),
+        timestamp,
+        {
+          intent: 'ai-reply',
+          note: '',
+          audit: createEmptyAudit(),
+          resultCode: 'ai-direct-reply',
+        },
+      );
     }
 
     const audit = buildAuditFromRequest(response.request);
@@ -87,7 +92,7 @@ export function handleAiText(
         toolResult,
       });
 
-      return buildAiResult(reply, timestamp, {
+      return buildAiResult(normalizeTelegramHtmlReply(reply), timestamp, {
         intent: 'ai-tool',
         tool: response.request.tool,
         note: `${response.request.tool} ${response.request.sheet}`,

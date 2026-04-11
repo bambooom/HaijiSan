@@ -119,11 +119,12 @@ export function buildDailyInsight(
             {
               text: [
                 'You are writing a short daily health insight in Chinese for a personal self-tracking assistant.',
+                'Use a calm, steady, observant, lightly encouraging tone, like a reliable senior teammate.',
                 'Base the insight only on the provided records and deterministic summary.',
                 'Prefer trend-aware observations from recent days over generic advice.',
                 'Do not invent missing data. If evidence is weak, say so plainly.',
                 'Do not provide medical diagnosis.',
-                'Output plain Chinese text only.',
+                'Output plain Chinese text only. Do not use Markdown. Do not use HTML tags.',
                 'Keep it concise: 2 to 4 short lines.',
                 'Start directly with observations, without greetings.',
               ].join(' '),
@@ -150,7 +151,7 @@ export function buildDailyInsight(
     );
 
     const insight = extractTextParts(response.candidates?.[0]?.content);
-    return insight ? `💡 Insights:\n${insight}` : null;
+    return insight ? `💡 灰二的观察\n${insight}` : null;
   } catch {
     return null;
   }
