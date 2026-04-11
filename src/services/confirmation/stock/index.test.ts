@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  TelegramInlineKeyboardButton,
+  TelegramReplyMarkup,
+} from '../../../types';
 
 const mocks = vi.hoisted(() => ({
   adjustStock: vi.fn(),
@@ -47,6 +51,26 @@ import {
   handleStockDeductionConfirmationCallback,
   handleStockDeductionConfirmationReply,
 } from './index';
+
+function getInlineKeyboard(
+  replyMarkup: TelegramReplyMarkup | undefined,
+): TelegramInlineKeyboardButton[][] | undefined {
+  if (!replyMarkup || !('inlineKeyboard' in replyMarkup)) {
+    return undefined;
+  }
+
+  return replyMarkup.inlineKeyboard;
+}
+
+function getEditTextReplyMarkup(
+  callIndex: number,
+): TelegramReplyMarkup | undefined {
+  const options = mocks.editText.mock.calls[callIndex]?.[3] as
+    | { replyMarkup?: TelegramReplyMarkup }
+    | undefined;
+
+  return options?.replyMarkup;
+}
 
 describe('stock-deduction-confirmation', () => {
   beforeEach(() => {
@@ -297,12 +321,9 @@ describe('stock-deduction-confirmation', () => {
       'test-chat-id',
       321,
       expect.stringContaining('牛奶 扣减 0.4l'),
-      {
-        replyMarkup: expect.objectContaining({
-          inlineKeyboard: expect.any(Array),
-        }),
-      },
+      expect.anything(),
     );
+    expect(getInlineKeyboard(getEditTextReplyMarkup(0))).toBeDefined();
     expect(mocks.sendText).toHaveBeenCalledWith(
       'test-chat-id',
       '已更新扣减数量，请确认或继续修正。',
@@ -440,26 +461,20 @@ describe('stock-deduction-confirmation', () => {
       expect.stringContaining('"stockItemName":"麦片","stockQuantity":60'),
       21600,
     );
+    expect(mocks.editText).toHaveBeenCalledTimes(1);
     expect(mocks.editText).toHaveBeenCalledWith(
       'test-chat-id',
       321,
       expect.stringContaining('1. 牛奶 扣减 0.3l'),
-      {
-        replyMarkup: expect.objectContaining({
-          inlineKeyboard: expect.any(Array),
-        }),
-      },
+      expect.anything(),
     );
     expect(mocks.editText).toHaveBeenCalledWith(
       'test-chat-id',
       321,
       expect.stringContaining('2. 麦片 扣减 60g'),
-      {
-        replyMarkup: expect.objectContaining({
-          inlineKeyboard: expect.any(Array),
-        }),
-      },
+      expect.anything(),
     );
+    expect(getInlineKeyboard(getEditTextReplyMarkup(0))).toBeDefined();
     expect(result?.resultCode).toBe('food-stock-edited');
   });
 });
