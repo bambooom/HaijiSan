@@ -51,6 +51,7 @@ export function formatImageWriteReply(
 export function buildImageWriteRequest(
   extraction: HealthScreenshotExtractionResult,
   caption: string,
+  referenceTimestamp?: Date,
 ): InsertDataRequest | UpdateDataRequest | null {
   switch (extraction.kind) {
     case 'nutrition_label': {
@@ -70,7 +71,7 @@ export function buildImageWriteRequest(
         : toNutritionLabelRequest(extraction, caption);
     }
     case 'food_photo':
-      return toFoodPhotoRequest(extraction, caption);
+      return toFoodPhotoRequest(extraction, caption, referenceTimestamp);
     case 'body_metrics':
       return toBodyLogRequest(extraction, caption);
     case 'sleep_summary':
@@ -114,6 +115,101 @@ function inferMealType(text: string, occurredAt: string | null): MealType {
   }
 
   return 'snack';
+}
+
+function getDefaultMealTime(mealType: MealType): string {
+  switch (mealType) {
+    case 'breakfast':
+      return '08:00:00';
+    case 'lunch':
+      return '12:30:00';
+    case 'dinner':
+      return '18:30:00';
+    case 'snack':
+      return '15:30:00';
+  }
+}
+
+function hasExplicitMealCue(text: string): boolean {
+  return /早餐|早饭|breakfast|午餐|午饭|lunch|晚餐|晚饭|dinner|加餐|零食|下午茶|夜宵|snack/i.test(
+    text,
+  );
+}
+
+function formatDateStamp(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function shiftDate(baseDate: Date, days: number): Date {
+  const nextDate = new Date(baseDate);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function extractCaptionDateStamp(
+  text: string,
+  referenceTimestamp: Date,
+): string | null {
+  const explicitDate = text.match(/(\d{4}-\d{2}-\d{2})/);
+
+  if (explicitDate) {
+    return explicitDate[1] ?? null;
+  }
+
+  if (/前天/i.test(text)) {
+    return formatDateStamp(shiftDate(referenceTimestamp, -2));
+  }
+
+  if (/昨天|yesterday/i.test(text)) {
+    return formatDateStamp(shiftDate(referenceTimestamp, -1));
+  }
+
+  if (/今天|today/i.test(text)) {
+    return formatDateStamp(referenceTimestamp);
+  }
+
+  return null;
+}
+
+function isDateOnlyMidnightTimestamp(value: string | null): value is string {
+  return (
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2} 00:00:00$/.test(value)
+  );
+}
+
+function resolveFoodPhotoOccurredAt(
+  extraction: HealthScreenshotExtractionResult,
+  caption: string,
+  mealType: MealType,
+  referenceTimestamp: Date,
+): string | undefined {
+  if (
+    extraction.occurredAt &&
+    !isDateOnlyMidnightTimestamp(extraction.occurredAt)
+  ) {
+    return extraction.occurredAt;
+  }
+
+  const mealTime = getDefaultMealTime(mealType);
+  const captionDateStamp = extractCaptionDateStamp(caption, referenceTimestamp);
+
+  if (isDateOnlyMidnightTimestamp(extraction.occurredAt)) {
+    return `${extraction.occurredAt.slice(0, 10)} ${mealTime}`;
+  }
+
+  if (hasExplicitMealCue(caption)) {
+    return `${captionDateStamp ?? formatDateStamp(referenceTimestamp)} ${mealTime}`;
+  }
+
+  if (captionDateStamp) {
+    return `${captionDateStamp} ${referenceTimestamp.toTimeString().slice(0, 8)}`;
+  }
+
+  return undefined;
 }
 
 function buildFoodPhotoMealText(
@@ -213,19 +309,31 @@ function toNutritionLabelUpdateRequest(
 function toFoodPhotoRequest(
   extraction: HealthScreenshotExtractionResult,
   caption: string,
+  referenceTimestamp: Date = new Date(),
 ): InsertDataRequest {
   const mealText = buildFoodPhotoMealText(extraction, caption);
   const routingText = [caption, extraction.summary, extraction.foodName]
     .filter(Boolean)
     .join(' ');
+  const mealType = inferMealType(routingText, extraction.occurredAt);
+  const occurredAt = resolveFoodPhotoOccurredAt(
+    extraction,
+    caption,
+    mealType,
+    referenceTimestamp,
+  );
 
   return {
     tool: 'insertData',
     sheet: 'FOOD_LOG',
     record: {
-      occurred_at: extraction.occurredAt ?? undefined,
-      meal_type: inferMealType(routingText, extraction.occurredAt),
+      occurred_at: occurredAt,
+      meal_type: mealType,
       meal_text: mealText,
+      calories_kcal: extraction.caloriesKcal,
+      protein_g: extraction.proteinG,
+      fat_g: extraction.fatG,
+      carbs_g: extraction.carbsG,
       note: buildOcrNote(extraction, caption),
     },
   };

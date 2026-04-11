@@ -90,6 +90,7 @@ function buildSystemInstruction(referenceTimestamp: Date): string {
     'Use occurredAt for the time the measurement or activity shown in the screenshot actually happened. If the screenshot only implies a date but not a time, use 00:00:00 for that date. If the screenshot does not provide a trustworthy occurrence time, return null.',
     'For nutrition_label screenshots, extract foodName, brand, servingSize, servingUnit, caloriesKcal, proteinG, fatG, carbsG, and confidence.',
     'For food_photo images, identify the likely meal or dishes, return kind=food_photo, fill foodName when there is a clear primary dish, keep a concise meal summary in summary, preserve useful visible text in recognizedText, and use occurredAt only when the image itself implies a trustworthy meal time.',
+    'For food_photo images, when the visible portion is identifiable enough, also return rough caloriesKcal, proteinG, fatG, and carbsG estimates for the meal shown. If you cannot estimate them with low confidence, return null instead of inventing precision.',
     'For body_metrics screenshots, extract weightKg, bmi, bodyFatPct, leanBodyMassKg, occurredAt, appSource, confidence, and a short summary.',
     'For sleep_summary screenshots, extract sleepStart, sleepEnd, sleepHours, sleepQuality, occurredAt, appSource, confidence, and a short summary.',
     'For workout_summary screenshots, extract workoutName, durationMin, workoutLevel, avgHr, maxHr, minHr, workoutCaloriesKcal, occurredAt, appSource, confidence, and a short summary.',

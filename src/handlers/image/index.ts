@@ -35,7 +35,7 @@ export function handleIncomingImage(
       referenceTimestamp: timestamp,
       userPrompt: caption,
     });
-    const request = buildImageWriteRequest(extraction, caption);
+    const request = buildImageWriteRequest(extraction, caption, timestamp);
 
     if (!request) {
       return buildImageResult(

@@ -164,6 +164,10 @@ describe('extractHealthDataFromImage', () => {
                       recognizedText: 'Chicken salad',
                       summary: 'Chicken salad with avocado.',
                       foodName: 'Chicken salad',
+                      caloriesKcal: 420,
+                      proteinG: 24,
+                      fatG: 28,
+                      carbsG: 12,
                       confidence: 0.78,
                     }),
                   },
@@ -184,6 +188,10 @@ describe('extractHealthDataFromImage', () => {
       foodName: 'Chicken salad',
       summary: 'Chicken salad with avocado.',
       recognizedText: 'Chicken salad',
+      caloriesKcal: 420,
+      proteinG: 24,
+      fatG: 28,
+      carbsG: 12,
     });
   });
 

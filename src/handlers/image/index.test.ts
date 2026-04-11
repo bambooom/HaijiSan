@@ -247,17 +247,17 @@ describe('handleIncomingImage', () => {
     mocks.extractHealthDataFromImage.mockReturnValue({
       kind: 'food_photo',
       appSource: 'camera',
-      occurredAt: null,
+      occurredAt: '2026-04-08 00:00:00',
       recognizedText: 'Chicken salad',
       summary: 'Chicken salad with avocado',
       foodName: 'Chicken salad',
       brand: '',
       servingSize: null,
       servingUnit: '',
-      caloriesKcal: null,
-      proteinG: null,
-      fatG: null,
-      carbsG: null,
+      caloriesKcal: 420,
+      proteinG: 24,
+      fatG: 28,
+      carbsG: 12,
       confidence: 0.8,
       note: '',
       weightKg: null,
@@ -284,7 +284,7 @@ describe('handleIncomingImage', () => {
 
     const result = handleIncomingImage(
       'food_photo_1',
-      '午餐',
+      '今天的早饭',
       new Date('2026-04-08T10:00:00Z'),
       'test-chat-id',
     );
@@ -300,8 +300,13 @@ describe('handleIncomingImage', () => {
       sheet: 'FOOD_LOG',
     });
     expect(foodInsertRequest?.record).toMatchObject({
-      meal_type: 'lunch',
+      occurred_at: '2026-04-08 08:00:00',
+      meal_type: 'breakfast',
       meal_text: 'Chicken salad with avocado',
+      calories_kcal: 420,
+      protein_g: 24,
+      fat_g: 28,
+      carbs_g: 12,
     });
     expect(result.reply).toBe('已记录餐食图片。');
   });
