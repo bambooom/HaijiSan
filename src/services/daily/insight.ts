@@ -150,7 +150,7 @@ export function buildDailyInsight(
     );
 
     const insight = extractTextParts(response.candidates?.[0]?.content);
-    return insight ? `Insights:\n${insight}` : null;
+    return insight ? `💡 Insights:\n${insight}` : null;
   } catch {
     return null;
   }

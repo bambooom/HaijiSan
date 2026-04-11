@@ -63,3 +63,10 @@ export function formatDateLabel(timestamp: Date): string {
     String(timestamp.getDate()).padStart(2, '0'),
   ].join('-');
 }
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}

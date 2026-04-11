@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   cachePut: vi.fn(),
   cacheRemove: vi.fn(),
   buildDailySummaryMessage: vi.fn(() => 'digest'),
+  buildDailySummaryHtmlMessage: vi.fn(() => '<b>digest</b>'),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   createHtmlOutput: vi.fn(() => ({ getContent: () => 'ok' })),
@@ -57,6 +58,7 @@ vi.mock('./tables', () => ({
 
 vi.mock('./services/daily/summary', () => ({
   buildDailySummaryMessage: mocks.buildDailySummaryMessage,
+  buildDailySummaryHtmlMessage: mocks.buildDailySummaryHtmlMessage,
 }));
 
 vi.mock('./services/daily/trigger', () => ({

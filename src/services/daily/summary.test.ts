@@ -50,7 +50,7 @@ vi.mock('../../tables', () => ({
   },
 }));
 
-import { buildDailySummaryMessage } from './summary';
+import { buildDailySummaryHtmlMessage } from './summary';
 
 describe('daily summary', () => {
   beforeEach(() => {
@@ -173,18 +173,57 @@ describe('daily summary', () => {
         cycle_day: null,
       },
     ]);
-    const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
+    const result = buildDailySummaryHtmlMessage(
+      new Date('2026-04-02T23:30:00'),
+    );
 
     expect(result).toContain('📋 今日总结 2026-04-02');
+    expect(result).toContain('🍽️ 饮食');
     expect(result).toContain('今天共记录 2 餐，热量约 840 kcal。');
+    expect(result).toContain('⚖️ 身体');
     expect(result).toContain(
-      '身体：体重 54.8 kg，较上次 -0.4 kg；BMI 20.2；体脂 22.4%。',
+      '体重 54.8 kg，较上次 -0.4 kg；BMI 20.2；体脂 22.4%。',
+    );
+    expect(result).toContain('😴 睡眠');
+    expect(result).toContain(
+      '2026-04-01 23:30:00 - 2026-04-02 07:10:00，约 7.7 小时，质量 good。',
+    );
+    expect(result).toContain('🏋🏻 运动');
+    expect(result).toContain('今天共 1 次，合计 35 分钟；项目 跑步。');
+    expect(result).toContain('🩺 状态');
+    expect(result).toContain('排便已记录。');
+  });
+
+  it('builds an HTML-rendered digest for Telegram formatting', () => {
+    mocks.getTodayNutritionSummary.mockReturnValue({
+      meals: [{ food_log_id: '1' }],
+      proteinStatus: 'low',
+      proteinTarget: 66,
+      totalProtein: 56.7,
+      vegetableStatus: 'enough',
+      totalVegetableGrams: 380,
+      carbsStatus: 'moderate',
+      totalCarbs: 19.1,
+      carbCalorieShare: 0.1,
+    });
+    mocks.buildTodayNutritionReply.mockReturnValue(
+      '今天共记录 2 餐，热量约 840 kcal。',
+    );
+    mocks.buildDailyInsight.mockReturnValue(
+      'Insights:\n近几天 <稳定>，今天运动量中等。',
+    );
+
+    const result = buildDailySummaryHtmlMessage(
+      new Date('2026-04-02T23:30:00'),
+    );
+
+    expect(result).toContain('<b>📋 今日总结 2026-04-02</b>');
+    expect(result).toContain(
+      '<b>🍽️ 饮食</b><br>今天共记录 2 餐，热量约 840 kcal。',
     );
     expect(result).toContain(
-      '睡眠：2026-04-01 23:30:00 - 2026-04-02 07:10:00，约 7.7 小时，质量 good。',
+      '<b>Insights:</b><br>近几天 &lt;稳定&gt;，今天运动量中等。',
     );
-    expect(result).toContain('运动：今天共 1 次，合计 35 分钟；项目 跑步。');
-    expect(result).toContain('状态：排便已记录。');
   });
 
   it('appends AI insight when it is available', () => {
@@ -206,7 +245,9 @@ describe('daily summary', () => {
       'Insights:\n近几天睡眠整体稳定，今天运动量中等。',
     );
 
-    const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
+    const result = buildDailySummaryHtmlMessage(
+      new Date('2026-04-02T23:30:00'),
+    );
 
     expect(result).toContain('Insights:');
     expect(result).toContain('近几天睡眠整体稳定，今天运动量中等。');
@@ -215,8 +256,10 @@ describe('daily summary', () => {
   it('returns the empty-data fallback when nothing is available', () => {
     mocks.getTodayNutritionSummary.mockReturnValue(null);
 
-    const result = buildDailySummaryMessage(new Date('2026-04-02T23:30:00'));
+    const result = buildDailySummaryHtmlMessage(
+      new Date('2026-04-02T23:30:00'),
+    );
 
-    expect(result).toBe('今天还没有足够的数据可汇总。');
+    expect(result).toBe('<b>📝 今日总结</b><br>今天还没有足够的数据可汇总。');
   });
 });

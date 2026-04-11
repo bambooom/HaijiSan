@@ -1,6 +1,6 @@
 import { MY_CHAT_ID } from './app-config';
 import { processPendingImageOcrJobs } from './services/ocr/queue';
-import { buildDailySummaryMessage } from './services/daily/summary';
+import { buildDailySummaryHtmlMessage } from './services/daily/summary';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
@@ -201,7 +201,7 @@ function doPost(
 }
 
 function sendDailyDigest(): void {
-  sendText(MY_CHAT_ID, buildDailySummaryMessage(new Date()));
+  sendText(MY_CHAT_ID, buildDailySummaryHtmlMessage(new Date()));
 }
 
 function installDailyDigestTrigger() {
