@@ -190,8 +190,7 @@ flowchart TD
   - Generic OCR extraction service for nutrition labels, food photos, and health screenshots
   - Telegram image ingress for nutrition labels, food photos, and health screenshots
   - Nutrition-label OCR create-or-update flow for REF_CALORIES
-- Planned next:
-  - Better support for outside-food photos where a rough main-dish identification and calorie estimate is enough, without requiring a highly structured FOOD_LOG draft
+  - Support for outside-food photos where a rough main-dish identification and calorie estimation included
 
 ## Feature List
 
