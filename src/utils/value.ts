@@ -12,6 +12,40 @@ export function asNullableString(value: unknown): string | null {
   return normalized ? normalized : null;
 }
 
+export function asObjectRecord(
+  value: unknown,
+  label: string,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  return value as Record<string, unknown>;
+}
+
+export function readTrimmedString(
+  value: unknown,
+  label: string,
+  options: { required?: boolean } = {},
+): string | null {
+  const { required = true } = options;
+  const normalized = asNullableString(value);
+
+  if (normalized !== null) {
+    return normalized;
+  }
+
+  if (!required) {
+    return null;
+  }
+
+  throw new Error(
+    typeof value === 'string'
+      ? `${label} must be a non-empty string`
+      : `${label} must be a string`,
+  );
+}
+
 export function asNullableNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -24,6 +58,29 @@ export function asNullableNumber(value: unknown): number | null {
   }
 
   return null;
+}
+
+export function parseNumericText(value: unknown, label: string): number {
+  const parsed = asNullableNumber(value);
+
+  if (parsed === null) {
+    throw new Error(`${label} must be a finite number`);
+  }
+
+  return parsed;
+}
+
+export function parseOptionalNumericText(
+  value: unknown,
+  label: string,
+): number | null {
+  const text = readTrimmedString(value, label, { required: false });
+
+  if (text === null) {
+    return null;
+  }
+
+  return parseNumericText(text, label);
 }
 
 export function toNullableNumber(value: unknown): number | null | undefined {

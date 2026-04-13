@@ -10,3 +10,4 @@ export * from './sheet-schema';
 export * from './telegram';
 export * from './webhook';
 export * from './tools';
+export * from './shortcuts';

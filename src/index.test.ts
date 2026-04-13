@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CommandHandlingResult } from './types';
+import type { ShortcutRequestPayload } from './services/shortcuts';
 
 const mocks = vi.hoisted(() => ({
   appConfig: Object.assign(globalThis, {
@@ -8,6 +10,7 @@ const mocks = vi.hoisted(() => ({
       MY_CHAT_ID: 'test-chat-id',
       GEMINI_API_KEY: 'test-gemini-key',
       GEMINI_MODEL: 'test-gemini-model',
+      X_HAIJI_SECRET: 'shortcut-secret',
     },
   }),
   handleIncomingText: vi.fn(),
@@ -27,6 +30,20 @@ const mocks = vi.hoisted(() => ({
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   createHtmlOutput: vi.fn(() => ({ getContent: () => 'ok' })),
+  parseShortcutPayload: vi.fn<
+    (contents: string | undefined) => ShortcutRequestPayload | null
+  >(() => null),
+  buildShortcutRawLogText: vi.fn(
+    () => '[ios_shortcut] weight=1; bmi=1; bfp=1; lbm=1; sleep=1',
+  ),
+  hasValidShortcutSecret: vi.fn(() => false),
+  ingestShortcutPayload:
+    vi.fn<
+      (
+        payload: ShortcutRequestPayload,
+        timestamp?: Date,
+      ) => CommandHandlingResult
+    >(),
 }));
 
 vi.mock('./handlers', () => ({
@@ -64,6 +81,13 @@ vi.mock('./services/daily/summary', () => ({
 vi.mock('./services/daily/trigger', () => ({
   installDailyDigestTrigger: mocks.installDailyDigestTrigger,
   disableDailyDigestTrigger: mocks.disableDailyDigestTrigger,
+}));
+
+vi.mock('./services/shortcuts', () => ({
+  parseShortcutPayload: mocks.parseShortcutPayload,
+  buildShortcutRawLogText: mocks.buildShortcutRawLogText,
+  hasValidShortcutSecret: mocks.hasValidShortcutSecret,
+  ingestShortcutPayload: mocks.ingestShortcutPayload,
 }));
 
 Object.assign(globalThis, {
@@ -153,6 +177,22 @@ describe('doPost', () => {
     mocks.sendText.mockReturnValue(321);
     mocks.handleConfirmationCallback.mockReturnValue(null);
     mocks.handleConfirmationReply.mockReturnValue(null);
+    mocks.parseShortcutPayload.mockReturnValue(null);
+    mocks.buildShortcutRawLogText.mockReturnValue(
+      '[ios_shortcut] weight=1; bmi=1; bfp=1; lbm=1; sleep=1',
+    );
+    mocks.hasValidShortcutSecret.mockReturnValue(false);
+    mocks.ingestShortcutPayload.mockReturnValue({
+      reply: 'iOS Shortcuts 数据已处理：新增 2 条，跳过 0 条。',
+      handlingMode: 'rule',
+      status: 'success',
+      note: 'source=ios_shortcut; body_inserted=1; body_skipped=0; sleep_inserted=1; sleep_skipped=0',
+      traceId: '',
+      intent: 'ios-shortcut-ingest',
+      tool: 'insertData',
+      confirmationState: 'none',
+      resultCode: 'ios-shortcut-ingested',
+    });
   });
 
   it('processes a webhook update once and marks it done by update_id', () => {
@@ -167,7 +207,7 @@ describe('doPost', () => {
           },
         }),
       },
-    } as GoogleAppsScript.Events.DoPost);
+    } as unknown as GoogleAppsScript.Events.DoPost);
 
     expect(mocks.handleIncomingText).toHaveBeenCalledTimes(1);
     expect(mocks.sendText).toHaveBeenCalledWith('test-chat-id', '已记录。', {
@@ -207,7 +247,7 @@ describe('doPost', () => {
           },
         }),
       },
-    } as GoogleAppsScript.Events.DoPost);
+    } as unknown as GoogleAppsScript.Events.DoPost);
 
     mocks.cacheGet.mockImplementation((key: string) => {
       if (key === 'telegram_update:123') {
@@ -568,5 +608,70 @@ describe('doPost', () => {
       '220',
       expect.objectContaining({ resultCode: 'image-ocr-field-updated' }),
     );
+  });
+
+  it('processes authenticated ios shortcut payloads without entering telegram handlers', () => {
+    mocks.parseShortcutPayload.mockReturnValue({
+      source: 'ios_shortcut',
+      weight: [{ date: '2026-04-01T08:39:21+08:00', value: '52.3' }],
+      sleep: {
+        start: '2026-04-01T00:30:00+08:00',
+        end: '2026-04-01T08:10:00+08:00',
+        hours: '7.7',
+        rating: '88',
+      },
+    });
+    mocks.hasValidShortcutSecret.mockReturnValue(true);
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({ source: 'ios_shortcut' }),
+      },
+      headers: {
+        'X-HAIJI-SECRET': 'shortcut-secret',
+      },
+    } as unknown as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.ingestShortcutPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'ios_shortcut' }),
+      expect.any(Date),
+    );
+    expect(mocks.handleIncomingText).not.toHaveBeenCalled();
+    expect(mocks.handleIncomingImageMessage).not.toHaveBeenCalled();
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '[ios_shortcut] weight=1; bmi=1; bfp=1; lbm=1; sleep=1',
+      expect.objectContaining({ resultCode: 'ios-shortcut-ingested' }),
+    );
+    expect(mocks.sendText).not.toHaveBeenCalled();
+  });
+
+  it('ignores unauthorized ios shortcut payloads without sending telegram messages', () => {
+    mocks.parseShortcutPayload.mockReturnValue({
+      source: 'ios_shortcut',
+      weight: [{ date: '2026-04-01T08:39:21+08:00', value: '52.3' }],
+    });
+    mocks.hasValidShortcutSecret.mockReturnValue(false);
+
+    doPost({
+      postData: {
+        contents: JSON.stringify({ source: 'ios_shortcut' }),
+      },
+      headers: {
+        'X-HAIJI-SECRET': 'wrong-secret',
+      },
+    } as unknown as GoogleAppsScript.Events.DoPost);
+
+    expect(mocks.ingestShortcutPayload).not.toHaveBeenCalled();
+    expect(mocks.handleIncomingText).not.toHaveBeenCalled();
+    expect(mocks.appendMessageLog).toHaveBeenCalledWith(
+      expect.any(Date),
+      '[ios_shortcut] weight=1; bmi=1; bfp=1; lbm=1; sleep=1',
+      expect.objectContaining({
+        status: 'ignored',
+        resultCode: 'webhook-unauthorized-shortcut',
+      }),
+    );
+    expect(mocks.sendText).not.toHaveBeenCalled();
   });
 });

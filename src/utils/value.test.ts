@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  asObjectRecord,
   asNullableNumber,
   asNullableString,
   asTrimmedString,
+  parseNumericText,
+  parseOptionalNumericText,
+  readTrimmedString,
   roundToOneDecimal,
   sumNullableNumbers,
 } from './value';
@@ -19,10 +23,34 @@ describe('value utils', () => {
     expect(asNullableString('   ')).toBeNull();
   });
 
+  it('reads trimmed strings with required and optional modes', () => {
+    expect(readTrimmedString('  milk ', 'field')).toBe('milk');
+    expect(readTrimmedString('   ', 'field', { required: false })).toBeNull();
+    expect(() => readTrimmedString(42, 'field')).toThrow(
+      'field must be a string',
+    );
+  });
+
+  it('asserts object records', () => {
+    expect(asObjectRecord({ value: 1 }, 'payload')).toEqual({ value: 1 });
+    expect(() => asObjectRecord([], 'payload')).toThrow(
+      'payload must be an object',
+    );
+  });
+
   it('normalizes finite numbers from numbers and numeric strings', () => {
     expect(asNullableNumber(12.5)).toBe(12.5);
     expect(asNullableNumber(' 42 ')).toBe(42);
     expect(asNullableNumber('x')).toBeNull();
+  });
+
+  it('parses required and optional numeric text values', () => {
+    expect(parseNumericText(' 42 ', 'field')).toBe(42);
+    expect(parseOptionalNumericText(' 42 ', 'field')).toBe(42);
+    expect(parseOptionalNumericText(' ', 'field')).toBeNull();
+    expect(() => parseNumericText('x', 'field')).toThrow(
+      'field must be a finite number',
+    );
   });
 
   it('rounds numbers to one decimal place', () => {

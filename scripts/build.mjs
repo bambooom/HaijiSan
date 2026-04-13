@@ -38,6 +38,7 @@ const appConfig = {
   MY_CHAT_ID: getRequiredEnv('MY_CHAT_ID'),
   GEMINI_API_KEY: getRequiredEnv('GEMINI_API_KEY'),
   GEMINI_MODEL: getOptionalEnv('GEMINI_MODEL', 'gemini-3.1-flash-lite-preview'),
+  X_HAIJI_SECRET: getOptionalEnv('X_HAIJI_SECRET', ''),
 };
 
 const sheetLayouts = JSON.parse(readFileSync(sheetLayoutsPath, 'utf8'));

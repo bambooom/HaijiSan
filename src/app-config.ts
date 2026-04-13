@@ -4,6 +4,7 @@ type AppConfig = {
   MY_CHAT_ID: string;
   GEMINI_API_KEY: string;
   GEMINI_MODEL: string;
+  X_HAIJI_SECRET: string;
 };
 
 declare const __APP_CONFIG__: AppConfig;
@@ -13,3 +14,4 @@ export const BOT_TOKEN = __APP_CONFIG__.BOT_TOKEN;
 export const MY_CHAT_ID = __APP_CONFIG__.MY_CHAT_ID;
 export const GEMINI_API_KEY = __APP_CONFIG__.GEMINI_API_KEY;
 export const GEMINI_MODEL = __APP_CONFIG__.GEMINI_MODEL;
+export const X_HAIJI_SECRET = __APP_CONFIG__.X_HAIJI_SECRET;

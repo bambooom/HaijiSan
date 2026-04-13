@@ -1,4 +1,4 @@
-import { MY_CHAT_ID } from './app-config';
+import { X_HAIJI_SECRET, MY_CHAT_ID } from './app-config';
 import { processPendingImageOcrJobs } from './services/ocr/queue';
 import { buildDailySummaryHtmlMessage } from './services/daily/summary';
 import {
@@ -34,6 +34,12 @@ import {
   reportTypingFailure,
   sendTyping,
 } from './services/webhook/routing';
+import {
+  buildShortcutRawLogText,
+  hasValidShortcutSecret,
+  ingestShortcutPayload,
+  parseShortcutPayload,
+} from './services/shortcuts';
 
 function createOkResponse(): GoogleAppsScript.HTML.HtmlOutput {
   return HtmlService.createHtmlOutput('ok');
@@ -48,6 +54,38 @@ function doPost(
   let processingMarked = false;
 
   try {
+    const timestamp = new Date();
+
+    // First branch by request source: iOS Shortcuts uses a fixed payload and
+    // writes directly to sheets, while Telegram keeps the existing bot flow.
+    const shortcutPayload = parseShortcutPayload(e.postData?.contents);
+
+    if (shortcutPayload) {
+      rawLogText = buildShortcutRawLogText(shortcutPayload);
+
+      // Shortcuts requests are authenticated by a shared secret instead of
+      // Telegram chat allowlisting.
+      if (!hasValidShortcutSecret(e, X_HAIJI_SECRET)) {
+        appendIgnoredWebhookLog(
+          timestamp,
+          rawLogText,
+          'ignored unauthorized ios shortcut request',
+          'webhook-unauthorized-shortcut',
+          null,
+        );
+        return createOkResponse();
+      }
+
+      appendWebhookLog(
+        timestamp,
+        rawLogText,
+        ingestShortcutPayload(shortcutPayload, timestamp),
+        null,
+      );
+      return createOkResponse();
+    }
+
+    // Telegram requests continue through the existing webhook parsing flow.
     update = parseUpdate(e);
 
     if (!update?.message && !update?.callback_query) {
@@ -67,6 +105,8 @@ function doPost(
         ? getRawMessageText(update.message)
         : '[unknown update]';
 
+    // Telegram deliveries can be retried by the platform, so mark an update
+    // as processing/done before the business handlers run.
     dedupeKey = getUpdateDedupeKey(update.update_id);
 
     if (dedupeKey) {
@@ -89,7 +129,6 @@ function doPost(
     }
 
     const chatId = getUpdateChatId(update);
-    const timestamp = new Date();
     const context = {
       update,
       rawLogText,
@@ -122,6 +161,8 @@ function doPost(
       return createOkResponse();
     }
 
+    // After auth and dedupe, route by message shape: image, callback, reply,
+    // then plain text/default handling.
     try {
       sendTyping(chatId);
     } catch (error) {
@@ -165,6 +206,8 @@ function doPost(
     markUpdateDone(dedupeKey);
     processingMarked = false;
   } catch (error) {
+    // Preserve the original failure, clear any in-flight dedupe marker, log it,
+    // and attempt to alert the owner without masking the main error.
     const message = error instanceof Error ? error.message : String(error);
 
     logWebhookTrace('webhook_error', {
