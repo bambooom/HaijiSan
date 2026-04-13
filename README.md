@@ -86,7 +86,7 @@ GAS_DEPLOYMENT_ID=optional_existing_deployment_id
 Notes:
 
 - `SHEET_ID`, `BOT_TOKEN`, `MY_CHAT_ID`, and `GEMINI_API_KEY` are injected into the final GAS artifact during `pnpm build`.
-- `X_HAIJI_SECRET` is optional unless you enable the iOS Shortcuts webhook path. When present, the deployed GAS web app expects `X-HAIJI-SECRET` on `source=ios_shortcut` requests.
+- `X_HAIJI_SECRET` is optional unless you enable the iOS Shortcuts webhook path. For `source=ios_shortcut` requests, Apps Script may not expose custom HTTP headers reliably, so the webhook accepts the same secret from any of these locations: `X-HAIJI-SECRET` header, URL query parameter `x_haiji_secret`, or JSON body field `x_haiji_secret` / `secret`.
 - `GAS_SCRIPT_ID` is used to generate `.clasp.json` when running `pnpm push` or `pnpm deploy`, so `.clasp.json` does not need to be committed.
 - `GAS_DEPLOYMENT_ID` is only used by local `pnpm deploy`. If it is present, the existing deployment is updated; otherwise a new deployment is created.
 - `GEMINI_MODEL` is optional locally and defaults to `gemini-2.0-flash`.

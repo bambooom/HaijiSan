@@ -65,7 +65,7 @@ function doPost(
 
       // Shortcuts requests are authenticated by a shared secret instead of
       // Telegram chat allowlisting.
-      if (!hasValidShortcutSecret(e, X_HAIJI_SECRET)) {
+      if (!hasValidShortcutSecret(e, X_HAIJI_SECRET, shortcutPayload)) {
         appendIgnoredWebhookLog(
           timestamp,
           rawLogText,

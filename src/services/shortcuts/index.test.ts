@@ -77,6 +77,45 @@ describe('shortcuts ingestion', () => {
     expect(hasValidShortcutSecret(event, 'other-secret')).toBe(false);
   });
 
+  it('accepts query-string or body secret when GAS does not expose headers', () => {
+    expect(
+      hasValidShortcutSecret(
+        {
+          parameter: {
+            x_haiji_secret: 'shortcut-secret',
+          },
+        } as unknown as GoogleAppsScript.Events.DoPost,
+        'shortcut-secret',
+      ),
+    ).toBe(true);
+
+    expect(
+      hasValidShortcutSecret(
+        {
+          parameter: {},
+        } as unknown as GoogleAppsScript.Events.DoPost,
+        'shortcut-secret',
+        {
+          source: 'ios_shortcut',
+          x_haiji_secret: 'shortcut-secret',
+        },
+      ),
+    ).toBe(true);
+
+    expect(
+      hasValidShortcutSecret(
+        {
+          parameter: {},
+        } as unknown as GoogleAppsScript.Events.DoPost,
+        'shortcut-secret',
+        {
+          source: 'ios_shortcut',
+          secret: 'shortcut-secret',
+        },
+      ),
+    ).toBe(true);
+  });
+
   it('aggregates body metrics by timestamp and inserts sleep with derived quality', () => {
     const result = ingestShortcutPayload(
       {

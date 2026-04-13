@@ -20,6 +20,8 @@ export type ShortcutSleepPayload = {
 
 export type ShortcutRequestPayload = {
   source: 'ios_shortcut';
+  secret?: unknown;
+  x_haiji_secret?: unknown;
   weight?: ShortcutMetricSample[];
   bmi?: ShortcutMetricSample[];
   bfp?: ShortcutMetricSample[];

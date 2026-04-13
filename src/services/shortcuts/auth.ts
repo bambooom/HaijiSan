@@ -1,3 +1,4 @@
+import type { ShortcutRequestPayload } from '../../types';
 import { readTrimmedString } from '../../utils/value';
 
 export function getRequestHeader(
@@ -32,6 +33,7 @@ export function getRequestHeader(
 export function hasValidShortcutSecret(
   event: GoogleAppsScript.Events.DoPost,
   expectedSecret: string,
+  payload?: ShortcutRequestPayload,
 ): boolean {
   const configuredSecret = expectedSecret.trim();
 
@@ -39,5 +41,24 @@ export function hasValidShortcutSecret(
     return false;
   }
 
-  return getRequestHeader(event, 'X-HAIJI-SECRET') === configuredSecret;
+  const parameterSecret = readTrimmedString(
+    event.parameter?.x_haiji_secret,
+    'parameter x_haiji_secret',
+    {
+      required: false,
+    },
+  );
+  const bodySecret =
+    readTrimmedString(payload?.x_haiji_secret, 'payload.x_haiji_secret', {
+      required: false,
+    }) ??
+    readTrimmedString(payload?.secret, 'payload.secret', {
+      required: false,
+    });
+
+  return [
+    getRequestHeader(event, 'X-HAIJI-SECRET'),
+    parameterSecret,
+    bodySecret,
+  ].includes(configuredSecret);
 }
