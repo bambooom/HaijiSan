@@ -42,6 +42,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          X_HAIJI_SECRET: ${{ secrets.X_HAIJI_SECRET }}
         run: pnpm build
 
       - name: Create clasp credentials
