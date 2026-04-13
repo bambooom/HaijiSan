@@ -37,6 +37,12 @@ describe('timestamp utils', () => {
     );
   });
 
+  it('normalizes iOS shortcuts localized datetime text', () => {
+    expect(normalizeTimestampText('26/4/13, Mon, 2:09 AM', 'field')).toBe(
+      '2026-04-01 00:39:21',
+    );
+  });
+
   it('parses date stamps into local dates', () => {
     expect(parseDateStamp('2026-04-01')).toEqual(new Date(2026, 3, 1));
   });
