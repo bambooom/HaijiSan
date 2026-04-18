@@ -3,11 +3,13 @@ import type {
   BodyLogEntry,
   InsertDataRequest,
   SleepLogEntry,
+  WorkoutLogEntry,
 } from '../../types';
 
 const mocks = vi.hoisted(() => ({
   listBodyLogByDate: vi.fn<() => BodyLogEntry[]>(() => []),
   listSleepLogByDate: vi.fn<() => SleepLogEntry[]>(() => []),
+  listWorkoutLogByDate: vi.fn<() => WorkoutLogEntry[]>(() => []),
   executeInsertData: vi.fn((request: InsertDataRequest) => ({
     tool: 'insertData',
     sheet: request.sheet,
@@ -24,6 +26,9 @@ vi.mock('../../tables', () => ({
   },
   sleepLogTable: {
     listByDate: mocks.listSleepLogByDate,
+  },
+  workoutLogTable: {
+    listByDate: mocks.listWorkoutLogByDate,
   },
 }));
 
@@ -50,6 +55,7 @@ describe('shortcuts ingestion', () => {
     vi.clearAllMocks();
     mocks.listBodyLogByDate.mockReturnValue([]);
     mocks.listSleepLogByDate.mockReturnValue([]);
+    mocks.listWorkoutLogByDate.mockReturnValue([]);
   });
 
   it('parses ios shortcut payloads and ignores non-shortcut bodies', () => {
@@ -208,7 +214,143 @@ describe('shortcuts ingestion', () => {
         weight: [{}],
         sleep: {},
       }),
-    ).toBe('[ios_shortcut] weight=1; bmi=0; bfp=0; lbm=0; sleep=1');
+    ).toBe('[ios_shortcut] weight=1; bmi=0; bfp=0; lbm=0; sleep=1; workout=0');
+  });
+
+  it('maps raw workout payloads into WORKOUT_LOG records', () => {
+    const result = ingestShortcutPayload(
+      {
+        source: 'ios_shortcut',
+        video_url: 'https://b23.tv/example',
+        share_text: 'Mixed Cardio 跟练视频 https://b23.tv/example',
+        workout: {
+          uuid: 'A55EB1B3-DE7E-48E1-89F9-18319B52889A',
+          name: 'Mixed Cardio',
+          activity: {
+            name: 'Mixed Cardio',
+            type: 73,
+          },
+          startDate: '2026-04-17T10:02:35Z',
+          endDate: '2026-04-17T10:33:30Z',
+          source: 'Milky’s Apple Watch',
+          duration: {
+            value: 1854,
+            unit: 'sec',
+          },
+          activeCalories: {
+            value: 128,
+            unit: 'kcal',
+          },
+          distance: {
+            value: 2.8,
+            unit: 'km',
+          },
+          pace: '11′00″',
+          averageIntensity: {
+            value: 60,
+            unit: '%',
+          },
+          minIntensity: {
+            value: 37,
+            unit: '%',
+          },
+          maxIntensity: {
+            value: 72,
+            unit: '%',
+          },
+          averageMETs: {
+            value: 5.8,
+            unit: 'METs',
+          },
+          averageHeartRate: {
+            value: 113,
+            unit: 'bpm',
+          },
+          minHeartRate: {
+            value: 71,
+            unit: 'bpm',
+          },
+          maxHeartRate: {
+            value: 136,
+            unit: 'bpm',
+          },
+          zones: {
+            zone1: { time: { value: 683, unit: 'sec' } },
+            zone2: { time: { value: 860, unit: 'sec' } },
+            zone3: { time: { value: 105, unit: 'sec' } },
+            zone4: { time: { value: 0, unit: 'sec' } },
+            zone5: { time: { value: 0, unit: 'sec' } },
+          },
+          weather: {
+            humidity: '76%',
+            temperature: '26°C',
+          },
+          device: {
+            name: 'Apple Watch',
+            hardwareVersion: 'Watch7,1',
+            softwareVersion: '26.2.1',
+          },
+        },
+      },
+      new Date('2026-04-17T18:40:00+08:00'),
+    );
+
+    expect(mocks.executeInsertData).toHaveBeenCalledWith(
+      {
+        tool: 'insertData',
+        sheet: 'WORKOUT_LOG',
+        record: expect.objectContaining({
+          occurred_at: '2026-04-17 10:02:35',
+          workout_name: 'Mixed Cardio',
+          workout_video_url: 'https://b23.tv/example',
+          workout_level: 'medium',
+          duration_min: 30.9,
+          avg_hr: 113,
+          max_hr: 136,
+          min_hr: 71,
+          calories_kcal: 128,
+        }),
+      },
+      new Date('2026-04-17T18:40:00+08:00'),
+    );
+    expect(result.resultCode).toBe('ios-shortcut-ingested');
+    expect(result.note).toContain('workout_inserted=1');
+    expect(
+      (mocks.executeInsertData.mock.calls[0]?.[0] as InsertDataRequest).record
+        .note,
+    ).toContain('share_text=Mixed Cardio 跟练视频 https://b23.tv/example');
+  });
+
+  it('skips workout records that already exist by occurred_at and workout_name', () => {
+    mocks.listWorkoutLogByDate.mockReturnValue([
+      {
+        workout_id: 'workout_1',
+        logged_at: '2026-04-17 18:40:00',
+        occurred_at: '2026-04-17 10:02:35',
+        workout_name: 'Mixed Cardio',
+        workout_video_url: '',
+        workout_level: 'medium',
+        duration_min: 30.9,
+        avg_hr: 113,
+        max_hr: 136,
+        min_hr: 71,
+        calories_kcal: 128,
+        note: '',
+      },
+    ]);
+
+    const result = ingestShortcutPayload({
+      source: 'ios_shortcut',
+      workout: {
+        name: 'Mixed Cardio',
+        startDate: '2026-04-17T10:02:35Z',
+        averageIntensity: { value: 60 },
+      },
+    });
+
+    expect(mocks.executeInsertData).not.toHaveBeenCalled();
+    expect(result.resultCode).toBe('ios-shortcut-noop');
+    expect(result.note).toContain('workout_skipped=1');
   });
 
   it('skips body and sleep records that already exist by timestamp window', () => {

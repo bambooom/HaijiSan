@@ -26,5 +26,5 @@ export function buildShortcutRawLogText(
     `lbm=${payload.lbm?.length ?? 0}`,
   ].join('; ');
 
-  return `[ios_shortcut] ${bodyCounts}; sleep=${payload.sleep ? 1 : 0}`;
+  return `[ios_shortcut] ${bodyCounts}; sleep=${payload.sleep ? 1 : 0}; workout=${payload.workout ? 1 : 0}`;
 }

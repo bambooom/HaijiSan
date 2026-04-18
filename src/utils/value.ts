@@ -23,6 +23,17 @@ export function asObjectRecord(
   return value as Record<string, unknown>;
 }
 
+export function asOptionalObjectRecord(
+  value: unknown,
+  label: string,
+): Record<string, unknown> | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  return asObjectRecord(value, label);
+}
+
 export function readTrimmedString(
   value: unknown,
   label: string,

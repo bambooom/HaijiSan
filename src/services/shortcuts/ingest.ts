@@ -1,4 +1,4 @@
-import { bodyLogTable, sleepLogTable } from '../../tables';
+import { bodyLogTable, sleepLogTable, workoutLogTable } from '../../tables';
 import { executeInsertData } from '../../tools';
 import type {
   BodyLogEntry,
@@ -9,7 +9,7 @@ import type {
   ShortcutMetricKey,
   ShortcutRequestPayload,
   ShortcutSleepCandidate,
-  SleepLogEntry,
+  ShortcutWorkoutCandidate,
   SleepQuality,
 } from '../../types';
 import { SHORTCUT_SOURCE } from '../../types';
@@ -19,6 +19,7 @@ import {
   parseOptionalNumericText,
 } from '../../utils/value';
 import { normalizeTimestampText, parseDateStamp } from '../../utils/timestamp';
+import { buildWorkoutCandidate } from '../../services/shortcuts/workout';
 
 const BODY_METRIC_FIELD_MAP: Record<
   ShortcutMetricKey,
@@ -133,51 +134,56 @@ function buildSleepCandidate(
   };
 }
 
-function listExistingBodyEntries(
-  candidates: ShortcutBodyCandidate[],
-): BodyLogEntry[] {
-  const existingEntries: BodyLogEntry[] = [];
-  const dateStamps = [
-    ...new Set(
-      candidates.map((candidate) => candidate.occurred_at.slice(0, 10)),
-    ),
-  ];
+function listExistingEntriesByDateStamps<TRecord>(
+  dateStamps: string[],
+  listByDate: (date: Date) => TRecord[],
+): TRecord[] {
+  const existingEntries: TRecord[] = [];
 
   dateStamps.forEach((dateStamp) => {
-    existingEntries.push(...bodyLogTable.listByDate(parseDateStamp(dateStamp)));
+    existingEntries.push(...listByDate(parseDateStamp(dateStamp)));
   });
 
   return existingEntries;
 }
 
-function listExistingSleepEntries(
-  candidate: ShortcutSleepCandidate | null,
-): SleepLogEntry[] {
-  if (!candidate) {
-    return [];
-  }
-
-  return sleepLogTable.listByDate(
-    parseDateStamp(candidate.sleep_end_at.slice(0, 10)),
-  );
-}
-
-function createBodyInsertRequest(
-  record: ShortcutBodyCandidate,
-): InsertDataRequest {
+function listCandidateDateStamps(
+  bodyCandidates: ShortcutBodyCandidate[],
+  sleepCandidate: ShortcutSleepCandidate | null,
+  workoutCandidate: ShortcutWorkoutCandidate | null,
+): {
+  bodyDateStamps: string[];
+  sleepDateStamps: string[];
+  workoutDateStamps: string[];
+} {
   return {
-    tool: 'insertData',
-    sheet: 'BODY_LOG',
-    record,
+    bodyDateStamps: [
+      ...new Set(
+        bodyCandidates.map((candidate) => candidate.occurred_at.slice(0, 10)),
+      ),
+    ],
+    sleepDateStamps: sleepCandidate
+      ? [sleepCandidate.sleep_end_at.slice(0, 10)]
+      : [],
+    workoutDateStamps: workoutCandidate
+      ? [workoutCandidate.occurred_at.slice(0, 10)]
+      : [],
   };
 }
 
-function createSleepInsertRequest(
-  record: ShortcutSleepCandidate,
+type ShortcutInsertRecordMap = {
+  BODY_LOG: ShortcutBodyCandidate;
+  SLEEP_LOG: ShortcutSleepCandidate;
+  WORKOUT_LOG: ShortcutWorkoutCandidate;
+};
+
+function createInsertRequest<TSheet extends keyof ShortcutInsertRecordMap>(
+  sheet: TSheet,
+  record: ShortcutInsertRecordMap[TSheet],
 ): InsertDataRequest {
   return {
     tool: 'insertData',
-    sheet: 'SLEEP_LOG',
+    sheet,
     record,
   };
 }
@@ -188,18 +194,35 @@ export function ingestShortcutPayload(
 ): CommandHandlingResult {
   const bodyCandidates = buildBodyCandidates(payload);
   const sleepCandidate = buildSleepCandidate(payload);
+  const workoutCandidate = buildWorkoutCandidate(payload);
 
-  if (bodyCandidates.length === 0 && !sleepCandidate) {
-    throw new Error('iOS shortcut payload does not contain body or sleep data');
+  if (bodyCandidates.length === 0 && !sleepCandidate && !workoutCandidate) {
+    throw new Error(
+      'iOS shortcut payload does not contain body, sleep, or workout data',
+    );
   }
 
-  const existingBodyEntries = listExistingBodyEntries(bodyCandidates);
-  const existingSleepEntries = listExistingSleepEntries(sleepCandidate);
+  const { bodyDateStamps, sleepDateStamps, workoutDateStamps } =
+    listCandidateDateStamps(bodyCandidates, sleepCandidate, workoutCandidate);
+  const existingBodyEntries = listExistingEntriesByDateStamps(
+    bodyDateStamps,
+    (date) => bodyLogTable.listByDate(date),
+  );
+  const existingSleepEntries = listExistingEntriesByDateStamps(
+    sleepDateStamps,
+    (date) => sleepLogTable.listByDate(date),
+  );
+  const existingWorkoutEntries = listExistingEntriesByDateStamps(
+    workoutDateStamps,
+    (date) => workoutLogTable.listByDate(date),
+  );
   const counts: ShortcutIngestionCounts = {
     bodyInserted: 0,
     bodySkipped: 0,
     sleepInserted: 0,
     sleepSkipped: 0,
+    workoutInserted: 0,
+    workoutSkipped: 0,
   };
 
   bodyCandidates.forEach((candidate) => {
@@ -214,7 +237,7 @@ export function ingestShortcutPayload(
       return;
     }
 
-    executeInsertData(createBodyInsertRequest(candidate), timestamp);
+    executeInsertData(createInsertRequest('BODY_LOG', candidate), timestamp);
     counts.bodyInserted += 1;
   });
 
@@ -229,13 +252,36 @@ export function ingestShortcutPayload(
     if (duplicate) {
       counts.sleepSkipped += 1;
     } else {
-      executeInsertData(createSleepInsertRequest(sleepCandidate), timestamp);
+      executeInsertData(
+        createInsertRequest('SLEEP_LOG', sleepCandidate),
+        timestamp,
+      );
       counts.sleepInserted += 1;
     }
   }
 
-  const insertedCount = counts.bodyInserted + counts.sleepInserted;
-  const skippedCount = counts.bodySkipped + counts.sleepSkipped;
+  if (workoutCandidate) {
+    const duplicate = existingWorkoutEntries.some(
+      (entry) =>
+        entry.occurred_at === workoutCandidate.occurred_at &&
+        entry.workout_name === workoutCandidate.workout_name,
+    );
+
+    if (duplicate) {
+      counts.workoutSkipped += 1;
+    } else {
+      executeInsertData(
+        createInsertRequest('WORKOUT_LOG', workoutCandidate),
+        timestamp,
+      );
+      counts.workoutInserted += 1;
+    }
+  }
+
+  const insertedCount =
+    counts.bodyInserted + counts.sleepInserted + counts.workoutInserted;
+  const skippedCount =
+    counts.bodySkipped + counts.sleepSkipped + counts.workoutSkipped;
 
   return {
     reply: `iOS Shortcuts 数据已处理：新增 ${insertedCount} 条，跳过 ${skippedCount} 条。`,
@@ -247,6 +293,8 @@ export function ingestShortcutPayload(
       `body_skipped=${counts.bodySkipped}`,
       `sleep_inserted=${counts.sleepInserted}`,
       `sleep_skipped=${counts.sleepSkipped}`,
+      `workout_inserted=${counts.workoutInserted}`,
+      `workout_skipped=${counts.workoutSkipped}`,
     ].join('; '),
     traceId: '',
     intent: 'ios-shortcut-ingest',
