@@ -86,6 +86,21 @@ describe('handleCommand digest trigger commands', () => {
     expect(result.reply).toContain('测试日报已发送');
   });
 
+  it('returns a controlled failure reply when manual digest delivery fails', () => {
+    mocks.sendDailyDigestMessage.mockImplementation(() => {
+      throw new Error('Telegram sendMessage request failed (400)');
+    });
+
+    const result = handleCommand(
+      '/digesttest',
+      new Date('2026-04-02T12:00:00'),
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.resultCode).toBe('digest-test-failed');
+    expect(result.reply).toContain('日报测试发送失败');
+  });
+
   it('returns a reauthorization hint when digest trigger scope is missing', () => {
     mocks.installDailyDigestTrigger.mockImplementation(() => {
       throw new Error(

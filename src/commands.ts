@@ -70,6 +70,10 @@ function buildDigestAuthorizationReply(): string {
   return '日报定时需要额外授权后才能管理触发器。请在重新部署后，到 Apps Script 编辑器手动运行一次 digest 相关函数并完成授权，然后再试 /digeston。';
 }
 
+function buildDigestDeliveryFailureReply(): string {
+  return '日报测试发送失败。我刚刚已经尝试发送错误告警；请查看 BOT_LOG 或刚收到的错误消息。';
+}
+
 export function handleCommand(
   text: string,
   _timestamp: Date,
@@ -128,6 +132,18 @@ export function handleCommand(
           'failed',
           {
             resultCode: 'digest-trigger-auth-required',
+          },
+        );
+      }
+
+      if (normalizedText.startsWith(SLASH_COMMANDS.DIGEST_TEST)) {
+        return buildResult(
+          buildDigestDeliveryFailureReply(),
+          'command',
+          'digest-test-failed',
+          'failed',
+          {
+            resultCode: 'digest-test-failed',
           },
         );
       }

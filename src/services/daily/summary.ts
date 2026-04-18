@@ -17,10 +17,10 @@ type DailySummarySection = {
 
 function formatSectionAsHtml(section: string): string {
   const [heading, ...bodyLines] = section.split('\n');
-  const body = bodyLines.map((line) => escapeHtml(line)).join('<br>');
+  const body = bodyLines.map((line) => escapeHtml(line)).join('\n');
 
   return body
-    ? `<b>${escapeHtml(heading)}</b><br>${body}`
+    ? `<b>${escapeHtml(heading)}</b>\n${body}`
     : `<b>${escapeHtml(heading)}</b>`;
 }
 
@@ -62,7 +62,7 @@ export function buildDailySummaryHtmlMessage(timestamp: Date): string {
   const { sections, aiInsight } = buildDailySummarySections(timestamp);
 
   if (sections.length === 0) {
-    return '<b>📝 今日总结</b><br>今天还没有足够的数据可汇总。';
+    return '<b>📝 今日总结</b>\n今天还没有足够的数据可汇总。';
   }
 
   return [

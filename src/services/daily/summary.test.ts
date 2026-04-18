@@ -219,10 +219,10 @@ describe('daily summary', () => {
 
     expect(result).toContain('<b>📋 今日总结 2026-04-02</b>');
     expect(result).toContain(
-      '<b>🍽️ 饮食</b><br>今天共记录 2 餐，热量约 840 kcal。',
+      '<b>🍽️ 饮食</b>\n今天共记录 2 餐，热量约 840 kcal。',
     );
     expect(result).toContain(
-      '<b>💡 灰二的观察</b><br>近几天 &lt;稳定&gt;，今天运动量中等。',
+      '<b>💡 灰二的观察</b>\n近几天 &lt;稳定&gt;，今天运动量中等。',
     );
   });
 
@@ -260,6 +260,6 @@ describe('daily summary', () => {
       new Date('2026-04-02T23:30:00'),
     );
 
-    expect(result).toBe('<b>📝 今日总结</b><br>今天还没有足够的数据可汇总。');
+    expect(result).toBe('<b>📝 今日总结</b>\n今天还没有足够的数据可汇总。');
   });
 });
