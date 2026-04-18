@@ -192,6 +192,7 @@ describe('daily summary', () => {
     expect(result).toContain('今天共 1 次，合计 35 分钟；项目 跑步。');
     expect(result).toContain('🩺 状态');
     expect(result).toContain('排便已记录。');
+    expect(mocks.buildDailyInsight).not.toHaveBeenCalled();
   });
 
   it('builds an HTML-rendered digest for Telegram formatting', () => {
@@ -215,6 +216,7 @@ describe('daily summary', () => {
 
     const result = buildDailySummaryHtmlMessage(
       new Date('2026-04-02T23:30:00'),
+      { includeAiInsight: true },
     );
 
     expect(result).toContain('<b>📋 今日总结 2026-04-02</b>');
@@ -247,6 +249,7 @@ describe('daily summary', () => {
 
     const result = buildDailySummaryHtmlMessage(
       new Date('2026-04-02T23:30:00'),
+      { includeAiInsight: true },
     );
 
     expect(result).toContain('💡 灰二的观察');

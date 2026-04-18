@@ -683,6 +683,9 @@ describe('sendDailyDigest', () => {
     sendDailyDigest();
 
     expect(mocks.sendDailyDigestMessage).toHaveBeenCalledTimes(1);
-    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledWith(expect.any(Date));
+    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledWith(
+      expect.any(Date),
+      { includeAiInsight: true },
+    );
   });
 });

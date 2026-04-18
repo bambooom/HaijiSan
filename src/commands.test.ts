@@ -81,6 +81,9 @@ describe('handleCommand digest trigger commands', () => {
     );
 
     expect(mocks.sendDailyDigestMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledWith(undefined, {
+      includeAiInsight: false,
+    });
     expect(result.status).toBe('success');
     expect(result.resultCode).toBe('digest-trigger-command');
     expect(result.reply).toContain('测试日报已发送');

@@ -54,6 +54,10 @@ export type TelegramResponseMeta = {
   pendingConfirmationId?: string;
 };
 
+export type DailyDigestOptions = {
+  includeAiInsight?: boolean;
+};
+
 export type CommandAuditFields = {
   toolCallCount: number;
   readCount: number;

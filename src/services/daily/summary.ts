@@ -9,6 +9,7 @@ import {
   statusLogTable,
   workoutLogTable,
 } from '../../tables';
+import type { DailyDigestOptions } from '../../types';
 import { formatDateLabel, escapeHtml } from '../../utils/value';
 
 type DailySummarySection = {
@@ -24,10 +25,14 @@ function formatSectionAsHtml(section: string): string {
     : `<b>${escapeHtml(heading)}</b>`;
 }
 
-function buildDailySummarySections(timestamp: Date): {
+function buildDailySummarySections(
+  timestamp: Date,
+  options: DailyDigestOptions = {},
+): {
   sections: DailySummarySection[];
   aiInsight: string | null;
 } {
+  const { includeAiInsight = false } = options;
   const nutritionSummary = getTodayNutritionSummary(timestamp);
   const bodySection = buildBodySection(timestamp);
   const sleepSection = buildSleepSection(timestamp);
@@ -48,7 +53,7 @@ function buildDailySummarySections(timestamp: Date): {
     .map((section) => section.text)
     .join('\n\n');
   const aiInsight =
-    sections.length > 0
+    includeAiInsight && sections.length > 0
       ? buildDailyInsight(timestamp, deterministicSummary)
       : null;
 
@@ -58,8 +63,11 @@ function buildDailySummarySections(timestamp: Date): {
   };
 }
 
-export function buildDailySummaryHtmlMessage(timestamp: Date): string {
-  const { sections, aiInsight } = buildDailySummarySections(timestamp);
+export function buildDailySummaryHtmlMessage(
+  timestamp: Date,
+  options: DailyDigestOptions = {},
+): string {
+  const { sections, aiInsight } = buildDailySummarySections(timestamp, options);
 
   if (sections.length === 0) {
     return '<b>📝 今日总结</b>\n今天还没有足够的数据可汇总。';

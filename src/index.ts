@@ -244,7 +244,7 @@ function doPost(
 }
 
 function sendDailyDigest(): void {
-  sendDailyDigestMessage(new Date());
+  sendDailyDigestMessage(new Date(), { includeAiInsight: true });
 }
 
 function installDailyDigestTrigger() {

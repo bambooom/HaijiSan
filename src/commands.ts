@@ -45,7 +45,7 @@ function buildDigestCommandReply(command: string): string {
   }
 
   if (command.startsWith(SLASH_COMMANDS.DIGEST_TEST)) {
-    sendDailyDigestMessage();
+    sendDailyDigestMessage(undefined, { includeAiInsight: false });
     return '🧪 测试日报已发送，请检查刚收到的日报消息。';
   }
 
