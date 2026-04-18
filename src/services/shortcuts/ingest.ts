@@ -1,7 +1,6 @@
 import { bodyLogTable, sleepLogTable, workoutLogTable } from '../../tables';
 import { executeInsertData } from '../../tools';
 import type {
-  BodyLogEntry,
   CommandHandlingResult,
   InsertDataRequest,
   ShortcutBodyCandidate,

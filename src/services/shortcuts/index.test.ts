@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   BodyLogEntry,
   InsertDataRequest,
+  InsertDataResult,
   SleepLogEntry,
   WorkoutLogEntry,
 } from '../../types';
@@ -10,7 +11,9 @@ const mocks = vi.hoisted(() => ({
   listBodyLogByDate: vi.fn<() => BodyLogEntry[]>(() => []),
   listSleepLogByDate: vi.fn<() => SleepLogEntry[]>(() => []),
   listWorkoutLogByDate: vi.fn<() => WorkoutLogEntry[]>(() => []),
-  executeInsertData: vi.fn((request: InsertDataRequest) => ({
+  executeInsertData: vi.fn<
+    (request: InsertDataRequest, timestamp?: Date) => InsertDataResult
+  >((request: InsertDataRequest) => ({
     tool: 'insertData',
     sheet: request.sheet,
     record: request.record,
@@ -295,30 +298,36 @@ describe('shortcuts ingestion', () => {
       new Date('2026-04-17T18:40:00+08:00'),
     );
 
-    expect(mocks.executeInsertData).toHaveBeenCalledWith(
-      {
-        tool: 'insertData',
-        sheet: 'WORKOUT_LOG',
-        record: expect.objectContaining({
-          occurred_at: '2026-04-17 10:02:35',
-          workout_name: 'Mixed Cardio',
-          workout_video_url: 'https://b23.tv/example',
-          workout_level: 'medium',
-          duration_min: 30.9,
-          avg_hr: 113,
-          max_hr: 136,
-          min_hr: 71,
-          calories_kcal: 128,
-        }),
-      },
-      new Date('2026-04-17T18:40:00+08:00'),
+    const firstInsertCall = mocks.executeInsertData.mock.calls[0];
+
+    expect(firstInsertCall).toBeDefined();
+
+    if (!firstInsertCall) {
+      throw new Error('expected executeInsertData to be called');
+    }
+
+    const [firstInsertRequest, firstInsertTimestamp] = firstInsertCall;
+    const insertedRecord = firstInsertRequest.record as Record<string, unknown>;
+
+    expect(firstInsertRequest.tool).toBe('insertData');
+    expect(firstInsertRequest.sheet).toBe('WORKOUT_LOG');
+    expect(firstInsertTimestamp).toEqual(new Date('2026-04-17T18:40:00+08:00'));
+    expect(insertedRecord.occurred_at).toBe('2026-04-17 10:02:35');
+    expect(insertedRecord.workout_name).toBe('Mixed Cardio');
+    expect(insertedRecord.workout_video_url).toBe('https://b23.tv/example');
+    expect(insertedRecord.workout_level).toBe('medium');
+    expect(insertedRecord.duration_min).toBe(30.9);
+    expect(insertedRecord.avg_hr).toBe(113);
+    expect(insertedRecord.max_hr).toBe(136);
+    expect(insertedRecord.min_hr).toBe(71);
+    expect(insertedRecord.calories_kcal).toBe(128);
+    expect(insertedRecord.note).toEqual(
+      expect.stringContaining(
+        'share_text=Mixed Cardio 跟练视频 https://b23.tv/example',
+      ),
     );
     expect(result.resultCode).toBe('ios-shortcut-ingested');
     expect(result.note).toContain('workout_inserted=1');
-    expect(
-      (mocks.executeInsertData.mock.calls[0]?.[0] as InsertDataRequest).record
-        .note,
-    ).toContain('share_text=Mixed Cardio 跟练视频 https://b23.tv/example');
   });
 
   it('skips workout records that already exist by occurred_at and workout_name', () => {
