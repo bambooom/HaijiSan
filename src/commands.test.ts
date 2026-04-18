@@ -14,12 +14,17 @@ const mocks = vi.hoisted(() => ({
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   getDailyDigestTriggerStatus: vi.fn(),
+  sendDailyDigestMessage: vi.fn(),
 }));
 
 vi.mock('./services/daily/trigger', () => ({
   installDailyDigestTrigger: mocks.installDailyDigestTrigger,
   disableDailyDigestTrigger: mocks.disableDailyDigestTrigger,
   getDailyDigestTriggerStatus: mocks.getDailyDigestTriggerStatus,
+}));
+
+vi.mock('./services/daily/send', () => ({
+  sendDailyDigestMessage: mocks.sendDailyDigestMessage,
 }));
 
 import { handleCommand } from './commands';
@@ -67,6 +72,18 @@ describe('handleCommand digest trigger commands', () => {
 
     expect(mocks.getDailyDigestTriggerStatus).toHaveBeenCalledTimes(1);
     expect(result.reply).toContain('日报定时当前未开启');
+  });
+
+  it('sends a manual test digest via slash command', () => {
+    const result = handleCommand(
+      '/digesttest',
+      new Date('2026-04-02T12:00:00'),
+    );
+
+    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('success');
+    expect(result.resultCode).toBe('digest-trigger-command');
+    expect(result.reply).toContain('测试日报已发送');
   });
 
   it('returns a reauthorization hint when digest trigger scope is missing', () => {

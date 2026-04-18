@@ -38,6 +38,26 @@ type SendTextOptions = {
   replyMarkup?: TelegramReplyMarkup;
 };
 
+function getTelegramResponseCode(response: {
+  getResponseCode?: () => number;
+}): number {
+  return typeof response.getResponseCode === 'function'
+    ? response.getResponseCode()
+    : 200;
+}
+
+function parseTelegramResponseBody(body: string): TelegramRequestResponse {
+  if (!body) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(body) as TelegramRequestResponse;
+  } catch {
+    throw new Error(`Telegram returned invalid JSON: ${body}`);
+  }
+}
+
 function toReplyMarkup(
   replyMarkup: TelegramReplyMarkup | undefined,
 ): TelegramApiReplyMarkup | undefined {
@@ -73,9 +93,23 @@ function postTelegramRequest(
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
+  const statusCode = getTelegramResponseCode(response);
   const body = response.getContentText();
+  const parsedBody = parseTelegramResponseBody(body);
 
-  return body ? (JSON.parse(body) as TelegramRequestResponse) : {};
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(
+      `Telegram ${endpoint} request failed (${statusCode}): ${parsedBody.description || body || 'empty response'}`,
+    );
+  }
+
+  if (parsedBody.ok === false) {
+    throw new Error(
+      `Telegram ${endpoint} request was rejected: ${parsedBody.description || 'unknown error'}`,
+    );
+  }
+
+  return parsedBody;
 }
 
 function postTelegramVoidRequest(endpoint: string, payload: object): void {

@@ -175,4 +175,17 @@ describe('downloadTelegramFile', () => {
       }),
     );
   });
+
+  it('throws when Telegram rejects sendMessage', () => {
+    mocks.fetch.mockReturnValue({
+      getResponseCode: () => 400,
+      getContentText: () =>
+        JSON.stringify({
+          ok: false,
+          description: 'Bad Request: chat not found',
+        }),
+    });
+
+    expect(() => sendText('missing-chat', 'hello')).toThrow('chat not found');
+  });
 });

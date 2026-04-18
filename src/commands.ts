@@ -8,6 +8,7 @@ import {
   getDailyDigestTriggerStatus,
   installDailyDigestTrigger,
 } from './services/daily/trigger';
+import { sendDailyDigestMessage } from './services/daily/send';
 import type {
   CommandHandlingResult,
   CommandLogFields,
@@ -23,6 +24,7 @@ ${SLASH_COMMANDS.HELP} - 再看一遍所有指令
 ${SLASH_COMMANDS.DIGEST_ON} - 开启每天接近 23:30 的日报定时
 ${SLASH_COMMANDS.DIGEST_OFF} - 关闭日报定时
 ${SLASH_COMMANDS.DIGEST_STATUS} - 查看日报定时当前是否已开启
+${SLASH_COMMANDS.DIGEST_TEST} - 立即手动发送一条测试日报
 `;
 
 function buildDigestCommandReply(command: string): string {
@@ -40,6 +42,11 @@ function buildDigestCommandReply(command: string): string {
     return status.enabled
       ? `日报定时仍存在 ${status.triggerCount} 个触发器，建议再检查一次。`
       : '🛑 日报定时已关闭，之后不会再自动发送。';
+  }
+
+  if (command.startsWith(SLASH_COMMANDS.DIGEST_TEST)) {
+    sendDailyDigestMessage();
+    return '🧪 测试日报已发送，请检查刚收到的日报消息。';
   }
 
   const status = getDailyDigestTriggerStatus();

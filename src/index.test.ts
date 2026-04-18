@@ -21,12 +21,11 @@ const mocks = vi.hoisted(() => ({
   attachConfirmationPreviewMessage: vi.fn(),
   sendChatAction: vi.fn(),
   sendText: vi.fn(),
+  sendDailyDigestMessage: vi.fn(),
   appendMessageLog: vi.fn(),
   cacheGet: vi.fn(),
   cachePut: vi.fn(),
   cacheRemove: vi.fn(),
-  buildDailySummaryMessage: vi.fn(() => 'digest'),
-  buildDailySummaryHtmlMessage: vi.fn(() => '<b>digest</b>'),
   installDailyDigestTrigger: vi.fn(),
   disableDailyDigestTrigger: vi.fn(),
   createHtmlOutput: vi.fn(() => ({ getContent: () => 'ok' })),
@@ -73,9 +72,8 @@ vi.mock('./tables', () => ({
   },
 }));
 
-vi.mock('./services/daily/summary', () => ({
-  buildDailySummaryMessage: mocks.buildDailySummaryMessage,
-  buildDailySummaryHtmlMessage: mocks.buildDailySummaryHtmlMessage,
+vi.mock('./services/daily/send', () => ({
+  sendDailyDigestMessage: mocks.sendDailyDigestMessage,
 }));
 
 vi.mock('./services/daily/trigger', () => ({
@@ -103,7 +101,7 @@ Object.assign(globalThis, {
   },
 });
 
-import { doPost } from './index';
+import { doPost, sendDailyDigest } from './index';
 
 function getAppendMessageLogResult(callIndex: number): {
   note?: string;
@@ -673,5 +671,18 @@ describe('doPost', () => {
       }),
     );
     expect(mocks.sendText).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendDailyDigest', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('delegates scheduled digest delivery to the shared daily service', () => {
+    sendDailyDigest();
+
+    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.sendDailyDigestMessage).toHaveBeenCalledWith(expect.any(Date));
   });
 });

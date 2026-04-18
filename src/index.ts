@@ -1,6 +1,6 @@
 import { X_HAIJI_SECRET, MY_CHAT_ID } from './app-config';
 import { processPendingImageOcrJobs } from './services/ocr/queue';
-import { buildDailySummaryHtmlMessage } from './services/daily/summary';
+import { sendDailyDigestMessage } from './services/daily/send';
 import {
   disableDailyDigestTrigger as disableDailyDigestTriggerService,
   installDailyDigestTrigger as installDailyDigestTriggerService,
@@ -244,7 +244,7 @@ function doPost(
 }
 
 function sendDailyDigest(): void {
-  sendText(MY_CHAT_ID, buildDailySummaryHtmlMessage(new Date()));
+  sendDailyDigestMessage(new Date());
 }
 
 function installDailyDigestTrigger() {
